@@ -9,7 +9,7 @@ Last updated: 2026-03-04
 | foundation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | embedding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | classification | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| telegram-bot | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
+| telegram-bot | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
 | web-auth | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-dashboard | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-browse | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -29,7 +29,9 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Classification complete.** All 6 phases done, 50/50 tests pass (33 unit + 17 integration), review report at `classification-implementation-review.md`. CRITICAL-1 (dead threshold code) fixed. 6 WARNINGs remain (non-blocking). Implementation: `src/classify.ts`, `src/llm/index.ts`, `src/sleep.ts`, `prompts/classify.md`.
 
-Next: **telegram-bot** — Phase 4 (test implementation). Install `grammy`, create `tests/helpers/mock-telegram.ts`, then implement 47 unit + 23 integration tests per `telegram-bot-test-implementation-specification.md`.
+**Telegram Bot Phase 4 complete.** 70 tests implemented (47 unit + 23 integration), all failing with `ERR_MODULE_NOT_FOUND` as expected (`src/telegram.ts` doesn't exist yet). Files: `tests/unit/telegram-bot.test.ts`, `tests/integration/telegram-bot-integration.test.ts`, `tests/helpers/mock-telegram.ts`. Dependency `grammy` installed.
+
+Next: **telegram-bot** — Phase 5 (feature implementation). Create `src/telegram.ts` with handler functions (`handleTextMessage`, `handleVoiceMessage`, `handleCallbackQuery`, `handleFixCommand`, `startBot`, `createBotWithHandlers`) to make all 70 tests pass. Also add `reclassifyEntry` to `src/classify.ts`.
 
 ## Spec Files
 
