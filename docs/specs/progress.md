@@ -8,8 +8,8 @@ Last updated: 2026-03-04
 |---------|:---:|:---:|:---:|:---:|:---:|:---:|
 | foundation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | embedding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| classification | ✅ | ✅ | ✅ | ✅ | ✅ | ⬜ |
-| telegram-bot | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| classification | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| telegram-bot | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
 | web-auth | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-dashboard | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-browse | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -27,9 +27,9 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Embedding complete.** All 6 phases done, 26/26 tests pass (16 unit + 10 integration), review report at `embedding-implementation-review.md`. Implementation: `src/embed.ts` exports `generateEmbedding`, `prepareEmbeddingInput`, `initializeEmbedding`, `retryFailedEmbeddings`, `embedEntry`.
 
-**Classification Phase 5 complete.** All 50 classification tests pass (33 unit + 17 integration). Implementation: `src/classify.ts` (pure helpers + DB functions + LLM classification), `src/llm/index.ts` (provider abstraction with Anthropic + OpenAI-compatible backends), `src/sleep.ts` (mockable delay utility), `prompts/classify.md` (classification prompt template).
+**Classification complete.** All 6 phases done, 50/50 tests pass (33 unit + 17 integration), review report at `classification-implementation-review.md`. CRITICAL-1 (dead threshold code) fixed. 6 WARNINGs remain (non-blocking). Implementation: `src/classify.ts`, `src/llm/index.ts`, `src/sleep.ts`, `prompts/classify.md`.
 
-Next: **Classification** — Phase 6 (review). Then proceed to **telegram-bot** Phase 2 (test specification).
+Next: **telegram-bot** — Phase 4 (test implementation). Install `grammy`, create `tests/helpers/mock-telegram.ts`, then implement 47 unit + 23 integration tests per `telegram-bot-test-implementation-specification.md`.
 
 ## Spec Files
 
@@ -38,7 +38,7 @@ Next: **Classification** — Phase 6 (review). Then proceed to **telegram-bot** 
 | foundation | `foundation-specification.md`, `foundation-test-specification.md`, `foundation-test-implementation-specification.md` |
 | embedding | `embedding-specification.md`, `embedding-test-specification.md`, `embedding-test-implementation-specification.md` |
 | classification | `classification-specification.md`, `classification-test-specification.md`, `classification-test-implementation-specification.md` |
-| telegram-bot | `telegram-bot-specification.md` |
+| telegram-bot | `telegram-bot-specification.md`, `telegram-bot-test-specification.md`, `telegram-bot-test-implementation-specification.md` |
 | web-auth | `web-auth-specification.md` |
 | web-dashboard | `web-dashboard-specification.md` |
 | web-browse | `web-browse-specification.md` |

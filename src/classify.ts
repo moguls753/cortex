@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { createLLMProvider } from "./llm/index.js";
 import { generateEmbedding } from "./embed.js";
 import { createLogger } from "./logger.js";
-import { resolveConfigValue } from "./config.js";
 import { sleep } from "./sleep.js";
 
 const log = createLogger("classify");
@@ -319,10 +318,6 @@ export async function classifyEntry(
     log.error("Failed to load classification prompt template");
     return;
   }
-
-  // Read threshold from settings
-  const thresholdStr = await resolveConfigValue("confidence_threshold", sql);
-  const _threshold = resolveConfidenceThreshold(thresholdStr ?? undefined);
 
   // Format context
   const contextStr = formatContextEntries(
