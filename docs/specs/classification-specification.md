@@ -36,42 +36,42 @@ The Classification feature integrates with a configurable LLM provider (Anthropi
 
 **US-4: As a system, I want classification failures to degrade gracefully so that no thought is lost.**
 
-- AC-4.1: If the Claude API returns an error (timeout, rate limit 429, server error 5xx, network error), the entry is stored with `category: null` and `confidence: null`. The raw input text is preserved in the `content` field.
+- AC-4.1: If the LLM API returns an error (timeout, rate limit 429, server error 5xx, network error), the entry is stored with `category: null` and `confidence: null`. The raw input text is preserved in the `content` field.
 - AC-4.2: Entries with `category: null` are displayed on the web dashboard with an "unclassified" label, visually distinct from categorized entries.
 - AC-4.3: A cron job runs periodically and retries classification for all entries where `category IS NULL` and `deleted_at IS NULL`. Successfully classified entries are updated with the returned category, name, fields, tags, and confidence.
 - AC-4.4: Classification errors are logged with structured context: API response code, error message, entry ID, and the input text length.
 
 ## Constraints
 
-- **Technical:** The Claude API is the only external (non-self-hosted) dependency. All classification requests go through the official Anthropic SDK for TypeScript.
+- **Technical:** Classification uses the LLM provider abstraction (`src/llm/`). Two implementations: Anthropic SDK (`@anthropic-ai/sdk`) and OpenAI-compatible SDK (`openai` — covers LM Studio, Ollama chat, OpenAI, etc.). The provider is determined by the `llm_provider` setting.
 - **Technical:** The classification prompt is stored in `prompts/classify.md` and loaded at runtime. Changes to the prompt file take effect on the next classification request without requiring a restart.
-- **Technical:** Claude's response must be pure JSON with no markdown fencing, no explanatory text, and no trailing content. The prompt explicitly instructs "Return ONLY valid JSON. No explanation. No markdown."
-- **Technical:** The `create_calendar_event` and `calendar_date` fields from Claude's response are ephemeral. They are used to trigger Google Calendar event creation (if configured) but are NOT stored in the database.
-- **Operational:** Claude API rate limits apply. The system should respect rate limit headers and implement exponential backoff on 429 responses during retry cron runs.
+- **Technical:** The LLM's response must be pure JSON with no markdown fencing, no explanatory text, and no trailing content. The prompt explicitly instructs "Return ONLY valid JSON. No explanation. No markdown."
+- **Technical:** The `create_calendar_event` and `calendar_date` fields from the LLM's response are ephemeral. They are used to trigger Google Calendar event creation (if configured) but are NOT stored in the database.
+- **Operational:** LLM API rate limits apply. The system should respect rate limit headers and implement exponential backoff on 429 responses during retry cron runs.
 - **Business:** Classification always produces exactly one category. Multi-category classification is not supported.
 - **Business:** The five categories (people, projects, tasks, ideas, reference) are fixed and not user-configurable.
 
 ## Edge Cases
 
 - **Confidence exactly at threshold (0.6):** An entry with `confidence` equal to the threshold (e.g., exactly 0.6 when threshold is 0.6) is treated as "confident" (greater-than-or-equal comparison).
-- **Claude returns a category not in the allowed list:** Schema validation catches this. The entry is treated as a classification failure and stored with `category: null`.
-- **Claude returns malformed JSON (truncated response):** JSON parsing fails. The entry is stored with `category: null` and the error is logged with the raw response body for debugging.
-- **Claude API rate limit (429 response):** The entry is stored with `category: null`. The retry cron will attempt classification again. During cron retries, the system implements exponential backoff if it encounters consecutive 429 responses.
-- **Very short input ("Hi"):** The system still sends it to Claude for classification. Claude should return a category (likely `reference` or `ideas`) with an appropriately low confidence score.
-- **Very long input (thousands of words):** The system sends the full text to Claude. If the input exceeds Claude's context window, the API returns an error. The system should truncate the `content` portion of the prompt (preserving the classification instructions and context entries) to fit within the model's token limit.
-- **Input in German:** Claude supports German. The classification prompt is in English, but Claude can classify German input and return English category names and tags. The `name` field may be in the input language.
-- **Input with no clear category:** Claude should still return a classification with a low confidence score (below threshold). The entry is flagged for user review.
+- **LLM returns a category not in the allowed list:** Schema validation catches this. The entry is treated as a classification failure and stored with `category: null`.
+- **LLM returns malformed JSON (truncated response):** JSON parsing fails. The entry is stored with `category: null` and the error is logged with the raw response body for debugging.
+- **LLM API rate limit (429 response):** The entry is stored with `category: null`. The retry cron will attempt classification again. During cron retries, the system implements exponential backoff if it encounters consecutive 429 responses.
+- **Very short input ("Hi"):** The system still sends it to the LLM for classification. The LLM should return a category (likely `reference` or `ideas`) with an appropriately low confidence score.
+- **Very long input (thousands of words):** The system sends the full text to the LLM. If the input exceeds the model's context window, the API returns an error. The system should truncate the `content` portion of the prompt (preserving the classification instructions and context entries) to fit within the model's token limit.
+- **Input in German:** The classification prompt is in English, but the LLM can classify German input and return English category names and tags. The `name` field may be in the input language.
+- **Input with no clear category:** The LLM should still return a classification with a low confidence score (below threshold). The entry is flagged for user review.
 - **Context entries are empty (brand new system with no entries):** The `{context_entries}` placeholder is replaced with a note like "No existing entries yet." Classification proceeds without context. This is the normal state on first use.
 - **Duplicate context entries (same entry appears in both recent and similar results):** Context entries are deduplicated by entry ID before formatting. Each entry appears at most once in the prompt.
-- **Claude returns confidence as a string instead of a number:** Schema validation catches type mismatches. If the value is a numeric string (e.g., "0.85"), the system coerces it to a number. If it is not numeric, classification is treated as failed.
+- **LLM returns confidence as a string instead of a number:** Schema validation catches type mismatches. If the value is a numeric string (e.g., "0.85"), the system coerces it to a number. If it is not numeric, classification is treated as failed.
 - **Settings table has `confidence_threshold` set to an invalid value (e.g., negative or > 1.0):** The system clamps the threshold to the valid range [0.0, 1.0] and logs a warning.
 
 ## Non-Goals
 
-- **Using any LLM other than Claude for classification:** Ollama or other local models are not used for classification. Only the Claude API is used, via the model specified in configuration.
-- **Storing the raw Claude API response:** Only the parsed and validated fields are stored. The raw API response is not persisted, though it may be logged at debug level for troubleshooting.
+- **Using embedding-only models for classification:** Ollama's embedding models (e.g., snowflake-arctic-embed2) are not used for classification. Classification requires a chat/instruct LLM via the provider abstraction.
+- **Storing the raw LLM API response:** Only the parsed and validated fields are stored. The raw API response is not persisted, though it may be logged at debug level for troubleshooting.
 - **Re-classifying entries automatically when the prompt changes:** Editing the classification prompt does not trigger re-classification of existing entries. Only new entries and entries with `category: null` go through classification.
-- **Classifying into multiple categories:** Every entry gets exactly one category. An entry about a person working on a project is classified into whichever category Claude deems most relevant, following the decision tree (person-first, then project, then task, then idea, then reference).
+- **Classifying into multiple categories:** Every entry gets exactly one category. An entry about a person working on a project is classified into whichever category the LLM deems most relevant, following the decision tree (person-first, then project, then task, then idea, then reference).
 - **Custom categories beyond the five defined ones:** The category list is hardcoded. Users cannot add, remove, or rename categories.
 - **Automatic re-classification when entry content is edited:** If a user edits an entry's content in the webapp, the existing category is preserved. The user can manually change the category or use the "AI Suggest" button, but the system does not automatically re-classify.
 
