@@ -13,9 +13,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@hono/node-server": "^1.19.11",
     "drizzle-orm": "^0.39.0",
     "grammy": "^1.41.1",
     "hono": "^4.7.0",
+    "openai": "^6.25.0",
     "postgres": "^3.4.0"
   },
   "devDependencies": {

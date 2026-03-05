@@ -173,7 +173,7 @@ export async function getRecentEntries(
     ORDER BY created_at DESC
     LIMIT 5
   `;
-  return rows as Array<{ id: string; name: string; category: string | null; content: string | null }>;
+  return rows as unknown as Array<{ id: string; name: string; category: string | null; content: string | null }>;
 }
 
 export async function getSimilarEntries(
@@ -194,7 +194,7 @@ export async function getSimilarEntries(
     ORDER BY similarity DESC
     LIMIT 3
   `;
-  return rows as Array<{ id: string; name: string; category: string | null; content: string | null }>;
+  return rows as unknown as Array<{ id: string; name: string; category: string | null; content: string | null }>;
 }
 
 export async function assembleContext(

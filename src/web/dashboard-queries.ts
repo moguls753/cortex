@@ -96,7 +96,7 @@ export async function insertEntry(
       ${(data.content as string) ?? null},
       ${(data.category as string) ?? null},
       ${(data.confidence as number) ?? null},
-      ${data.fields ?? {}},
+      ${sql.json((data.fields ?? {}) as unknown as Parameters<typeof sql.json>[0])},
       ${(data.tags as string[]) ?? []},
       ${(data.source as string) ?? "webapp"},
       ${(data.source_type as string) ?? "text"}

@@ -57,9 +57,7 @@ Web Editor ────┘           ├── Ollama
 
 ## Quick Start
 
-> **Note:** Deployment files (Dockerfile, docker-compose.yml, .env.example) are not yet implemented. The planned setup is described below.
-
-The planned deployment uses Docker Compose with four services: the app, PostgreSQL with pgvector, Ollama for embeddings, and faster-whisper for voice transcription.
+Docker Compose runs four services: the app, PostgreSQL with pgvector, Ollama for embeddings, and faster-whisper for voice transcription.
 
 ```bash
 git clone <repo-url> && cd cortex

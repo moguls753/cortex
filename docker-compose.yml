@@ -1,0 +1,67 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-cortex}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:-cortex}
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-snowflake-arctic-embed2}
+      - WHISPER_URL=http://whisper:8000
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - LLM_API_KEY
+      - LLM_MODEL=${LLM_MODEL:-claude-sonnet-4-20250514}
+      - LLM_BASE_URL
+      - TELEGRAM_BOT_TOKEN
+      - TELEGRAM_CHAT_ID
+      - WEBAPP_PASSWORD
+      - SESSION_SECRET
+      - SMTP_HOST
+      - SMTP_PORT
+      - SMTP_USER
+      - SMTP_PASS
+      - DIGEST_EMAIL_TO
+      - DIGEST_EMAIL_FROM=${DIGEST_EMAIL_FROM:-${SMTP_USER}}
+      - DAILY_DIGEST_CRON=${DAILY_DIGEST_CRON:-30 7 * * *}
+      - WEEKLY_DIGEST_CRON=${WEEKLY_DIGEST_CRON:-0 16 * * 0}
+      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.6}
+      - TZ=${TZ:-Europe/Berlin}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      whisper:
+        condition: service_started
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cortex}
+      POSTGRES_USER: ${POSTGRES_USER:-cortex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cortex}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama_data:/root/.ollama
+
+  whisper:
+    image: fedirz/faster-whisper-server:latest
+    environment:
+      WHISPER__MODEL: medium
+      WHISPER__DEVICE: cpu
+    volumes:
+      - whisper_data:/root/.cache/huggingface
+
+volumes:
+  postgres_data:
+  ollama_data:
+  whisper_data:

@@ -12,7 +12,7 @@ Last updated: 2026-03-05
 | telegram-bot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-browse | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
+| web-browse | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
 | web-entry | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-new-note | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-settings | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -55,7 +55,11 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web Browse Phase 2 complete.** Test specification with 33 scenarios derived from behavioral spec. Full traceability: all acceptance criteria, constraints, edge cases, and 4 resolved questions covered across 6 groups (category browsing, semantic search, text search, tag filtering, constraints, edge cases). Resolved: fallback notice shown, query params + reload, single tag selection + deselect, max 10 tags with collapse. Review: split TS-5.3 (two-When violation), added tag deselect scenario (TS-4.6), fixed constraint numbering.
 
-Next: **web-browse** — Phase 3 (test implementation specification). Run `spec-dd web-browse` to continue.
+**Web Browse Phase 3 complete.** Test implementation specification with all 33 scenarios mapped to test functions. Split: 20 unit tests (mocked query layer + embedding) + 13 integration tests (testcontainers + pgvector). Key decisions: factory pattern `createBrowseRoutes(sql)`, query module `browse-queries.ts` with `browseEntries`, `semanticSearch`, `textSearch`, `getFilterTags`. Embedding handled at handler level via `generateEmbedding` from `src/embed.ts`. Controlled similarity testing via unit vector embeddings (`createQueryEmbedding`, `createSimilarEmbedding`, `createDissimilarEmbedding`). Text search uses `mode=text` query param to bypass semantic.
+
+**Deployment scaffolding complete.** Created `src/index.ts` (entry point wiring Hono server, DB, auth, dashboard, SSE, Telegram bot), `docker-compose.yml` (4 services: app, PostgreSQL+pgvector, Ollama, faster-whisper), `Dockerfile` (multi-stage node:22-slim), `.env.example`. Installed `@hono/node-server`, `@anthropic-ai/sdk`, `openai`. Fixed pre-existing type errors in `classify.ts` and `dashboard-queries.ts` so `npm run build` succeeds. App is now runnable via `docker compose up`. 234/234 tests passing.
+
+Next: **web-browse** — Phase 4 (test implementation). Run `spec-dd web-browse` to continue.
 
 ## Spec Files
 
@@ -67,7 +71,7 @@ Next: **web-browse** — Phase 3 (test implementation specification). Run `spec-
 | telegram-bot | `telegram-bot-specification.md`, `telegram-bot-test-specification.md`, `telegram-bot-test-implementation-specification.md` |
 | web-auth | `web-auth-specification.md`, `web-auth-test-specification.md`, `web-auth-test-implementation-specification.md` |
 | web-dashboard | `web-dashboard-specification.md`, `web-dashboard-test-specification.md`, `web-dashboard-test-implementation-specification.md` |
-| web-browse | `web-browse-specification.md`, `web-browse-test-specification.md` |
+| web-browse | `web-browse-specification.md`, `web-browse-test-specification.md`, `web-browse-test-implementation-specification.md` |
 | web-entry | `web-entry-specification.md` |
 | web-new-note | `web-new-note-specification.md` |
 | web-settings | `web-settings-specification.md` |
