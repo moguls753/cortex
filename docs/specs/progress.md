@@ -1,6 +1,6 @@
 # Spec-DD Progress Tracker
 
-Last updated: 2026-03-04
+Last updated: 2026-03-05
 
 ## Feature Status
 
@@ -9,7 +9,7 @@ Last updated: 2026-03-04
 | foundation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | embedding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | classification | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| telegram-bot | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
+| telegram-bot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-auth | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-dashboard | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-browse | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -31,7 +31,11 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Telegram Bot Phase 4 complete.** 70 tests implemented (47 unit + 23 integration), all failing with `ERR_MODULE_NOT_FOUND` as expected (`src/telegram.ts` doesn't exist yet). Files: `tests/unit/telegram-bot.test.ts`, `tests/integration/telegram-bot-integration.test.ts`, `tests/helpers/mock-telegram.ts`. Dependency `grammy` installed.
 
-Next: **telegram-bot** — Phase 5 (feature implementation). Create `src/telegram.ts` with handler functions (`handleTextMessage`, `handleVoiceMessage`, `handleCallbackQuery`, `handleFixCommand`, `startBot`, `createBotWithHandlers`) to make all 70 tests pass. Also add `reclassifyEntry` to `src/classify.ts`.
+**Telegram Bot Phase 5 complete.** All 70 tests pass (47 unit + 23 integration). Implementation: `src/telegram.ts` exports `handleTextMessage`, `handleVoiceMessage`, `handleCallbackQuery`, `handleFixCommand`, `startBot`, `createBotWithHandlers`. Added `reclassifyEntry` to `src/classify.ts`. Total: 178/178 tests passing across all features.
+
+**Telegram Bot complete.** All 6 phases done, 70/70 tests pass (47 unit + 23 integration), review report at `telegram-bot-implementation-review.md`. 1 CRITICAL fixed during review (context-aware classification was missing from handlers). 1 WARNING fixed (auth check ordering in /fix). 1 WARNING remains (non-blocking): `/fix` doesn't filter by sender chat ID — acceptable for single-user, needs schema change for multi-user.
+
+Next: **web-auth** — Phase 2 (test specification). Run `/spec-dd:test web-auth` to derive test scenarios from the behavioral spec.
 
 ## Spec Files
 

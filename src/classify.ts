@@ -225,7 +225,10 @@ export async function assembleContext(
 
 export async function classifyText(
   text: string,
-  options?: { entryId?: string },
+  options?: {
+    entryId?: string;
+    contextEntries?: Array<{ name: string; category: string | null; content: string | null }>;
+  },
 ): Promise<{
   category: string | null;
   name: string | null;
@@ -257,7 +260,18 @@ export async function classifyText(
     inputText = inputText.substring(0, MAX_INPUT_LENGTH);
   }
 
-  const prompt = assemblePrompt(template, "", inputText);
+  // Format context entries if provided
+  const contextStr = options?.contextEntries
+    ? formatContextEntries(
+        options.contextEntries.map((e) => ({
+          name: e.name,
+          category: e.category ?? "unclassified",
+          content: e.content,
+        })),
+      )
+    : "";
+
+  const prompt = assemblePrompt(template, contextStr, inputText);
 
   let response: string;
   try {
@@ -472,4 +486,62 @@ export async function retryFailedClassifications(
       WHERE id = ${id}
     `;
   }
+}
+
+// ---------------------------------------------------------------------------
+// reclassifyEntry — re-classify with correction context
+// ---------------------------------------------------------------------------
+
+export async function reclassifyEntry(
+  content: string,
+  correctionCategory: string | null,
+  correctionText: string,
+): Promise<{
+  category: string;
+  name: string;
+  confidence: number;
+  fields: Record<string, unknown>;
+  tags: string[];
+} | null> {
+  const provider = createLLMProvider({
+    provider: process.env.LLM_PROVIDER || "anthropic",
+    apiKey: process.env.LLM_API_KEY || "",
+    model: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
+    baseUrl: process.env.LLM_BASE_URL || undefined,
+  });
+
+  let template: string;
+  try {
+    template = await loadPromptTemplate();
+  } catch {
+    log.error("Failed to load classification prompt template for reclassify");
+    return null;
+  }
+
+  const correctionContext = correctionCategory
+    ? `\n\nUser correction: The user has indicated this should be categorized as "${correctionCategory}". ${correctionText}`
+    : `\n\nUser correction: ${correctionText}`;
+
+  const inputText = content + correctionContext;
+  const prompt = assemblePrompt(template, "", inputText);
+
+  let response: string;
+  try {
+    response = await provider.chat(prompt);
+  } catch (error) {
+    const err = error as Error;
+    log.error("Reclassification LLM request failed", { error: err.message });
+    return null;
+  }
+
+  const validated = validateClassificationResponse(response);
+  if (!validated) return null;
+
+  return {
+    category: validated.category,
+    name: validated.name,
+    confidence: validated.confidence,
+    fields: validated.fields,
+    tags: validated.tags,
+  };
 }
