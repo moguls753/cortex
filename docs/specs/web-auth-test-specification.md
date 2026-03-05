@@ -413,7 +413,7 @@ For login authentication, the following decision table enumerates the combinatio
 
 All acceptance criteria (AC-1.1 through AC-3.1), all constraints (C-1 through C-6), all edge cases (EC-1 through EC-5), and both resolved questions (RQ-1, RQ-2) have at least one corresponding test scenario.
 
-**Total scenarios:** 22
+**Total scenarios:** 25
 
 ## Orphan Check
 
