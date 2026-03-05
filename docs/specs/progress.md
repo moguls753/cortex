@@ -11,8 +11,8 @@ Last updated: 2026-03-05
 | classification | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | telegram-bot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-dashboard | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
-| web-browse | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| web-dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| web-browse | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-entry | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-new-note | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-settings | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -51,7 +51,11 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web Dashboard Phase 4 complete.** 31 tests implemented (22 unit + 9 integration), 29 failing against stubs as expected, 2 passing (TS-6.2/TS-6.3 auth middleware enforcement — already implemented). Files: `tests/unit/web-dashboard.test.ts`, `tests/integration/web-dashboard-integration.test.ts`. Stubs: `src/web/dashboard.ts`, `src/web/dashboard-queries.ts`, `src/web/sse.ts` (SSE broadcaster fully implemented). Key decisions: `classifyText` (not `classifyEntry`) for capture pipeline, `insertEntry` in dashboard-queries for mockable DB inserts, TS-4.3 moved from integration to unit (only checks 2xx response). Total: 144/164 unit tests passing, 61/70 integration tests passing across all features.
 
-Next: **web-dashboard** — Phase 5 (feature implementation). Run `spec-dd web-dashboard` to continue.
+**Web Dashboard complete.** All 6 phases done, 31/31 tests pass (22 unit + 9 integration), review report at `web-dashboard-implementation-review.md`. 0 CRITICAL findings. All 3 WARNINGs and 1 INFO resolved: context-aware classification wired via `assembleContext`, client-side SSE DOM manipulation for all 4 event types (no reload), markdown rendering for digest. Implementation: `src/web/dashboard.ts`, `src/web/dashboard-queries.ts`, `src/web/layout.ts`. Total: 234/234 tests passing across all features.
+
+**Web Browse Phase 2 complete.** Test specification with 33 scenarios derived from behavioral spec. Full traceability: all acceptance criteria, constraints, edge cases, and 4 resolved questions covered across 6 groups (category browsing, semantic search, text search, tag filtering, constraints, edge cases). Resolved: fallback notice shown, query params + reload, single tag selection + deselect, max 10 tags with collapse. Review: split TS-5.3 (two-When violation), added tag deselect scenario (TS-4.6), fixed constraint numbering.
+
+Next: **web-browse** — Phase 3 (test implementation specification). Run `spec-dd web-browse` to continue.
 
 ## Spec Files
 
@@ -63,7 +67,7 @@ Next: **web-dashboard** — Phase 5 (feature implementation). Run `spec-dd web-d
 | telegram-bot | `telegram-bot-specification.md`, `telegram-bot-test-specification.md`, `telegram-bot-test-implementation-specification.md` |
 | web-auth | `web-auth-specification.md`, `web-auth-test-specification.md`, `web-auth-test-implementation-specification.md` |
 | web-dashboard | `web-dashboard-specification.md`, `web-dashboard-test-specification.md`, `web-dashboard-test-implementation-specification.md` |
-| web-browse | `web-browse-specification.md` |
+| web-browse | `web-browse-specification.md`, `web-browse-test-specification.md` |
 | web-entry | `web-entry-specification.md` |
 | web-new-note | `web-new-note-specification.md` |
 | web-settings | `web-settings-specification.md` |

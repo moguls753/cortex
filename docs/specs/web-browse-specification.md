@@ -73,9 +73,9 @@ Allow browsing, filtering, and searching entries by category, tags, semantic mea
 - Advanced query syntax (boolean operators, field-specific search).
 - Sorting options beyond the default `updated_at` descending (semantic search overrides with similarity ranking).
 
-## Open Questions
+## Resolved Questions
 
-- Should the text search fallback be silent (automatic) or should the user be notified that semantic search found nothing and text search was used instead?
-- Should filter changes trigger a full page reload or use client-side JavaScript to update results dynamically?
-- Should the tag filter support selecting multiple tags (AND: entries must have all selected tags, or OR: entries must have any selected tag)?
-- What is the maximum number of tags to display before collapsing into a "show more" control?
+- **Text search fallback notification:** Show a notice (e.g., "No semantic matches found, showing text results instead") so the user understands which search mode produced results.
+- **Filter interaction model:** Query parameters + full page reload. Filter state in URL (`?category=Projects&tag=budget&q=search+term`). Consistent with server-rendered approach, bookmarkable.
+- **Tag selection:** Single tag only. Clicking another tag switches the filter (not additive). Clicking the currently active tag deselects it (clears the tag filter). Keeps the UI simple; multi-tag can be added later.
+- **Tag display limit:** Show up to 10 tags, collapse the rest behind a "show more" control.
