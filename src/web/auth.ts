@@ -177,15 +177,113 @@ function renderLoginPage(error?: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - Cortex</title>
+  <title>Login — Cortex</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:            #ffffff;
+      --bg-off:        #f7f7f7;
+      --border:        #cccccc;
+      --border-strong: #333333;
+      --text:          #111111;
+      --text-mid:      #444444;
+      --text-muted:    #888888;
+      --text-faint:    #bbbbbb;
+      --font-serif:    "IBM Plex Serif", Georgia, serif;
+      --font-mono:     "JetBrains Mono", "Courier New", monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-off);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .login-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 360px;
+    }
+    .login-brand {
+      font-family: var(--font-serif);
+      font-size: 24px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      text-align: center;
+      margin-bottom: 40px;
+      color: var(--text);
+    }
+    .login-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 6px;
+    }
+    .login-input {
+      width: 100%;
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .login-input:focus {
+      border-color: var(--border-strong);
+    }
+    .login-button {
+      width: 100%;
+      margin-top: 20px;
+      padding: 10px 0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border-strong);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .login-button:hover {
+      background: var(--bg-off);
+    }
+    .login-error {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-mid);
+      text-align: center;
+      margin-bottom: 16px;
+    }
+  </style>
 </head>
 <body>
-  <form method="POST">
-    ${error ? `<p>${error}</p>` : ""}
-    <label for="password">Password</label>
-    <input type="password" id="password" name="password" required>
-    <button type="submit">Login</button>
-  </form>
+  <div class="login-card">
+    <div class="login-brand">Cortex</div>
+    ${error ? `<p class="login-error">${error}</p>` : ""}
+    <form method="POST">
+      <label class="login-label" for="password">Password</label>
+      <input class="login-input" type="password" id="password" name="password" required autofocus>
+      <button class="login-button" type="submit">Log in</button>
+    </form>
+  </div>
 </body>
 </html>`;
 }
