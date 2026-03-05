@@ -5,7 +5,7 @@
 | Feature | Web Auth |
 | Phase | 4 |
 | Date | 2026-03-03 |
-| Status | Draft |
+| Status | Final |
 
 ## Objective
 
@@ -20,6 +20,7 @@ Protect all web routes with cookie-based session authentication. Cortex is a sin
 - **AC-1.3:** On correct password, a session cookie is set (signed with `SESSION_SECRET`) and the user is redirected to `/`.
 - **AC-1.4:** On incorrect password, the login page is re-rendered with an error message (e.g., "Invalid password").
 - **AC-1.5:** The session cookie is `HttpOnly`, `Secure` (if HTTPS), `SameSite=Lax`.
+- **AC-1.6:** If the user is already authenticated, GET `/login` redirects to `/`.
 
 ### US-2: As a user, I want all routes except /login and /health to require authentication.
 
@@ -59,8 +60,12 @@ Protect all web routes with cookie-based session authentication. Cortex is a sin
 - Rate limiting on login attempts (can be added later if needed).
 - CSRF protection beyond SameSite cookies (SameSite=Lax provides baseline protection).
 
+## Resolved Questions
+
+- **Session expiration:** 30-day cookie max-age. User must re-authenticate after 30 days.
+- **Login page branding:** Minimal password form (branding deferred to frontend design phase).
+- **Failed login logging:** Yes — log failed login attempts with timestamp for security auditing.
+
 ## Open Questions
 
-- Should sessions have a fixed expiration (e.g., 30 days) or last indefinitely until logout?
-- Should the login page show any branding or just a minimal password form?
-- Should failed login attempts be logged with timestamps for security auditing?
+None.

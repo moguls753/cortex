@@ -10,7 +10,7 @@ Last updated: 2026-03-05
 | embedding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | classification | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | telegram-bot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-auth | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| web-auth | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-dashboard | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-browse | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-entry | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -35,7 +35,9 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Telegram Bot complete.** All 6 phases done, 70/70 tests pass (47 unit + 23 integration), review report at `telegram-bot-implementation-review.md`. 1 CRITICAL fixed during review (context-aware classification was missing from handlers). 1 WARNING fixed (auth check ordering in /fix). 1 WARNING remains (non-blocking): `/fix` doesn't filter by sender chat ID — acceptable for single-user, needs schema change for multi-user.
 
-Next: **web-auth** — Phase 2 (test specification). Run `/spec-dd:test web-auth` to derive test scenarios from the behavioral spec.
+**Web Auth Phase 2 complete.** Test specification with 21 scenarios derived from behavioral spec. Full traceability: all acceptance criteria, constraints, and edge cases covered. Resolved 3 open questions (30-day session expiry, failed login logging, authenticated user at /login redirects to /).
+
+Next: **web-auth** — Phase 3 (test implementation specification). Run `/spec-dd:test-impl web-auth` to map test scenarios to implementation approaches.
 
 ## Spec Files
 
@@ -45,7 +47,7 @@ Next: **web-auth** — Phase 2 (test specification). Run `/spec-dd:test web-auth
 | embedding | `embedding-specification.md`, `embedding-test-specification.md`, `embedding-test-implementation-specification.md` |
 | classification | `classification-specification.md`, `classification-test-specification.md`, `classification-test-implementation-specification.md` |
 | telegram-bot | `telegram-bot-specification.md`, `telegram-bot-test-specification.md`, `telegram-bot-test-implementation-specification.md` |
-| web-auth | `web-auth-specification.md` |
+| web-auth | `web-auth-specification.md`, `web-auth-test-specification.md` |
 | web-dashboard | `web-dashboard-specification.md` |
 | web-browse | `web-browse-specification.md` |
 | web-entry | `web-entry-specification.md` |
