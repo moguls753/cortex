@@ -10,8 +10,8 @@ Last updated: 2026-03-05
 | embedding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | classification | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | telegram-bot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-auth | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
-| web-dashboard | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| web-auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| web-dashboard | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-browse | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-entry | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-new-note | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -41,7 +41,13 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web Auth Phase 4 complete.** 25 tests implemented in `tests/unit/web-auth.test.ts` (all unit, no integration needed). 22 fail against stub, 3 pass (TS-4.1/TS-4.2 traceability + TS-2.5 noop bypass). Stub updated to factory pattern: `createAuthMiddleware(secret)` + `createAuthRoutes(password, secret)`. Health test updated for new API. Code review: 0 critical, 0 blocking issues.
 
-Next: **web-auth** — Phase 5 (feature implementation). Implement `src/web/auth.ts` to make all 25 tests pass.
+**Web Auth Phase 5 complete.** All 25 tests pass (25 unit, no integration needed). Implementation: `src/web/auth.ts` exports `createAuthMiddleware(secret)` and `createAuthRoutes(password, secret)`. Cookie-based sessions with HMAC-SHA256 signing, server-side expiry checking via embedded `issued_at`, 30-day max-age. Total: 142/142 unit tests passing across all features.
+
+**Web Auth complete.** All 6 phases done, 25/25 tests pass (all unit), review report at `web-auth-implementation-review.md`. 0 CRITICAL findings. 1 WARNING (non-blocking): `Secure` cookie flag not conditionally set for HTTPS — acceptable for Docker deployment, address when adding HTTPS. Implementation: `src/web/auth.ts` with HMAC-SHA256 cookie signing, `timingSafeEqual` verification, server-side 30-day expiry. Total: 203/203 tests passing across all features.
+
+**Web Dashboard Phase 2 complete.** Test specification with 30 scenarios derived from behavioral spec. Full traceability: all acceptance criteria, constraints, and edge cases covered across 7 groups (digest, entries, stats, capture, SSE, constraints, edge cases). Design doc at `docs/plans/2026-03-05-web-dashboard-design.md`.
+
+Next: **web-dashboard** — Phase 3 (test implementation specification). Run `spec-dd web-dashboard` to continue.
 
 ## Spec Files
 

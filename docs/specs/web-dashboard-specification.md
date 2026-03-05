@@ -5,7 +5,7 @@
 | Feature | Web Dashboard |
 | Phase | 4 |
 | Date | 2026-03-03 |
-| Status | Draft |
+| Status | Final |
 
 ## Objective
 
@@ -21,11 +21,12 @@ Serve as the user's browser start page. The dashboard shows today's digest, rece
 
 ### US-2: As a user, I want to see recent entries grouped by day.
 
-- **AC-2.1:** The dashboard shows entries from the last 7 days.
+- **AC-2.1:** The dashboard shows the 5 most recent entries (not soft-deleted).
 - **AC-2.2:** Entries are grouped by date with the most recent date first.
-- **AC-2.3:** Each entry shows: category icon/badge, name, tags, and relative time (e.g., "2h ago" or the time of day).
+- **AC-2.3:** Each entry shows: category badge, name, and relative time (e.g., "2h ago").
 - **AC-2.4:** Clicking an entry navigates to `/entry/:id` for the full view.
 - **AC-2.5:** Soft-deleted entries (where `deleted_at` is not null) are NOT shown.
+- **AC-2.6:** A "View all" link below the entries navigates to `/browse`.
 
 ### US-3: As a user, I want quick stats at a glance.
 
@@ -37,7 +38,7 @@ Serve as the user's browser start page. The dashboard shows today's digest, rece
 
 ### US-4: As a user, I want to quickly capture a thought from the dashboard.
 
-- **AC-4.1:** A text input is displayed at the top of the dashboard page. It accepts markdown text.
+- **AC-4.1:** A single-line text input is displayed on the dashboard page. It accepts plain text (longer notes go to `/new`).
 - **AC-4.2:** On submit (e.g., pressing Enter or clicking a submit button), the text is sent through the classification pipeline: classify with Claude (with context), generate embedding with Ollama, store in PostgreSQL with `source: 'webapp'`.
 - **AC-4.3:** The new entry appears in the recent entries list via SSE without a page refresh.
 - **AC-4.4:** The input is cleared after successful capture.
@@ -64,7 +65,7 @@ Serve as the user's browser start page. The dashboard shows today's digest, rece
 
 - **No entries yet (first-time use):** The recent entries section shows an empty state message (e.g., "No entries yet. Capture your first thought above or send a message via Telegram."). Stats show zeros.
 - **SSE connection drops:** The client-side JavaScript automatically reconnects to the SSE endpoint. The `EventSource` API handles reconnection natively. On reconnect, the page may need to fetch missed updates (or the user can refresh).
-- **Hundreds of entries in 7 days:** If the user captures many entries, the recent entries list could become long. Implement a "show more" mechanism or limit the initial display to the most recent 50 entries with a link to load more.
+- **Many entries:** Dashboard only shows the 5 most recent entries. The full list lives on `/browse`.
 - **Unclassified entries:** Entries where `category IS NULL` (Claude API failure during classification) are shown with an "unclassified" badge. They still appear in the recent entries list.
 - **Quick capture while Ollama is down:** The entry is saved without an embedding (`embedding: null`). The confirmation still shows the classification result. The embedding is retried by the background cron job.
 - **Quick capture while Claude API is down:** The entry is saved with `category: null` and `confidence: null`. It appears in the recent entries list with an "unclassified" badge.
@@ -80,9 +81,13 @@ Serve as the user's browser start page. The dashboard shows today's digest, rece
 - Dashboard widgets for calendar, weather, or external services.
 - Notification badges or unread counts.
 
+## Resolved Questions
+
+- **Quick capture input:** Single-line text field. Longer notes go to `/new`.
+- **SSE payload:** Full entry objects. Simpler client JS, no follow-up fetches.
+- **Digest collapsible?** No — always visible. It's the primary content.
+- **Max entries on dashboard:** 5 most recent. "View all" links to `/browse`.
+
 ## Open Questions
 
-- Should the quick capture input be a single-line text field or a multi-line textarea?
-- Should the SSE endpoint send full entry objects or just IDs (with the client fetching details)?
-- Should the digest section be collapsible or always expanded?
-- What is the maximum number of entries to show in the initial load before requiring "show more"?
+None.
