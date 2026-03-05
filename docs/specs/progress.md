@@ -10,7 +10,7 @@ Last updated: 2026-03-05
 | embedding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | classification | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | telegram-bot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-auth | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
+| web-auth | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
 | web-dashboard | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-browse | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-entry | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -39,7 +39,9 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web Auth Phase 3 complete.** Test implementation specification with all 25 scenarios mapped to test functions. All unit tests — no integration tests needed (no DB/external deps). Factory pattern: `createAuthMiddleware(secret)` + `createAuthRoutes(password, secret)`. Key decisions: server-side expiry via embedded `issued_at` in cookie, post-logout tests cookie absence (not replay), `process.stdout.write` spy for login logging.
 
-Next: **web-auth** — Phase 4 (test implementation). Write tests that fail against the stub `src/web/auth.ts`.
+**Web Auth Phase 4 complete.** 25 tests implemented in `tests/unit/web-auth.test.ts` (all unit, no integration needed). 22 fail against stub, 3 pass (TS-4.1/TS-4.2 traceability + TS-2.5 noop bypass). Stub updated to factory pattern: `createAuthMiddleware(secret)` + `createAuthRoutes(password, secret)`. Health test updated for new API. Code review: 0 critical, 0 blocking issues.
+
+Next: **web-auth** — Phase 5 (feature implementation). Implement `src/web/auth.ts` to make all 25 tests pass.
 
 ## Spec Files
 

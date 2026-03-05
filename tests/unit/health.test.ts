@@ -68,11 +68,11 @@ describe("Health endpoint", () => {
 
   it("is accessible without authentication", async () => {
     const { createHealthRoute } = await import("../../src/web/health.js");
-    const { authMiddleware } = await import("../../src/web/auth.js");
+    const { createAuthMiddleware } = await import("../../src/web/auth.js");
     const checkers = createAllConnectedCheckers();
 
     const app = new Hono();
-    app.use("*", authMiddleware);
+    app.use("*", createAuthMiddleware("test-secret-at-least-32-chars-long!!"));
     app.route("/", createHealthRoute(checkers));
 
     // Request with no auth header or cookie
