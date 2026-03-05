@@ -11,7 +11,7 @@ Last updated: 2026-03-05
 | classification | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | telegram-bot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-dashboard | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
+| web-dashboard | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
 | web-browse | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-entry | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-new-note | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -45,9 +45,13 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web Auth complete.** All 6 phases done, 25/25 tests pass (all unit), review report at `web-auth-implementation-review.md`. 0 CRITICAL findings. 1 WARNING (non-blocking): `Secure` cookie flag not conditionally set for HTTPS — acceptable for Docker deployment, address when adding HTTPS. Implementation: `src/web/auth.ts` with HMAC-SHA256 cookie signing, `timingSafeEqual` verification, server-side 30-day expiry. Total: 203/203 tests passing across all features.
 
-**Web Dashboard Phase 2 complete.** Test specification with 30 scenarios derived from behavioral spec. Full traceability: all acceptance criteria, constraints, and edge cases covered across 7 groups (digest, entries, stats, capture, SSE, constraints, edge cases). Design doc at `docs/plans/2026-03-05-web-dashboard-design.md`.
+**Web Dashboard Phase 2 complete.** Test specification with 31 scenarios derived from behavioral spec. Full traceability: all acceptance criteria, constraints, and edge cases covered across 7 groups (digest, entries, stats, capture, SSE, constraints, edge cases). Design doc at `docs/plans/2026-03-05-web-dashboard-design.md`.
 
-Next: **web-dashboard** — Phase 3 (test implementation specification). Run `spec-dd web-dashboard` to continue.
+**Web Dashboard Phase 3 complete.** Test implementation specification with all 31 scenarios mapped to test functions. Split: 22 unit tests (mocked query layer, classify, embed) + 9 integration tests (testcontainers). Key decisions: factory pattern `createDashboardRoutes(sql, broadcaster)`, SSE via in-memory `SSEBroadcaster` event bus, query functions mockable via `vi.mock()`, capture pipeline mocks classify/embed modules. Helpers: `createTestDashboard()`, `readSSEEvent()`, `createMockEntry()`, `seedEntry()`.
+
+**Web Dashboard Phase 4 complete.** 31 tests implemented (22 unit + 9 integration), 29 failing against stubs as expected, 2 passing (TS-6.2/TS-6.3 auth middleware enforcement — already implemented). Files: `tests/unit/web-dashboard.test.ts`, `tests/integration/web-dashboard-integration.test.ts`. Stubs: `src/web/dashboard.ts`, `src/web/dashboard-queries.ts`, `src/web/sse.ts` (SSE broadcaster fully implemented). Key decisions: `classifyText` (not `classifyEntry`) for capture pipeline, `insertEntry` in dashboard-queries for mockable DB inserts, TS-4.3 moved from integration to unit (only checks 2xx response). Total: 144/164 unit tests passing, 61/70 integration tests passing across all features.
+
+Next: **web-dashboard** — Phase 5 (feature implementation). Run `spec-dd web-dashboard` to continue.
 
 ## Spec Files
 
@@ -58,7 +62,7 @@ Next: **web-dashboard** — Phase 3 (test implementation specification). Run `sp
 | classification | `classification-specification.md`, `classification-test-specification.md`, `classification-test-implementation-specification.md` |
 | telegram-bot | `telegram-bot-specification.md`, `telegram-bot-test-specification.md`, `telegram-bot-test-implementation-specification.md` |
 | web-auth | `web-auth-specification.md`, `web-auth-test-specification.md`, `web-auth-test-implementation-specification.md` |
-| web-dashboard | `web-dashboard-specification.md` |
+| web-dashboard | `web-dashboard-specification.md`, `web-dashboard-test-specification.md`, `web-dashboard-test-implementation-specification.md` |
 | web-browse | `web-browse-specification.md` |
 | web-entry | `web-entry-specification.md` |
 | web-new-note | `web-new-note-specification.md` |
