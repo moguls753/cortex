@@ -54,7 +54,7 @@ services:
       - ollama_data:/root/.ollama
 
   whisper:
-    image: fedirz/faster-whisper-server:latest
+    image: fedirz/faster-whisper-server:latest-cpu
     environment:
       WHISPER__MODEL: medium
       WHISPER__DEVICE: cpu
