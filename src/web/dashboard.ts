@@ -335,41 +335,45 @@ function renderClientScript(): string {
     updateSubmit();
   }
 
+  function doCapture() {
+    var text = input.value.trim();
+    if (!text) return;
+    input.disabled = true;
+    if (submitBtn) submitBtn.disabled = true;
+    feedback.innerHTML = '<span class="text-primary animate-pulse">classifying...</span>';
+    fetch('/api/capture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      input.value = '';
+      input.disabled = false;
+      updateSubmit();
+      if (res.ok) {
+        var cat = res.data.category || 'unclassified';
+        var conf = res.data.confidence ? Math.round(res.data.confidence * 100) + '%' : '';
+        feedback.innerHTML = '<span class="text-primary">Captured as <strong>' + cat + '</strong>: ' + (res.data.name || '') + (conf ? ' (' + conf + ')' : '') + '</span>';
+        setTimeout(function() { feedback.innerHTML = ''; }, 3000);
+      }
+    })
+    .catch(function() {
+      input.disabled = false;
+      updateSubmit();
+      feedback.innerHTML = '<span class="text-destructive">Capture failed — try again</span>';
+      setTimeout(function() { feedback.innerHTML = ''; }, 8000);
+    });
+  }
+
   if (form) {
     form.addEventListener('submit', function(e) {
       e.preventDefault();
-      var text = input.value.trim();
-      if (!text) return;
-      input.disabled = true;
-      if (submitBtn) submitBtn.disabled = true;
-      feedback.innerHTML = '<span class="text-primary animate-pulse">classifying...</span>';
-      fetch('/api/capture', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text })
-      })
-      .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-      .then(function(res) {
-        input.value = '';
-        input.disabled = false;
-        updateSubmit();
-        if (res.ok) {
-          var cat = res.data.category || 'unclassified';
-          var conf = res.data.confidence ? Math.round(res.data.confidence * 100) + '%' : '';
-          feedback.innerHTML = '<span class="text-primary">Captured as <strong>' + cat + '</strong>: ' + (res.data.name || '') + (conf ? ' (' + conf + ')' : '') + '</span>';
-          setTimeout(function() { feedback.innerHTML = ''; }, 3000);
-        }
-      })
-      .catch(function() {
-        input.disabled = false;
-        updateSubmit();
-        feedback.innerHTML = '<span class="text-destructive">Capture failed — try again</span>';
-        setTimeout(function() { feedback.innerHTML = ''; }, 5000);
-      });
+      doCapture();
     });
 
     input.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); form.dispatchEvent(new Event('submit')); }
+      if (e.key === 'Enter') { e.preventDefault(); doCapture(); }
     });
   }
 
