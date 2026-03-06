@@ -73,6 +73,8 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web New Note Phase 4 complete.** 24 tests implemented (20 unit + 4 integration), 21 failing against stub as expected, 3 passing early (TS-4.2/TS-4.3 auth redirect, TS-4.5 auth 401 for API path). Files: `tests/unit/web-new-note.test.ts`, `tests/integration/web-new-note-integration.test.ts`. Stub: `src/web/new-note.ts`. Code review: 0 CRITICAL, 4 WARNINGs all fixed (W-1 TS-4.5 name mismatch renamed, W-2 TS-2.1 missing arg verification added, W-3/W-4 missing response status checks added to TS-2.3/TS-3.2/TS-3.3/TS-5.2). Key decisions: reuses `insertEntry` from dashboard-queries, `getAllTags` from entry-queries, `classifyText`+`assembleContext` from classify, `embedEntry` from embed. TS-4.5 expects 401 (not 302) — auth middleware returns 401 for `/api/` paths. Total: 294/294 existing tests passing (1 pre-existing flake in embed-integration retry test, unrelated).
 
+**SSE via PostgreSQL NOTIFY complete.** Replaced manual `broadcaster.broadcast()` in dashboard capture route with a PG trigger (`notify_entry_change`) that fires `pg_notify('entries_changed', JSON)` on INSERT, UPDATE, and soft-delete. App listens via `sql.listen()` and forwards to SSEBroadcaster. Fulfills AC-5.2 ("entries from any source appear in real-time") — Telegram, webapp, and future MCP all trigger SSE automatically. 9 new tests (5 unit + 4 integration), all passing. Implementation: `src/db/notify.ts`, trigger in `src/db/index.ts`. Design doc at `docs/plans/2026-03-06-sse-db-notify-design.md`.
+
 Next: **web-new-note** — Phase 5 (feature implementation). Run `spec-dd web-new-note` to continue.
 
 ## Spec Files

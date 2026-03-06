@@ -553,11 +553,6 @@ export function createDashboardRoutes(
       // Ollama down
     }
 
-    broadcaster.broadcast({
-      type: "entry:created",
-      data: { id: entryId, name: name ?? "Untitled", category, confidence },
-    });
-
     return c.json({ id: entryId, category, name, confidence }, 201);
   });
 

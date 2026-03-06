@@ -57,6 +57,60 @@ export async function runMigrations(url: string): Promise<void> {
         BEFORE UPDATE ON settings
         FOR EACH ROW
         EXECUTE FUNCTION update_updated_at();
+
+      CREATE OR REPLACE FUNCTION notify_entry_change()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        event_type TEXT;
+        payload JSONB;
+      BEGIN
+        -- Determine event type
+        -- NOTE: pg_notify payload limited to ~8000 bytes. Keep payload minimal.
+        IF TG_OP = 'INSERT' THEN
+          event_type := 'entry:created';
+        ELSIF NEW.deleted_at IS NOT NULL AND (OLD.deleted_at IS NULL) THEN
+          event_type := 'entry:deleted';
+        ELSIF NEW.deleted_at IS NULL AND OLD.deleted_at IS NOT NULL THEN
+          event_type := 'entry:created';
+        ELSE
+          -- Skip if only embedding or updated_at changed
+          IF NEW.name = OLD.name
+             AND NEW.category IS NOT DISTINCT FROM OLD.category
+             AND NEW.confidence IS NOT DISTINCT FROM OLD.confidence
+             AND NEW.fields = OLD.fields
+             AND NEW.tags = OLD.tags
+             AND NEW.content IS NOT DISTINCT FROM OLD.content
+             AND NEW.deleted_at IS NOT DISTINCT FROM OLD.deleted_at THEN
+            RETURN NEW;
+          END IF;
+          event_type := 'entry:updated';
+        END IF;
+
+        -- Build payload
+        IF event_type = 'entry:deleted' THEN
+          payload := jsonb_build_object('type', event_type, 'data', jsonb_build_object('id', NEW.id));
+        ELSE
+          payload := jsonb_build_object(
+            'type', event_type,
+            'data', jsonb_build_object(
+              'id', NEW.id,
+              'name', NEW.name,
+              'category', NEW.category,
+              'confidence', NEW.confidence
+            )
+          );
+        END IF;
+
+        PERFORM pg_notify('entries_changed', payload::text);
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS entries_notify ON entries;
+      CREATE TRIGGER entries_notify
+        AFTER INSERT OR UPDATE ON entries
+        FOR EACH ROW
+        EXECUTE FUNCTION notify_entry_change();
     `);
   } finally {
     await sql.end();

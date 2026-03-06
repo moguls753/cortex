@@ -12,6 +12,7 @@ import { createEntryRoutes } from "./web/entry.js";
 import { createSSEBroadcaster } from "./web/sse.js";
 import { initializeEmbedding } from "./embed.js";
 import { startBot } from "./telegram.js";
+import { listenForEntryChanges } from "./db/notify.js";
 
 const log = createLogger("server");
 const startTime = Date.now();
@@ -33,6 +34,13 @@ async function main(): Promise<void> {
 
   // Create SSE broadcaster
   const broadcaster = createSSEBroadcaster();
+
+  // Listen for DB entry changes and broadcast via SSE
+  listenForEntryChanges(sql, broadcaster).catch((err) => {
+    log.warn("Failed to start entry change listener", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
 
   // Telegram bot state (must be declared before checkers reference it)
   let telegramStarted = false;

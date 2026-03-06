@@ -124,7 +124,14 @@ export function assemblePrompt(
   contextEntries: string,
   inputText: string,
 ): string {
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  const tmrw = new Date(now);
+  tmrw.setDate(tmrw.getDate() + 1);
+  const tomorrow = tmrw.toISOString().split("T")[0];
   return template
+    .replace(/\{today\}/g, today)
+    .replace(/\{tomorrow\}/g, tomorrow)
     .replace("{context_entries}", contextEntries)
     .replace("{input_text}", inputText);
 }

@@ -76,3 +76,7 @@ All findings from the initial review have been addressed:
 ## Recommendations
 
 None — all findings resolved.
+
+## Post-Review Update: SSE via PostgreSQL NOTIFY
+
+Manual `broadcaster.broadcast({ type: "entry:created", ... })` in the capture route was replaced by a PostgreSQL trigger (`notify_entry_change`) that fires `pg_notify('entries_changed', JSON)` on all `entries` table changes. The app listens via `sql.listen('entries_changed')` in `src/index.ts` and forwards to `SSEBroadcaster`. This fulfills AC-5.2 ("entries from any source") without coupling entry-creating modules to the broadcaster. `digest:updated` remains application-level. See `docs/plans/2026-03-06-sse-db-notify-design.md`.
