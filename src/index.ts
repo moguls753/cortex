@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { config } from "./config.js";
 import { createLogger } from "./logger.js";
 import { createDbConnection, runMigrations } from "./db/index.js";
@@ -70,6 +71,9 @@ async function main(): Promise<void> {
 
   // Build the app
   const app = new Hono();
+
+  // Static files (CSS, etc.) — before auth so they load on the login page
+  app.use("/public/*", serveStatic({ root: "./" }));
 
   // Auth middleware (protects all routes except /health and /login)
   app.use("*", createAuthMiddleware(config.sessionSecret));
