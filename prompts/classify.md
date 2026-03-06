@@ -39,9 +39,15 @@ For all categories: notes = additional details not captured in other fields (tim
 
 ## Output format
 
-Return ONLY valid JSON. No explanation. No extra text.
+Return ONLY a single valid JSON object. No explanation, no extra text, no wrapping.
 
-{"category":"tasks","name":"Brot beim Bäcker kaufen","confidence":0.9,"fields":{"due_date":"2026-03-06","status":"pending","notes":null},"tags":["einkauf","erledigung"],"create_calendar_event":false,"calendar_date":null}
+Use exactly this structure — one flat object with all 7 keys at the top level:
+
+```
+{"category":"...","name":"...","confidence":0.0,"fields":{...},"tags":[...],"create_calendar_event":false,"calendar_date":null}
+```
+
+All 7 keys must appear in one object. Do NOT split into multiple objects.
 
 - **name**: Short descriptive name, max 6 words, same language as input.
 - **confidence**: 0.0–1.0, how certain you are about the category.
@@ -73,5 +79,7 @@ These are recent and related entries from the knowledge base. Use them to mainta
 {context_entries}
 
 ## Input to classify
+
+Respond with a single JSON object containing all 7 keys: category, name, confidence, fields, tags, create_calendar_event, calendar_date.
 
 {input_text}

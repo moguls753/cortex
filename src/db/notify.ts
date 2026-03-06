@@ -11,9 +11,11 @@ export async function listenForEntryChanges(
   await sql.listen("entries_changed", (payload) => {
     try {
       const event = JSON.parse(payload) as SSEEvent;
+      log.debug("Entry change notification received", { type: event.type });
       broadcaster.broadcast(event);
     } catch {
       log.error("Failed to parse entry change notification", { payload });
     }
   });
+  log.info("Listening for entry changes on entries_changed channel");
 }

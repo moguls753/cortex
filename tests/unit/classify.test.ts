@@ -365,6 +365,17 @@ describe("Classification", () => {
 
       expect(result).toBeNull();
     });
+
+    it("extracts JSON from markdown code fences", () => {
+      const json = createClassificationJSON();
+      const raw = "```json\n" + json + "\n```";
+
+      const result = validateClassificationResponse(raw);
+
+      expect(result).not.toBeNull();
+      expect(result!.category).toBe("people");
+    });
+
   });
 
   // ---------------------------------------------------------------------------

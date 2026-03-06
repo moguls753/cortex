@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import type { SSEBroadcaster, SSEEvent } from "./sse.js";
 import { renderLayout } from "./layout.js";
 import {
@@ -557,62 +558,24 @@ export function createDashboardRoutes(
   });
 
   app.get("/api/events", (c) => {
-    const encoder = new TextEncoder();
-    let buffer = "";
-    let pendingResolve: (() => void) | null = null;
-    let unsubscribe: (() => void) | null = null;
-    let cancelled = false;
+    return streamSSE(c, async (stream) => {
+      await stream.writeSSE({ data: "", retry: 5000 });
 
-    function writeToBuffer(data: string): void {
-      buffer += data;
-      if (pendingResolve) {
-        const r = pendingResolve;
-        pendingResolve = null;
-        r();
-      }
-    }
-
-    const stream = new ReadableStream({
-      start() {
-        writeToBuffer("retry: 5000\n\n");
-
-        unsubscribe = broadcaster.subscribe((event: SSEEvent) => {
-          if (cancelled) return;
-          const data = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
-          writeToBuffer(data);
+      const unsubscribe = broadcaster.subscribe((event: SSEEvent) => {
+        stream.writeSSE({
+          event: event.type,
+          data: JSON.stringify(event.data),
         });
-      },
-      pull(controller) {
-        if (cancelled) {
-          controller.close();
-          return;
-        }
-        if (buffer) {
-          controller.enqueue(encoder.encode(buffer));
-          buffer = "";
-          return;
-        }
-        return new Promise<void>((resolve) => {
-          pendingResolve = resolve;
-        });
-      },
-      cancel() {
-        cancelled = true;
-        if (unsubscribe) unsubscribe();
-        if (pendingResolve) {
-          const r = pendingResolve;
-          pendingResolve = null;
-          r();
-        }
-      },
-    }, { highWaterMark: 0 });
+      });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
+      stream.onAbort(() => {
+        unsubscribe();
+      });
+
+      // Keep the stream open until client disconnects
+      await new Promise<void>((resolve) => {
+        stream.onAbort(resolve);
+      });
     });
   });
 
