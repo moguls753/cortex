@@ -15,7 +15,7 @@
 | Test Spec → Test Impl Spec coverage | PASS | All 31 scenarios mapped to test functions (22 unit + 9 integration) |
 | Test Impl Spec → Test Spec (no orphans) | PASS | No orphan test implementations |
 | Spec constraints respected | PASS | Server-rendered HTML, auth required, SSE with cookie, soft-delete filter, full pipeline |
-| Non-goals respected | PASS | No customizable layout, drag-and-drop, dark mode, inline editing, or external widgets |
+| Non-goals respected | PASS | No customizable layout, drag-and-drop, inline editing, or external widgets. Dark mode now included via design system. |
 
 ## Code Alignment
 
@@ -32,7 +32,7 @@
 | `src/web/dashboard.ts` | Route factory: `createDashboardRoutes(sql, broadcaster)` with 3 routes |
 | `src/web/dashboard-queries.ts` | Query layer: `getRecentEntries`, `getDashboardStats`, `getLatestDigest`, `insertEntry` |
 | `src/web/sse.ts` | SSE broadcaster (implemented in Phase 4) |
-| `src/web/layout.ts` | Shared HTML layout template with editorial design |
+| `src/web/layout.ts` | Shared HTML layout template (to be rebuilt per `docs/plans/2026-03-06-web-design-system.md`) |
 
 ## Test Execution
 
@@ -71,7 +71,7 @@ All findings from the initial review have been addressed:
 | 1 | ~~WARNING~~ FIXED | Code vs Spec | Context-aware classification not implemented in capture pipeline. | Added `assembleContext(sql, text)` call before `classifyText`, with separate try/catch so context failure doesn't block classification. |
 | 2 | ~~WARNING~~ FIXED | Code (client-side) | Client-side SSE handler used `window.location.reload()` for live updates. | Replaced with targeted DOM manipulation: fade-in for new entries, highlight flash for updates, fade-out + collapse for deletes, content swap for digests. |
 | 3 | ~~WARNING~~ FIXED | Code (client-side) | Client-side SSE only handled `entry:created` and `digest:updated`. | Added handlers for all 4 event types: `entry:created`, `entry:updated`, `entry:deleted`, `digest:updated`. |
-| 4 | ~~INFO~~ FIXED | Code | Digest content rendered via `escapeHtml()` + `<br>` newline replacement. | Added lightweight regex-based markdown renderer supporting headings, bold, italic, code, blockquotes, and lists. Uses editorial typography (Lora for headings, IBM Plex Mono for code). |
+| 4 | ~~INFO~~ FIXED | Code | Digest content rendered via `escapeHtml()` + `<br>` newline replacement. | Added lightweight regex-based markdown renderer supporting headings, bold, italic, code, blockquotes, and lists. Typography to be updated per new design system (`docs/plans/2026-03-06-web-design-system.md`). |
 
 ## Recommendations
 

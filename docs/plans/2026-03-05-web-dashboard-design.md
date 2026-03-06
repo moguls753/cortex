@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Date | 2026-03-05 |
-| Status | Approved |
+| Status | Superseded by `2026-03-06-web-design-system.md` |
 | Derives From | `docs/specs/web-dashboard-specification.md` |
 
 ## IMPORTANT: Frontend Design Skill

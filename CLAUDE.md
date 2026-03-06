@@ -19,7 +19,7 @@ These were decided during the spec interview and are final:
 - **MCP CRUD:** 7 tools including `update_entry` and `delete_entry` (soft delete).
 - **Tags:** Claude-suggested + free-form + autocomplete from existing tags.
 - **Search:** Semantic (cosine similarity >= 0.5) + text search fallback.
-- **Frontend:** Server-rendered HTML via Hono, Tailwind CSS (CLI pre-built), responsive design.
+- **Frontend:** Server-rendered HTML via Hono, Tailwind CSS (CLI pre-built), "Terminal / Command Center" design system (`docs/plans/2026-03-06-web-design-system.md`). JetBrains Mono, oklch dark/light theme, Lucide inline SVGs, no client-side framework.
 - **Single-user for now:** Don't prevent multi-user architecturally (settings table supports multiple Telegram chat IDs).
 - **Google Calendar:** Optional (COULD priority). Keep in spec, build if time permits.
 - **No Obsidian import:** Removed from architecture.
@@ -34,7 +34,9 @@ These were decided during the spec interview and are final:
 - Voice: faster-whisper (medium)
 - Telegram: grammY
 - Testing: Vitest (recommended — not yet set up)
-- CSS: Tailwind CLI
+- CSS: Tailwind CLI + oklch CSS custom properties (dark/light theme)
+- Icons: Lucide (inline SVGs via `src/web/icons.ts`)
+- Font: JetBrains Mono (single monospace font)
 - Deploy: Docker Compose
 
 ## Development Workflow
@@ -57,6 +59,12 @@ Priority: **Capture first** (Telegram → classify → store, then web, then MCP
 | 4. Web | Auth, dashboard, browse, entry, new note, trash, settings, SSE |
 | 5. MCP | Stdio + HTTP transport, 7 tools |
 | 6. Digests | Daily + weekly + email + cron |
+
+## Web Design System
+
+All web UI implementation must follow `docs/plans/2026-03-06-web-design-system.md` (Terminal / Command Center). This is the single source of truth for typography, colors, layout, icons, and theming. The `design/` directory at the project root contains the React/shadcn prototype used as visual reference — do not use React or shadcn, only replicate the visual output with server-rendered HTML + Tailwind.
+
+**Do not invoke the `frontend-design` skill** for pages covered by the design system (dashboard, browse, entry, new note, trash, settings, login). The design is fully specified — follow it mechanically. Only invoke `frontend-design` for entirely new UI concepts not covered by the design doc.
 
 ## File Conventions
 

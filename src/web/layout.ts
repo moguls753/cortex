@@ -1,132 +1,224 @@
+import {
+  iconBrain,
+  iconSearch,
+  iconFolderOpen,
+  iconTrash2,
+  iconSettings,
+  iconSun,
+  iconMoon,
+  iconLogOut,
+} from "./icons.js";
+
+function navItem(
+  href: string,
+  iconHtml: string,
+  label: string,
+  active: boolean,
+): string {
+  const activeClass = active ? "text-foreground bg-secondary" : "";
+  return `<a href="${href}" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ${activeClass}" title="${label}">${iconHtml}<span class="hidden sm:inline">${label}</span></a>`;
+}
+
 export function renderLayout(
   title: string,
   content: string,
   activePage = "/",
 ): string {
-  const navItems = [
-    { href: "/", label: "Cortex", isBrand: true },
-    { href: "/browse", label: "Browse" },
-    { href: "/new", label: "New" },
-    { href: "/settings", label: "\u2699" },
+  const nav = [
+    { href: "/browse?q=", icon: iconSearch("size-3.5"), label: "Search" },
+    { href: "/browse", icon: iconFolderOpen("size-3.5"), label: "Browse" },
+    { href: "/trash", icon: iconTrash2("size-3.5"), label: "Trash" },
+    { href: "/settings", icon: iconSettings("size-3.5"), label: "Settings" },
   ];
 
-  const navLinks = navItems
-    .map((item) => {
-      if (item.isBrand) {
-        return `<a href="/" style="font-family:'Lora',serif;font-size:20px;font-weight:600;color:#2D2A26;text-decoration:none;">Cortex</a>`;
-      }
-      const isActive = activePage === item.href;
-      const activeStyle = isActive
-        ? "color:#C2705B;border-bottom:2px solid #C2705B;padding-bottom:2px;"
-        : "color:#7A746D;";
-      return `<a href="${item.href}" style="font-family:'Source Sans 3',sans-serif;font-size:14px;text-decoration:none;${activeStyle}">${item.label}</a>`;
-    })
+  const navHtml = nav
+    .map((n) => navItem(n.href, n.icon, n.label, activePage === n.href))
     .join("");
-
-  const logoutBtn = `<form method="POST" action="/logout" style="display:inline;margin:0;">
-    <button type="submit" style="font-family:'Source Sans 3',sans-serif;font-size:14px;color:#7A746D;background:none;border:none;cursor:pointer;">Log out</button>
-  </form>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} — Cortex</title>
+  <title>${title.replace(/</g, "&lt;").replace(/>/g, "&gt;")} — Cortex</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem("cortex-theme");
+        var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (t === "dark" || (!t && prefersDark)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch(e) {}
+    })();
+  </script>
   <style>
+    :root {
+      --background: oklch(0.97 0.005 90);
+      --foreground: oklch(0.18 0.01 160);
+      --card: oklch(0.99 0.003 90);
+      --card-foreground: oklch(0.18 0.01 160);
+      --primary: oklch(0.45 0.14 155);
+      --primary-foreground: oklch(0.98 0.005 90);
+      --secondary: oklch(0.93 0.008 90);
+      --secondary-foreground: oklch(0.25 0.01 160);
+      --muted: oklch(0.93 0.008 90);
+      --muted-foreground: oklch(0.50 0.01 160);
+      --accent: oklch(0.55 0.12 80);
+      --accent-foreground: oklch(0.98 0.005 90);
+      --destructive: oklch(0.55 0.20 25);
+      --border: oklch(0.88 0.008 90);
+      --input: oklch(0.93 0.008 90);
+      --ring: oklch(0.45 0.14 155);
+    }
+    .dark {
+      --background: oklch(0.10 0.005 160);
+      --foreground: oklch(0.90 0.01 160);
+      --card: oklch(0.13 0.005 160);
+      --card-foreground: oklch(0.90 0.01 160);
+      --primary: oklch(0.75 0.15 155);
+      --primary-foreground: oklch(0.10 0.005 160);
+      --secondary: oklch(0.18 0.005 160);
+      --secondary-foreground: oklch(0.85 0.01 160);
+      --muted: oklch(0.18 0.005 160);
+      --muted-foreground: oklch(0.55 0.01 160);
+      --accent: oklch(0.70 0.10 80);
+      --accent-foreground: oklch(0.10 0.005 160);
+      --destructive: oklch(0.55 0.20 25);
+      --border: oklch(0.22 0.008 160);
+      --input: oklch(0.18 0.005 160);
+      --ring: oklch(0.75 0.15 155);
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #FAF8F5;
-      color: #2D2A26;
-      font-family: 'Source Sans 3', sans-serif;
-      font-size: 16px;
-      line-height: 1.7;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      background: var(--background);
+      color: var(--foreground);
       -webkit-font-smoothing: antialiased;
     }
-    .navbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      max-width: 640px;
-      margin: 0 auto;
-      padding: 12px 24px;
-      border-bottom: 1px solid #E8E4DF;
-      height: 48px;
-    }
-    .navbar-links { display: flex; align-items: center; gap: 20px; }
-    .content {
-      max-width: 640px;
-      margin: 0 auto;
-      padding: 0 24px 64px;
-    }
-    .section-divider {
-      border: none;
-      border-top: 1px solid #E8E4DF;
-      margin: 48px 0;
-    }
+    /* Tailwind-like utility classes (inline, no build step needed for layout) */
+    .bg-background { background: var(--background); }
+    .bg-card { background: var(--card); }
+    .bg-secondary { background: var(--secondary); }
+    .bg-muted { background: var(--muted); }
+    .text-foreground { color: var(--foreground); }
+    .text-card-foreground { color: var(--card-foreground); }
+    .text-primary { color: var(--primary); }
+    .text-primary-foreground { color: var(--primary-foreground); }
+    .text-secondary-foreground { color: var(--secondary-foreground); }
+    .text-muted-foreground { color: var(--muted-foreground); }
+    .text-accent { color: var(--accent); }
+    .text-destructive { color: var(--destructive); }
+    .border-border { border-color: var(--border); }
+    .bg-primary { background: var(--primary); }
+    .ring-primary { --tw-ring-color: var(--primary); }
+
+    /* Category badge colors */
+    .badge-people { background: oklch(0.65 0.15 250 / 0.10); color: oklch(0.65 0.15 250); }
+    .badge-projects { background: oklch(0.45 0.14 155 / 0.10); color: var(--primary); }
+    .dark .badge-projects { background: oklch(0.75 0.15 155 / 0.10); }
+    .badge-tasks { background: oklch(0.55 0.12 80 / 0.10); color: var(--accent); }
+    .dark .badge-tasks { background: oklch(0.70 0.10 80 / 0.10); }
+    .badge-ideas { background: oklch(0.65 0.20 330 / 0.10); color: oklch(0.65 0.20 330); }
+    .badge-reference { background: var(--muted); color: var(--muted-foreground); }
+    .badge-unclassified { background: var(--muted); color: var(--muted-foreground); }
+
     .category-badge {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
+      font-size: 9px;
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      padding: 2px 8px;
-      border-radius: 999px;
+      padding: 1px 4px;
+      border-radius: 4px;
       display: inline-block;
-    }
-    .badge-people { background: rgba(91,127,194,0.12); color: #5B7FC2; }
-    .badge-projects { background: rgba(91,166,122,0.12); color: #5BA67A; }
-    .badge-tasks { background: rgba(194,153,91,0.12); color: #C2995B; }
-    .badge-ideas { background: rgba(139,91,194,0.12); color: #8B5BC2; }
-    .badge-reference { background: rgba(107,114,128,0.12); color: #6B7280; }
-    .badge-unclassified { background: rgba(122,116,109,0.12); color: #7A746D; }
-    .stat-number {
-      font-family: 'Lora', serif;
-      font-size: 28px;
-      font-weight: 700;
-      color: #2D2A26;
-      transition: color 0.2s;
-    }
-    .stat-label {
-      font-family: 'Source Sans 3', sans-serif;
-      font-size: 13px;
-      color: #7A746D;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
-    }
-    .stat-card:hover .stat-number { color: #C2705B; }
-    a.entry-link {
-      color: #2D2A26;
-      text-decoration: none;
-      transition: color 0.2s, transform 0.2s;
-      display: inline-block;
-    }
-    a.entry-link:hover { color: #C2705B; transform: translateX(2px); }
-    .entry-time {
-      font-size: 13px;
-      color: #7A746D;
       white-space: nowrap;
     }
-    .text-secondary { color: #7A746D; }
-    .text-accent { color: #C2705B; }
-    .heading-serif {
-      font-family: 'Lora', serif;
-      font-weight: 600;
-      font-size: 18px;
-    }
+
+    /* Scrollbar */
+    .scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Transitions */
+    .transition-colors { transition: color 0.15s, background-color 0.15s, border-color 0.15s; }
+
+    /* Animate pulse */
+    @keyframes pulse { 50% { opacity: 0.5; } }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+    a { text-decoration: none; color: inherit; }
   </style>
+  <link rel="stylesheet" href="/public/style.css">
 </head>
-<body>
-  <nav class="navbar">
-    ${navLinks}
-    <div class="navbar-links">${logoutBtn}</div>
-  </nav>
-  <main class="content">
+<body class="font-sans antialiased">
+  <div style="height:100dvh;display:flex;flex-direction:column;padding:16px 24px;gap:16px;max-width:1024px;margin:0 auto;width:100%;">
+
+    <!-- Header -->
+    <header style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${iconBrain("size-4 text-primary")}
+        <span style="font-size:14px;font-weight:500;letter-spacing:-0.02em;color:var(--foreground);">cortex</span>
+        <span style="font-size:10px;color:var(--muted-foreground);border:1px solid var(--border);border-radius:4px;padding:2px 6px;">v0.1</span>
+      </div>
+      <nav style="display:flex;align-items:center;gap:4px;">
+        ${navHtml}
+        <button id="theme-toggle" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:none;background:transparent;color:var(--muted-foreground);cursor:pointer;" class="transition-colors" aria-label="Toggle theme">
+          <span id="theme-icon-sun" style="display:none;">${iconSun("size-3.5")}</span>
+          <span id="theme-icon-moon">${iconMoon("size-3.5")}</span>
+        </button>
+        <form method="POST" action="/logout" style="display:inline;margin:0;">
+          <button type="submit" style="display:flex;align-items:center;gap:6px;border-radius:6px;padding:6px 10px;font-size:12px;color:var(--muted-foreground);background:transparent;border:none;cursor:pointer;font-family:inherit;" class="transition-colors" title="Log out">
+            ${iconLogOut("size-3.5")}
+            <span class="hidden sm:inline">Log out</span>
+          </button>
+        </form>
+      </nav>
+    </header>
+
+    <!-- Content -->
     ${content}
-  </main>
+
+    <!-- Status bar -->
+    <footer style="display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted-foreground);flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--primary);display:inline-block;" class="animate-pulse"></span> postgres</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--primary);display:inline-block;" class="animate-pulse"></span> ollama</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--primary);display:inline-block;" class="animate-pulse"></span> whisper</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--primary);display:inline-block;" class="animate-pulse"></span> telegram</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span>SSE connected</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    (function() {
+      var toggle = document.getElementById('theme-toggle');
+      var sunIcon = document.getElementById('theme-icon-sun');
+      var moonIcon = document.getElementById('theme-icon-moon');
+      function updateIcons() {
+        var isDark = document.documentElement.classList.contains('dark');
+        sunIcon.style.display = isDark ? '' : 'none';
+        moonIcon.style.display = isDark ? 'none' : '';
+      }
+      updateIcons();
+      if (toggle) {
+        toggle.addEventListener('click', function() {
+          var isDark = document.documentElement.classList.toggle('dark');
+          localStorage.setItem('cortex-theme', isDark ? 'dark' : 'light');
+          updateIcons();
+        });
+      }
+    })();
+  </script>
 </body>
 </html>`;
 }

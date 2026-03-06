@@ -75,7 +75,7 @@ Serve as the user's browser start page. The dashboard shows today's digest, rece
 
 - Customizable dashboard layout or widget system.
 - Drag-and-drop reordering of dashboard sections.
-- Dark mode (can be added later as a CSS concern, not a behavioral concern).
+- Dark mode is included in the design system (see `docs/plans/2026-03-06-web-design-system.md`). It is a CSS-only concern handled by the shared layout.
 - Full-text editing on the dashboard (quick capture is a single input, not an editor).
 - Inline editing of entries from the dashboard (clicking navigates to `/entry/:id`).
 - Dashboard widgets for calendar, weather, or external services.

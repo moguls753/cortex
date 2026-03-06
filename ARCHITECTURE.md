@@ -58,7 +58,7 @@ Web Editor ────┘           │    compatible endpoint)                
 | Cron | node-cron | Simple scheduled jobs |
 | Email | nodemailer | SMTP sending |
 | MCP | @modelcontextprotocol/sdk | Official MCP server SDK |
-| Frontend | Server-rendered HTML + Tailwind CSS (CLI build) | Pre-built CSS, no runtime overhead, responsive |
+| Frontend | Server-rendered HTML + Tailwind CSS (CLI build) + Lucide SVG icons | Terminal/Command Center design, JetBrains Mono, oklch dark/light theme, no client-side framework |
 | Deployment | Docker Compose | App + PostgreSQL + Ollama + faster-whisper |
 
 ## Categories

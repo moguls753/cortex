@@ -45,7 +45,7 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web Auth complete.** All 6 phases done, 25/25 tests pass (all unit), review report at `web-auth-implementation-review.md`. 0 CRITICAL findings. 1 WARNING (non-blocking): `Secure` cookie flag not conditionally set for HTTPS — acceptable for Docker deployment, address when adding HTTPS. Implementation: `src/web/auth.ts` with HMAC-SHA256 cookie signing, `timingSafeEqual` verification, server-side 30-day expiry. Total: 203/203 tests passing across all features.
 
-**Web Dashboard Phase 2 complete.** Test specification with 31 scenarios derived from behavioral spec. Full traceability: all acceptance criteria, constraints, and edge cases covered across 7 groups (digest, entries, stats, capture, SSE, constraints, edge cases). Design doc at `docs/plans/2026-03-05-web-dashboard-design.md`.
+**Web Dashboard Phase 2 complete.** Test specification with 31 scenarios derived from behavioral spec. Full traceability: all acceptance criteria, constraints, and edge cases covered across 7 groups (digest, entries, stats, capture, SSE, constraints, edge cases). Design doc at `docs/plans/2026-03-06-web-design-system.md` (supersedes `2026-03-05-web-dashboard-design.md`).
 
 **Web Dashboard Phase 3 complete.** Test implementation specification with all 31 scenarios mapped to test functions. Split: 22 unit tests (mocked query layer, classify, embed) + 9 integration tests (testcontainers). Key decisions: factory pattern `createDashboardRoutes(sql, broadcaster)`, SSE via in-memory `SSEBroadcaster` event bus, query functions mockable via `vi.mock()`, capture pipeline mocks classify/embed modules. Helpers: `createTestDashboard()`, `readSSEEvent()`, `createMockEntry()`, `seedEntry()`.
 
