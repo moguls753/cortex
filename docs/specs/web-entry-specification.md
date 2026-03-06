@@ -5,7 +5,7 @@
 | Feature | Web Entry |
 | Phase | 4 |
 | Date | 2026-03-03 |
-| Status | Draft |
+| Status | Complete |
 
 ## Objective
 
@@ -22,7 +22,7 @@ View, edit, and soft-delete individual entries. The entry page is the detailed v
 
 ### US-2: As a user, I want to edit an entry.
 
-- **AC-2.1:** An "Edit" button on the entry view switches to edit mode (either inline or navigates to an edit view).
+- **AC-2.1:** An "Edit" button on the entry view links to `GET /entry/:id/edit`. A "Cancel" link returns to `GET /entry/:id`.
 - **AC-2.2:** Edit mode shows:
   - Text input for name.
   - Category dropdown with all five categories (People, Projects, Tasks, Ideas, Reference).
@@ -43,7 +43,7 @@ View, edit, and soft-delete individual entries. The entry page is the detailed v
 
 ## Constraints
 
-- The entry page is server-rendered HTML via Hono templates. Edit mode can be implemented as a separate page (`GET /entry/:id/edit`) or as an inline toggle with client-side JavaScript.
+- The entry page is server-rendered HTML via Hono templates. Edit mode is a separate route (`GET /entry/:id/edit`, `POST /entry/:id/edit`).
 - Markdown rendering must be done server-side for the view mode. A lightweight markdown library (e.g., marked, markdown-it) is used.
 - The entry page requires authentication (session cookie).
 - The `:id` parameter is a UUID. Invalid UUIDs should be handled gracefully (404 page, not a server error).
@@ -71,9 +71,9 @@ View, edit, and soft-delete individual entries. The entry page is the detailed v
 - Markdown preview pane during editing (the user writes raw markdown and sees it rendered after save).
 - File or image attachments on entries.
 
-## Open Questions
+## Resolved Questions
 
-- Should edit mode be inline (toggle on the same page) or a separate route (`/entry/:id/edit`)?
-- Should there be a "Cancel" button in edit mode that discards changes, and should it warn about unsaved changes?
-- When changing categories, should the old category-specific fields be preserved in the JSONB (hidden but not deleted) in case the user switches back?
-- Should the entry page show related/similar entries (semantic neighbors) as a sidebar or footer section?
+- **Edit mode:** Separate route (`GET /entry/:id/edit`, `POST /entry/:id/edit`). Server-rendered, no client-side toggle.
+- **Cancel button:** Yes — a link back to `/entry/:id`. No unsaved changes warning (no client-side JS needed).
+- **Category change fields:** Old category-specific fields are replaced with new category defaults. No hidden preservation.
+- **Related entries:** Not included. Entry page stays focused on viewing/editing/deleting a single entry.
