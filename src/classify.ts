@@ -36,9 +36,16 @@ export function validateClassificationResponse(raw: string): {
   create_calendar_event: boolean;
   calendar_date: string | null;
 } | null {
+  // Extract JSON from response — LLMs often wrap in markdown code fences
+  let jsonStr = raw.trim();
+  const fenceMatch = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  if (fenceMatch) {
+    jsonStr = fenceMatch[1].trim();
+  }
+
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(jsonStr);
   } catch {
     return null;
   }

@@ -68,7 +68,7 @@ export function renderLayout(
     <header class="flex items-center justify-between shrink-0">
       <div class="flex items-center gap-2.5">
         ${iconBrain("size-4 text-primary")}
-        <span class="text-sm font-medium text-foreground tracking-tight">cortex</span>
+        <a href="/" class="text-sm font-medium text-foreground tracking-tight hover:text-primary transition-colors">cortex</a>
         <span class="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">v0.1</span>
       </div>
       <nav class="flex items-center gap-1">
