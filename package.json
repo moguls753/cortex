@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && npm run build:css",
+    "build:css": "tailwindcss -i src/web/styles.css -o public/style.css --minify",
+    "dev:css": "tailwindcss -i src/web/styles.css -o public/style.css --watch",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:unit": "vitest run --dir tests/unit",
@@ -22,9 +24,11 @@
     "postgres": "^3.4.0"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.2.1",
     "@testcontainers/postgresql": "^10.18.0",
     "@types/node": "^22.0.0",
     "drizzle-kit": "^0.30.0",
+    "tailwindcss": "^4.2.1",
     "testcontainers": "^10.18.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",

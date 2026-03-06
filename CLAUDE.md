@@ -66,6 +66,15 @@ All web UI implementation must follow `docs/plans/2026-03-06-web-design-system.m
 
 **Do not invoke the `frontend-design` skill** for pages covered by the design system (dashboard, browse, entry, new note, trash, settings, login). The design is fully specified — follow it mechanically. Only invoke `frontend-design` for entirely new UI concepts not covered by the design doc.
 
+### CSS Rules
+
+- **No inline styles.** All styling uses Tailwind utility classes. Never use `style="..."` on HTML elements in `src/web/` templates.
+- **CSS custom properties** (oklch color tokens, badge colors, scrollbar) are defined in `src/web/styles.css` — this is the Tailwind input file.
+- **Build step:** `npm run build:css` compiles `src/web/styles.css` → `public/style.css` (minified). Runs automatically as part of `npm run build`. Use `npm run dev:css` for watch mode during development.
+- **`public/style.css` is gitignored** — it is a build artifact, not checked in.
+- **Icons** (`src/web/icons.ts`): Lucide inline SVGs with `className` parameter. The `size-*` class is resolved to `width`/`height` attributes on the SVG element so icons render correctly even before CSS loads.
+- When adding new pages, copy class patterns from the `design/` reference components. Match the exact Tailwind classes — do not invent new patterns or translate to inline styles.
+
 ## File Conventions
 
 - Specs: `docs/specs/{feature}-specification.md`, `{feature}-test-specification.md`, `{feature}-test-implementation-specification.md`
