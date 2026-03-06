@@ -12,7 +12,7 @@ Last updated: 2026-03-06
 | telegram-bot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-browse | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
+| web-browse | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-entry | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-new-note | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-settings | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -61,7 +61,9 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web Browse Phase 4 complete.** 33 tests implemented (20 unit + 13 integration), 32 failing against stubs as expected, 1 passing (TS-5.2 auth redirect — already implemented). Files: `tests/unit/web-browse.test.ts`, `tests/integration/web-browse-integration.test.ts`. Stubs: `src/web/browse.ts`, `src/web/browse-queries.ts`. Key decisions: `generateEmbedding` (not `embedEntry`) for search path, `mode=text` query param for explicit text search bypass, embedding vector insertion via `::vector` cast string, controlled similarity testing via unit vector embeddings. Total: 234/234 existing tests passing.
 
-Next: **web-browse** — Phase 5 (feature implementation). Run `spec-dd web-browse` to continue.
+**Web Browse complete.** All 6 phases done, 33/33 tests pass (20 unit + 13 integration), review report at `web-browse-implementation-review.md`. 0 CRITICAL findings. 1 WARNING resolved (browse routes wired in `src/index.ts`). 2 INFO remain (non-blocking): ILIKE wildcard escaping, helper function duplication. Implementation: `src/web/browse.ts`, `src/web/browse-queries.ts`. Total: 267/267 tests passing across all features.
+
+Next: **web-entry** — Phase 2 (test specification). Run `spec-dd web-entry` to continue.
 
 ## Spec Files
 

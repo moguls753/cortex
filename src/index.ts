@@ -7,6 +7,7 @@ import { createDbConnection, runMigrations } from "./db/index.js";
 import { createHealthRoute, type ServiceCheckers } from "./web/health.js";
 import { createAuthMiddleware, createAuthRoutes } from "./web/auth.js";
 import { createDashboardRoutes } from "./web/dashboard.js";
+import { createBrowseRoutes } from "./web/browse.js";
 import { createSSEBroadcaster } from "./web/sse.js";
 import { initializeEmbedding } from "./embed.js";
 import { startBot } from "./telegram.js";
@@ -82,6 +83,7 @@ async function main(): Promise<void> {
   app.route("/", createAuthRoutes(config.webappPassword, config.sessionSecret));
   app.route("/", createHealthRoute(checkers));
   app.route("/", createDashboardRoutes(sql, broadcaster));
+  app.route("/", createBrowseRoutes(sql));
 
   // Start HTTP server
   serve({ fetch: app.fetch, port: config.port }, () => {

@@ -9,31 +9,82 @@ export interface BrowseFilters {
 }
 
 export async function browseEntries(
-  _sql: Sql,
-  _filters?: BrowseFilters,
+  sql: Sql,
+  filters?: BrowseFilters,
 ): Promise<EntryRow[]> {
-  throw new Error("Not implemented");
+  const category = filters?.category;
+  const tag = filters?.tag;
+
+  const rows = await sql`
+    SELECT id, name, category, content, fields, tags, confidence,
+           source, source_type, deleted_at, created_at, updated_at
+    FROM entries
+    WHERE deleted_at IS NULL
+      ${category ? sql`AND category = ${category}` : sql``}
+      ${tag ? sql`AND ${tag} = ANY(tags)` : sql``}
+    ORDER BY updated_at DESC
+  `;
+  return rows as unknown as EntryRow[];
 }
 
 export async function semanticSearch(
-  _sql: Sql,
-  _queryEmbedding: number[],
-  _filters?: BrowseFilters,
+  sql: Sql,
+  queryEmbedding: number[],
+  filters?: BrowseFilters,
 ): Promise<EntryRow[]> {
-  throw new Error("Not implemented");
+  const category = filters?.category;
+  const tag = filters?.tag;
+  const embeddingLiteral = `[${queryEmbedding.join(",")}]`;
+
+  const rows = await sql`
+    SELECT id, name, category, content, fields, tags, confidence,
+           source, source_type, deleted_at, created_at, updated_at,
+           1 - (embedding <=> ${embeddingLiteral}::vector(1024)) AS similarity
+    FROM entries
+    WHERE deleted_at IS NULL
+      AND embedding IS NOT NULL
+      AND 1 - (embedding <=> ${embeddingLiteral}::vector(1024)) >= 0.5
+      ${category ? sql`AND category = ${category}` : sql``}
+      ${tag ? sql`AND ${tag} = ANY(tags)` : sql``}
+    ORDER BY similarity DESC
+  `;
+  return rows as unknown as EntryRow[];
 }
 
 export async function textSearch(
-  _sql: Sql,
-  _query: string,
-  _filters?: BrowseFilters,
+  sql: Sql,
+  query: string,
+  filters?: BrowseFilters,
 ): Promise<EntryRow[]> {
-  throw new Error("Not implemented");
+  const category = filters?.category;
+  const tag = filters?.tag;
+  const pattern = `%${query}%`;
+
+  const rows = await sql`
+    SELECT id, name, category, content, fields, tags, confidence,
+           source, source_type, deleted_at, created_at, updated_at
+    FROM entries
+    WHERE deleted_at IS NULL
+      AND (name ILIKE ${pattern} OR content ILIKE ${pattern})
+      ${category ? sql`AND category = ${category}` : sql``}
+      ${tag ? sql`AND ${tag} = ANY(tags)` : sql``}
+    ORDER BY updated_at DESC
+  `;
+  return rows as unknown as EntryRow[];
 }
 
 export async function getFilterTags(
-  _sql: Sql,
-  _options?: { category?: string },
+  sql: Sql,
+  options?: { category?: string },
 ): Promise<string[]> {
-  throw new Error("Not implemented");
+  const category = options?.category;
+
+  const rows = await sql`
+    SELECT DISTINCT unnest(tags) AS tag
+    FROM entries
+    WHERE deleted_at IS NULL
+      ${category ? sql`AND category = ${category}` : sql``}
+    ORDER BY tag
+  `;
+  return rows.map((r) => r.tag as string);
 }
