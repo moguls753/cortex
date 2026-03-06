@@ -149,12 +149,18 @@ async function ensureModel(ollamaUrl: string): Promise<void> {
 
   const hasModel = models.some((name) => name.includes(EMBEDDING_MODEL));
   if (!hasModel) {
-    log.info("Pulling embedding model", { model: EMBEDDING_MODEL });
-    await fetch(`${ollamaUrl}/api/pull`, {
+    log.info("Pulling embedding model (this may take a few minutes)", { model: EMBEDDING_MODEL });
+    const pullResponse = await fetch(`${ollamaUrl}/api/pull`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: EMBEDDING_MODEL }),
+      body: JSON.stringify({ name: EMBEDDING_MODEL, stream: true }),
     });
+    // Ollama streams NDJSON progress — consume the entire body to wait for completion
+    if (pullResponse.body) {
+      for await (const _ of pullResponse.body) { /* drain */ }
+    } else {
+      await pullResponse.text();
+    }
     log.info("Model pull complete", { model: EMBEDDING_MODEL });
   }
 }

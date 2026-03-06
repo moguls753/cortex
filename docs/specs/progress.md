@@ -14,7 +14,7 @@ Last updated: 2026-03-06
 | web-dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-browse | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-entry | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-new-note | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
+| web-new-note | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
 | web-settings | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | mcp-server | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | digests | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -71,7 +71,9 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web New Note Phase 3 complete.** Test implementation specification with all 24 scenarios mapped to test functions. Split: 20 unit tests (mocked query layer + classify + embed) + 4 integration tests (testcontainers). Key decisions: factory pattern `createNewNoteRoutes(sql)`, reuses `insertEntry` from dashboard-queries and `getAllTags` from entry-queries. AI Suggest via `POST /api/classify` JSON endpoint using `classifyText` + `assembleContext`. Tag autocomplete via inline `<datalist>` (consistent with web-entry). Client-side behaviors (tag appending, beforeunload) tested by verifying server contract + HTML contains expected scripts.
 
-Next: **web-new-note** — Phase 4 (test implementation). Run `spec-dd web-new-note` to continue.
+**Web New Note Phase 4 complete.** 24 tests implemented (20 unit + 4 integration), 21 failing against stub as expected, 3 passing early (TS-4.2/TS-4.3 auth redirect, TS-4.5 auth 401 for API path). Files: `tests/unit/web-new-note.test.ts`, `tests/integration/web-new-note-integration.test.ts`. Stub: `src/web/new-note.ts`. Code review: 0 CRITICAL, 4 WARNINGs all fixed (W-1 TS-4.5 name mismatch renamed, W-2 TS-2.1 missing arg verification added, W-3/W-4 missing response status checks added to TS-2.3/TS-3.2/TS-3.3/TS-5.2). Key decisions: reuses `insertEntry` from dashboard-queries, `getAllTags` from entry-queries, `classifyText`+`assembleContext` from classify, `embedEntry` from embed. TS-4.5 expects 401 (not 302) — auth middleware returns 401 for `/api/` paths. Total: 294/294 existing tests passing (1 pre-existing flake in embed-integration retry test, unrelated).
+
+Next: **web-new-note** — Phase 5 (feature implementation). Run `spec-dd web-new-note` to continue.
 
 ## Spec Files
 

@@ -26,6 +26,8 @@ services:
       - WEEKLY_DIGEST_CRON=${WEEKLY_DIGEST_CRON:-0 16 * * 0}
       - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.6}
       - TZ=${TZ:-Europe/Berlin}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
