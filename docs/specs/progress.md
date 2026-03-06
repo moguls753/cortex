@@ -13,7 +13,7 @@ Last updated: 2026-03-06
 | web-auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-browse | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-entry | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| web-entry | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
 | web-new-note | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-settings | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | mcp-server | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -63,7 +63,7 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web Browse complete.** All 6 phases done, 33/33 tests pass (20 unit + 13 integration), review report at `web-browse-implementation-review.md`. 0 CRITICAL findings. 1 WARNING resolved (browse routes wired in `src/index.ts`). 2 INFO remain (non-blocking): ILIKE wildcard escaping, helper function duplication. Implementation: `src/web/browse.ts`, `src/web/browse-queries.ts`. Total: 267/267 tests passing across all features.
 
-Next: **web-entry** — Phase 2 (test specification). Run `spec-dd web-entry` to continue.
+Next: **web-entry** — Phase 4 (test implementation). Run `spec-dd web-entry` to continue.
 
 ## Spec Files
 
@@ -76,7 +76,7 @@ Next: **web-entry** — Phase 2 (test specification). Run `spec-dd web-entry` to
 | web-auth | `web-auth-specification.md`, `web-auth-test-specification.md`, `web-auth-test-implementation-specification.md` |
 | web-dashboard | `web-dashboard-specification.md`, `web-dashboard-test-specification.md`, `web-dashboard-test-implementation-specification.md` |
 | web-browse | `web-browse-specification.md`, `web-browse-test-specification.md`, `web-browse-test-implementation-specification.md` |
-| web-entry | `web-entry-specification.md` |
+| web-entry | `web-entry-specification.md`, `web-entry-test-specification.md`, `web-entry-test-implementation-specification.md` |
 | web-new-note | `web-new-note-specification.md` |
 | web-settings | `web-settings-specification.md` |
 | mcp-server | `mcp-server-specification.md` |
