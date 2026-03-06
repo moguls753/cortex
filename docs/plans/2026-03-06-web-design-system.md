@@ -13,7 +13,8 @@ Complete visual identity for the Cortex web interface. Replaces the previous "Ed
 ## Implementation Approach
 
 - **Server-rendered HTML** via Hono (no React, no client-side framework)
-- **Tailwind CSS** pre-built via CLI, using oklch CSS custom properties for theming
+- **Tailwind CSS v4** via `@tailwindcss/cli`. Input: `src/web/styles.css`. Output: `public/style.css` (gitignored). Build: `npm run build:css`. Watch: `npm run dev:css`.
+- **No inline styles.** All styling uses Tailwind utility classes only. oklch tokens and custom components defined in `src/web/styles.css`.
 - **Lucide icons** as inline SVGs from a helper module (`src/web/icons.ts`)
 - **Vanilla JS** for interactivity: theme toggle, SSE, capture bar
 - **Dark/light theme** toggle with `localStorage` persistence
@@ -220,12 +221,11 @@ WebKit fallback with 4px width, transparent track, `--border` colored thumb.
 `src/web/layout.ts` exports `renderLayout(title, content, activePage)`:
 
 - Full HTML document with:
-  - `<head>`: charset, viewport, title, Google Fonts link (JetBrains Mono 400+500), inline theme script
-  - `<style>`: oklch CSS custom properties (both themes), Tailwind theme bindings, scrollbar utilities, base layer styles
+  - `<head>`: charset, viewport, title, Google Fonts link (JetBrains Mono 400+500), inline theme script, `<link>` to `public/style.css`
   - `<body class="font-sans antialiased">`: header + content slot + status bar
 - Header and status bar rendered on every page (shared navigation)
 - Content slot receives page-specific HTML
-- Tailwind CSS loaded from pre-built `public/style.css`
+- **No inline styles.** All styling uses Tailwind utility classes only. oklch tokens, badge colors, and custom utilities are defined in `src/web/styles.css` (the Tailwind input file), not in a `<style>` block.
 
 ## Applying to Other Pages
 
@@ -258,9 +258,17 @@ This design system applies to all web pages, not just the dashboard:
 
 | File | Purpose |
 |------|---------|
-| `src/web/layout.ts` | Shared HTML layout with design system CSS, header, status bar |
-| `src/web/icons.ts` | Inline SVG icon helpers (~15-20 icons from Lucide) |
-| `public/style.css` | Pre-built Tailwind CSS |
+| `src/web/styles.css` | Tailwind input: oklch tokens (light+dark), `@theme` bindings, badge colors, scrollbar utility |
+| `src/web/layout.ts` | Shared HTML layout: `<head>`, header, status bar, theme toggle script |
+| `src/web/icons.ts` | Inline SVG icon helpers (~18 icons from Lucide), resolves `size-*` to `width`/`height` |
+| `public/style.css` | Build output (gitignored): `npm run build:css` compiles from `src/web/styles.css` |
+
+## CSS Convention
+
+- **No inline styles.** All `src/web/` templates use Tailwind utility classes exclusively.
+- **`src/web/styles.css`** is the single source for CSS custom properties and custom components (`badge-*`, `scrollbar-thin`).
+- **`public/style.css`** is a build artifact — never edit or commit it. Rebuild with `npm run build:css` (or `npm run dev:css` for watch mode).
+- When adding new pages, copy class patterns from the `design/` reference components verbatim.
 
 ## Reference
 

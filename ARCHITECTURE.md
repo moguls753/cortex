@@ -614,20 +614,22 @@ cortex/
 │   │   ├── schema.ts           # Drizzle schema (entries + settings tables)
 │   │   └── migrations/         # SQL migrations
 │   └── web/
-│       ├── routes.ts           # Hono routes (dashboard, browse, editor, API, /mcp, SSE)
 │       ├── auth.ts             # session-based auth middleware
 │       ├── sse.ts              # Server-Sent Events manager
-│       ├── templates/
-│       │   ├── layout.ts       # base HTML layout with Tailwind
-│       │   ├── login.ts        # login page
-│       │   ├── dashboard.ts    # start page (digest, recent, stats, quick capture)
-│       │   ├── browse.ts       # category browsing + semantic + text search
-│       │   ├── entry.ts        # view/edit single entry
-│       │   ├── new.ts          # new note editor
-│       │   ├── trash.ts        # soft-deleted entries
-│       │   └── settings.ts     # settings page
-│       └── public/
-│           └── style.css       # Tailwind CLI output
+│       ├── icons.ts            # Lucide inline SVG helpers
+│       ├── styles.css          # Tailwind input: oklch tokens, @theme, badge colors, scrollbar
+│       ├── layout.ts           # shared HTML shell: <head>, header, status bar, theme toggle
+│       ├── dashboard.ts        # start page (digest, recent, stats, quick capture)
+│       ├── dashboard-queries.ts # DB queries for dashboard data
+│       ├── browse.ts           # category browsing + semantic + text search
+│       ├── browse-queries.ts   # DB queries for browse data
+│       ├── entry.ts            # view/edit single entry
+│       ├── new.ts              # new note editor
+│       ├── trash.ts            # soft-deleted entries
+│       ├── settings.ts         # settings page
+│       └── login.ts            # login page
+├── public/
+│   └── style.css               # Tailwind CLI output (gitignored build artifact)
 ├── prompts/
 │   ├── classify.md
 │   ├── daily-digest.md
