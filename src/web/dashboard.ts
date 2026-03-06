@@ -94,26 +94,26 @@ function renderMarkdown(text: string): string {
       if (inList) { html += "</ul>"; inList = false; }
       const level = headingMatch[1]!.length;
       const sizes = ["22px", "18px", "16px"];
-      html += `<h${level + 1}>${inlineMarkdown(escapeHtml(headingMatch[2]!))}</h${level + 1}>`;
+      html += `<h${level + 1} style="font-family:'Lora',serif;font-size:${sizes[level - 1]};font-weight:600;margin:16px 0 8px;">${inlineMarkdown(escapeHtml(headingMatch[2]!))}</h${level + 1}>`;
       continue;
     }
 
     // Blockquotes
     if (trimmed.startsWith("> ")) {
       if (inList) { html += "</ul>"; inList = false; }
-      html += `<blockquote>${inlineMarkdown(escapeHtml(trimmed.slice(2)))}</blockquote>`;
+      html += `<blockquote style="border-left:3px solid #C2705B;padding-left:12px;margin:8px 0;color:#7A746D;font-style:italic;">${inlineMarkdown(escapeHtml(trimmed.slice(2)))}</blockquote>`;
       continue;
     }
 
     // Unordered list
     if (/^[-*]\s+/.test(trimmed)) {
-      if (!inList) { html += "<ul>"; inList = true; }
+      if (!inList) { html += "<ul style='margin:8px 0;padding-left:20px;'>"; inList = true; }
       html += `<li>${inlineMarkdown(escapeHtml(trimmed.replace(/^[-*]\s+/, "")))}</li>`;
       continue;
     }
 
     if (inList) { html += "</ul>"; inList = false; }
-    html += `<p>${inlineMarkdown(escapeHtml(trimmed))}</p>`;
+    html += `<p style="margin:4px 0;">${inlineMarkdown(escapeHtml(trimmed))}</p>`;
   }
 
   if (inList) html += "</ul>";
@@ -124,7 +124,7 @@ function inlineMarkdown(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, "<code>$1</code>");
+    .replace(/`(.+?)`/g, '<code style="font-family:\'IBM Plex Mono\',monospace;font-size:14px;background:rgba(0,0,0,0.05);padding:1px 4px;border-radius:3px;">$1</code>');
 }
 
 function renderDigest(
@@ -140,20 +140,24 @@ function renderDigest(
 
   let digestHtml: string;
   if (digest) {
-    digestHtml = `<div data-digest class="digest-content">
+    digestHtml = `<div data-digest style="font-family:'Source Sans 3',sans-serif;line-height:1.7;">
       ${renderMarkdown(digest.content)}
     </div>`;
   } else {
-    digestHtml = `<p class="empty-state">
+    digestHtml = `<p style="text-align:center;font-style:italic;color:#7A746D;">
       No digest yet &mdash; your first one arrives tomorrow at ${escapeHtml(cronTime)}
     </p>`;
   }
 
   return `
-    <div class="digest-header">
-      <span class="digest-date">${escapeHtml(dateLine)}</span>
+    <div style="text-align:center;margin-top:48px;">
+      <span style="font-family:'Lora',serif;font-style:italic;color:#7A746D;font-size:15px;">
+        ${escapeHtml(dateLine)}
+      </span>
     </div>
-    ${digestHtml}
+    <div style="margin-top:24px;">
+      ${digestHtml}
+    </div>
   `;
 }
 
@@ -171,7 +175,7 @@ function renderStats(stats: {
   const statCards = items
     .map(
       (s) => `
-      <div class="stat-card">
+      <div class="stat-card" style="text-align:center;flex:1;">
         <div class="stat-number">${s.value}</div>
         <div class="stat-label">${s.label}</div>
       </div>
@@ -179,7 +183,7 @@ function renderStats(stats: {
     )
     .join("");
 
-  return `<div class="stats-grid">${statCards}</div>`;
+  return `<div style="display:flex;gap:16px;">${statCards}</div>`;
 }
 
 function renderEntries(
@@ -193,7 +197,7 @@ function renderEntries(
   if (entries.length === 0) {
     return `
       <div data-entries>
-        <p data-empty class="empty-state">
+        <p data-empty style="text-align:center;font-style:italic;color:#7A746D;">
           No entries yet. Capture your first thought above or send a message via Telegram.
         </p>
       </div>
@@ -209,16 +213,16 @@ function renderEntries(
 
   let html = '<div data-entries>';
   for (const [label, groupEntries] of groups) {
-    html += `<div class="entry-group">
-      <h3 class="date-group-label">${escapeHtml(label)}</h3>`;
+    html += `<div style="margin-bottom:24px;">
+      <h3 style="font-family:'Source Sans 3',sans-serif;font-size:13px;color:#7A746D;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">${escapeHtml(label)}</h3>`;
 
     for (const entry of groupEntries) {
       const badgeLabel = entry.category ?? "unclassified";
       const badgeClass = categoryBadgeClass(entry.category);
       html += `
-        <div data-entry-id="${escapeHtml(entry.id)}" class="entry-row">
+        <div data-entry-id="${escapeHtml(entry.id)}" style="display:flex;align-items:center;gap:12px;padding:8px 0;">
           <span class="category-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>
-          <a href="/entry/${escapeHtml(entry.id)}" class="entry-link" >${escapeHtml(entry.name)}</a>
+          <a href="/entry/${escapeHtml(entry.id)}" class="entry-link" style="flex:1;">${escapeHtml(entry.name)}</a>
           <span class="entry-time">${relativeTime(entry.created_at)}</span>
         </div>`;
     }
@@ -227,8 +231,8 @@ function renderEntries(
   }
 
   html += `</div>
-  <div class="view-all-wrap">
-    <a href="/browse" class="view-all">View all &rarr;</a>
+  <div style="text-align:center;margin-top:16px;">
+    <a href="/browse" class="text-accent" style="font-size:14px;text-decoration:none;">View all &rarr;</a>
   </div>`;
 
   return html;
@@ -236,14 +240,18 @@ function renderEntries(
 
 function renderCapture(): string {
   return `
-    <form id="capture-form" class="capture-form">
+    <form id="capture-form" style="position:relative;">
       <input type="text" name="text" id="capture-input"
-        class="capture-input"
         placeholder="What's on your mind?"
-        autocomplete="off">
-      <span class="capture-hint">&#9166;</span>
+        autocomplete="off"
+        style="width:100%;padding:12px 0;font-family:'Source Sans 3',sans-serif;font-size:16px;
+               background:transparent;border:none;border-bottom:2px solid #E8E4DF;
+               outline:none;color:#2D2A26;font-style:italic;transition:border-color 0.2s;"
+        onfocus="this.style.borderBottomColor='#C2705B';this.style.fontStyle='normal'"
+        onblur="if(!this.value)this.style.fontStyle='italic';this.style.borderBottomColor='#E8E4DF'">
+      <span style="position:absolute;right:0;top:12px;color:#7A746D;opacity:0.5;font-size:14px;">&#9166;</span>
     </form>
-    <div id="capture-feedback" class="capture-feedback"></div>
+    <div id="capture-feedback" style="margin-top:8px;font-size:14px;min-height:20px;"></div>
   `;
 }
 
@@ -276,14 +284,14 @@ function renderClientScript(): string {
         if (res.ok) {
           var cat = res.data.category || 'unclassified';
           var conf = res.data.confidence ? Math.round(res.data.confidence * 100) + '%' : '';
-          feedback.innerHTML = '<span>Captured as <strong>' + cat + '</strong>: ' + (res.data.name || '') + (conf ? ' (' + conf + ')' : '') + '</span>';
+          feedback.innerHTML = '<span style="color:#5BA67A;">Captured as <strong>' + cat + '</strong>: ' + (res.data.name || '') + (conf ? ' (' + conf + ')' : '') + '</span>';
           setTimeout(function() { feedback.innerHTML = ''; }, 3000);
         }
       })
       .catch(function() {
         input.disabled = false;
         input.placeholder = "What's on your mind?";
-        feedback.innerHTML = '<span>Capture failed — try again</span>';
+        feedback.innerHTML = '<span style="color:#C2705B;">Capture failed — try again</span>';
         setTimeout(function() { feedback.innerHTML = ''; }, 5000);
       });
     });
@@ -304,9 +312,9 @@ function renderClientScript(): string {
     }
 
     function entryRowHtml(d) {
-      return '<div data-entry-id="' + d.id + '" class="entry-row" style="opacity:0;transition:opacity 0.3s;">'
+      return '<div data-entry-id="' + d.id + '" style="display:flex;align-items:center;gap:12px;padding:8px 0;opacity:0;transition:opacity 0.3s;">'
         + badgeHtml(d.category)
-        + '<a href="/entry/' + d.id + '" class="entry-link" >' + (d.name || 'Untitled') + '</a>'
+        + '<a href="/entry/' + d.id + '" class="entry-link" style="flex:1;">' + (d.name || 'Untitled') + '</a>'
         + '<span class="entry-time">just now</span></div>';
     }
 
@@ -332,7 +340,7 @@ function renderClientScript(): string {
         var d = JSON.parse(e.data);
         var row = document.querySelector('[data-entry-id="' + d.id + '"]');
         if (!row) return;
-        row.style.background = 'var(--bg-off)';
+        row.style.background = 'rgba(194,112,91,0.05)';
         var link = row.querySelector('.entry-link');
         if (link && d.name) link.textContent = d.name;
         var badge = row.querySelector('.category-badge');
@@ -359,7 +367,7 @@ function renderClientScript(): string {
         var d = JSON.parse(e.data);
         var digestEl = document.querySelector('[data-digest]');
         if (digestEl && d.content) {
-          digestEl.style.background = 'var(--bg-dark)';
+          digestEl.style.background = 'rgba(194,112,91,0.05)';
           digestEl.innerHTML = d.content.replace(/\\n/g, '<br>');
           setTimeout(function() { digestEl.style.background = 'transparent'; }, 500);
         }
@@ -394,26 +402,15 @@ export function createDashboardRoutes(
     const cronTime = parseCronHour(cronValue);
 
     const content = `
-      <div class="band band-off">
-        <div class="band-inner">
-          ${renderDigest(digest ?? null, cronTime)}
-        </div>
-      </div>
-      <div class="band band-white band-border">
-        <div class="band-inner">
-          ${renderCapture()}
-        </div>
-      </div>
-      <div class="band band-off band-border">
-        <div class="band-inner">
-          ${renderStats(stats)}
-        </div>
-      </div>
-      <div class="band band-white band-border">
-        <div class="band-inner">
-          <h2 class="section-label">Recent</h2>
-          ${renderEntries(entries)}
-        </div>
+      ${renderDigest(digest ?? null, cronTime)}
+      <hr class="section-divider">
+      ${renderCapture()}
+      <hr class="section-divider">
+      ${renderStats(stats)}
+      <hr class="section-divider">
+      <div>
+        <h2 class="heading-serif" style="margin-bottom:16px;">Recent</h2>
+        ${renderEntries(entries)}
       </div>
       ${renderClientScript()}
     `;

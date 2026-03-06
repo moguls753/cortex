@@ -1,6 +1,6 @@
 # Spec-DD Progress Tracker
 
-Last updated: 2026-03-05
+Last updated: 2026-03-06
 
 ## Feature Status
 
@@ -12,7 +12,7 @@ Last updated: 2026-03-05
 | telegram-bot | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-browse | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
+| web-browse | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
 | web-entry | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-new-note | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | web-settings | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -59,7 +59,9 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Deployment scaffolding complete.** Created `src/index.ts` (entry point wiring Hono server, DB, auth, dashboard, SSE, Telegram bot), `docker-compose.yml` (4 services: app, PostgreSQL+pgvector, Ollama, faster-whisper), `Dockerfile` (multi-stage node:22-slim), `.env.example`. Installed `@hono/node-server`, `@anthropic-ai/sdk`, `openai`. Fixed pre-existing type errors in `classify.ts` and `dashboard-queries.ts` so `npm run build` succeeds. App is now runnable via `docker compose up`. 234/234 tests passing.
 
-Next: **web-browse** — Phase 4 (test implementation). Run `spec-dd web-browse` to continue.
+**Web Browse Phase 4 complete.** 33 tests implemented (20 unit + 13 integration), 32 failing against stubs as expected, 1 passing (TS-5.2 auth redirect — already implemented). Files: `tests/unit/web-browse.test.ts`, `tests/integration/web-browse-integration.test.ts`. Stubs: `src/web/browse.ts`, `src/web/browse-queries.ts`. Key decisions: `generateEmbedding` (not `embedEntry`) for search path, `mode=text` query param for explicit text search bypass, embedding vector insertion via `::vector` cast string, controlled similarity testing via unit vector embeddings. Total: 234/234 existing tests passing.
+
+Next: **web-browse** — Phase 5 (feature implementation). Run `spec-dd web-browse` to continue.
 
 ## Spec Files
 
