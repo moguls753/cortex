@@ -13,8 +13,8 @@ Last updated: 2026-03-06
 | web-auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-browse | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-entry | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
-| web-new-note | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| web-entry | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| web-new-note | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
 | web-settings | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | mcp-server | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | digests | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -63,7 +63,15 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Web Browse complete.** All 6 phases done, 33/33 tests pass (20 unit + 13 integration), review report at `web-browse-implementation-review.md`. 0 CRITICAL findings. 1 WARNING resolved (browse routes wired in `src/index.ts`). 2 INFO remain (non-blocking): ILIKE wildcard escaping, helper function duplication. Implementation: `src/web/browse.ts`, `src/web/browse-queries.ts`. Total: 267/267 tests passing across all features.
 
-Next: **web-entry** — Phase 4 (test implementation). Run `spec-dd web-entry` to continue.
+**Web Entry Phase 4 complete.** 27 tests implemented (20 unit + 7 integration), 23 failing against stubs as expected, 4 passing early (TS-1.3/TS-1.4 — 404 from unmatched routes, TS-4.2/TS-4.3 — auth middleware redirects). Files: `tests/unit/web-entry.test.ts`, `tests/integration/web-entry-integration.test.ts`. Stubs: `src/web/entry.ts`, `src/web/entry-queries.ts`. Code review: 0 CRITICAL, 4 WARNINGs (all non-blocking — W-1 vacuous TS-5.2 fixed by adding `expect(res.status).toBe(200)`, W-2/W-3/W-4 deferred). Key decisions: `embedEntry` (not `generateEmbedding`) for re-embedding on save, `Referer` header for post-delete redirect, comma-separated string for tag submission, server-side field migration on category change. Total: 267/267 existing tests passing (no regressions).
+
+**Web Entry complete.** All 6 phases done, 27/27 tests pass (20 unit + 7 integration), review report at `web-entry-implementation-review.md`. 1 CRITICAL fixed (XSS via unsanitized `marked.parse()` — added `sanitize-html`). 3 WARNINGs fixed (missing UUID validation on delete/restore, single-quote escaping, inconsistent null guard). 4 INFO remain (non-blocking). Implementation: `src/web/entry.ts`, `src/web/entry-queries.ts`. Dependencies: `marked` + `sanitize-html`. Total: 294/294 tests passing across all features.
+
+**Web New Note Phase 2 complete.** Test specification with 24 scenarios derived from behavioral spec. Full traceability: all acceptance criteria, constraints, and edge cases covered across 5 groups (form display, AI suggest, save note, constraints, edge cases). Resolved 4 open questions: AI Suggest = category+tags only, no category fields on form, no "Save and New", yes beforeunload. Review: fixed TS-3.3 default fields (null not "active"), added TS-4.5 (unauth API classify), added TS-5.9 (name-only AI Suggest).
+
+**Web New Note Phase 3 complete.** Test implementation specification with all 24 scenarios mapped to test functions. Split: 20 unit tests (mocked query layer + classify + embed) + 4 integration tests (testcontainers). Key decisions: factory pattern `createNewNoteRoutes(sql)`, reuses `insertEntry` from dashboard-queries and `getAllTags` from entry-queries. AI Suggest via `POST /api/classify` JSON endpoint using `classifyText` + `assembleContext`. Tag autocomplete via inline `<datalist>` (consistent with web-entry). Client-side behaviors (tag appending, beforeunload) tested by verifying server contract + HTML contains expected scripts.
+
+Next: **web-new-note** — Phase 4 (test implementation). Run `spec-dd web-new-note` to continue.
 
 ## Spec Files
 
@@ -77,7 +85,7 @@ Next: **web-entry** — Phase 4 (test implementation). Run `spec-dd web-entry` t
 | web-dashboard | `web-dashboard-specification.md`, `web-dashboard-test-specification.md`, `web-dashboard-test-implementation-specification.md` |
 | web-browse | `web-browse-specification.md`, `web-browse-test-specification.md`, `web-browse-test-implementation-specification.md` |
 | web-entry | `web-entry-specification.md`, `web-entry-test-specification.md`, `web-entry-test-implementation-specification.md` |
-| web-new-note | `web-new-note-specification.md` |
+| web-new-note | `web-new-note-specification.md`, `web-new-note-test-specification.md`, `web-new-note-test-implementation-specification.md` |
 | web-settings | `web-settings-specification.md` |
 | mcp-server | `mcp-server-specification.md` |
 | digests | `digests-specification.md` |
