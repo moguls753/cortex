@@ -31,15 +31,15 @@ function categoryBadgeClass(category: string | null): string {
 }
 
 function categoryAbbr(category: string | null): string {
-  if (!category) return "UNC";
+  if (!category) return "—";
   const map: Record<string, string> = {
-    people: "PEO",
-    projects: "PRO",
-    tasks: "TSK",
-    ideas: "IDE",
-    reference: "REF",
+    people: "People",
+    projects: "Project",
+    tasks: "Task",
+    ideas: "Idea",
+    reference: "Ref",
   };
-  return map[category] ?? "UNC";
+  return map[category] ?? "—";
 }
 
 function relativeTime(date: Date): string {
