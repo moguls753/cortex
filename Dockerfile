@@ -8,6 +8,7 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src/ src/
 COPY prompts/ prompts/
+COPY public/ public/
 
 RUN npm run build
 

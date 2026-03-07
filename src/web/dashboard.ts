@@ -35,25 +35,6 @@ function parseCronHour(cron: string | undefined): string {
   return `${hour}:${String(minute).padStart(2, "0")}`;
 }
 
-function dateGroupLabel(date: Date): string {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const entryDate = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  );
-  const diffDays = Math.floor(
-    (today.getTime() - entryDate.getTime()) / 86400000,
-  );
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  return entryDate.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
 
 function categoryBadgeClass(category: string | null): string {
   if (!category) return "badge-unclassified";
@@ -208,7 +189,7 @@ function renderDigest(
       </div>`;
   }
 
-  return `<div class="flex-1 min-h-0 rounded-md border border-border bg-card p-6 flex flex-col">
+  return `<div class="min-h-[420px] max-h-[60vh] rounded-md border border-border bg-card p-6 flex flex-col">
     ${digestBody}
   </div>`;
 }
@@ -227,7 +208,7 @@ function renderCapture(): string {
           ${iconCornerDownLeft("size-3.5")}
         </button>
       </div>
-      <div id="capture-feedback" class="mt-1 text-[11px] min-h-4 pl-3"></div>
+      <div id="capture-feedback" class="text-[11px] pl-3 min-h-4"></div>
     </form>`;
 }
 
@@ -238,9 +219,9 @@ function renderStats(stats: {
   stalledProjects: number;
 }): string {
   const items = [
-    { value: stats.entriesThisWeek, label: "Entries this week", icon: iconZap("size-3"), colorCls: "text-primary", statKey: "week" },
-    { value: stats.totalEntries ?? 0, label: "Total entries", icon: iconBrain("size-3"), colorCls: "text-foreground", statKey: "total" },
-    { value: stats.openTasks, label: "Open tasks", icon: iconCheckSquare("size-3"), colorCls: "text-accent", statKey: "tasks" },
+    { value: stats.entriesThisWeek, label: "Entries this week", icon: iconZap("size-3"), colorCls: "text-primary", statKey: "entries-week" },
+    { value: stats.totalEntries ?? 0, label: "Total entries", icon: iconBrain("size-3"), colorCls: "text-foreground", statKey: "entries-total" },
+    { value: stats.openTasks, label: "Open tasks", icon: iconCheckSquare("size-3"), colorCls: "text-accent", statKey: "open-tasks" },
     { value: stats.stalledProjects, label: "Stalled projects", icon: iconAlertTriangle("size-3"), colorCls: "text-destructive", statKey: "stalled" },
   ];
 
@@ -278,42 +259,22 @@ function renderEntries(
     `;
   }
 
-  const groups = new Map<string, typeof entries>();
+  let html = '<div data-entries><div data-entry-list class="space-y-0.5">';
+
   for (const entry of entries) {
-    const label = dateGroupLabel(entry.created_at);
-    if (!groups.has(label)) groups.set(label, []);
-    groups.get(label)!.push(entry);
+    const badgeLabel = categoryAbbr(entry.category);
+    const badgeClass = categoryBadgeClass(entry.category);
+    const time = relativeTime(entry.created_at);
+    html += `
+      <a href="/entry/${escapeHtml(entry.id)}" data-entry-id="${escapeHtml(entry.id)}" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+        <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 ${badgeClass}">${escapeHtml(badgeLabel)}</span>
+        <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors entry-name">${escapeHtml(entry.name)}</span>
+        <span class="shrink-0">${sourceIcon(entry.source, entry.source_type)}</span>
+        <span class="text-[10px] text-muted-foreground shrink-0">${time}</span>
+      </a>`;
   }
 
-  let html = '<div data-entries>';
-
-  html += '<h2 class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2 shrink-0">Recent</h2>';
-
-  for (const [label, groupEntries] of groups) {
-    html += `<div class="mb-3">
-      <div class="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">${escapeHtml(label)}</div>
-      <div data-entry-list class="space-y-0.5">`;
-
-    for (const entry of groupEntries) {
-      const badgeLabel = categoryAbbr(entry.category);
-      const badgeClass = categoryBadgeClass(entry.category);
-      const time = relativeTime(entry.created_at);
-      html += `
-        <a href="/entry/${escapeHtml(entry.id)}" data-entry-id="${escapeHtml(entry.id)}" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
-          <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 ${badgeClass}">${escapeHtml(badgeLabel)}</span>
-          <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors entry-name">${escapeHtml(entry.name)}</span>
-          <span class="shrink-0">${sourceIcon(entry.source, entry.source_type)}</span>
-          <span class="text-[10px] text-muted-foreground shrink-0">${time}</span>
-        </a>`;
-    }
-
-    html += "</div></div>";
-  }
-
-  html += `</div>
-  <div class="text-center mt-2">
-    <a href="/browse" class="text-xs text-primary hover:underline">View all &rarr;</a>
-  </div>`;
+  html += `</div></div>`;
 
   return html;
 }
@@ -422,18 +383,10 @@ function renderClientScript(): string {
         var row = document.createElement('div');
         row.innerHTML = entryRowHtml(d);
         var el = row.firstElementChild;
-        var entryList = list.querySelector('.space-y-0\\.5');
+        var entryList = list.querySelector('[data-entry-list]');
         if (entryList) entryList.insertAdjacentElement('afterbegin', el);
         else list.appendChild(el);
         requestAnimationFrame(function() { el.classList.remove('opacity-0'); });
-        var weekEl = document.querySelector('[data-stat="week"]');
-        if (weekEl) weekEl.textContent = String((parseInt(weekEl.textContent || '0', 10) || 0) + 1);
-        var totalEl = document.querySelector('[data-stat="total"]');
-        if (totalEl) totalEl.textContent = String((parseInt(totalEl.textContent || '0', 10) || 0) + 1);
-        if (d.category === 'tasks') {
-          var tasksEl = document.querySelector('[data-stat="tasks"]');
-          if (tasksEl) tasksEl.textContent = String((parseInt(tasksEl.textContent || '0', 10) || 0) + 1);
-        }
       } catch(err) {}
     });
 
@@ -479,8 +432,6 @@ function renderClientScript(): string {
         row.style.transition = 'opacity 0.3s, max-height 0.3s';
         setTimeout(function() { row.style.maxHeight = '0'; row.style.overflow = 'hidden'; row.style.padding = '0'; }, 10);
         setTimeout(function() { row.remove(); }, 350);
-        var totalEl = document.querySelector('[data-stat="total"]');
-        if (totalEl) totalEl.textContent = String(Math.max(0, (parseInt(totalEl.textContent || '0', 10) || 0) - 1));
       } catch(err) {}
     });
 
@@ -508,7 +459,7 @@ export function createDashboardRoutes(
 
   app.get("/", async (c) => {
     const [rawEntries, rawStats, digest, cronValue] = await Promise.all([
-      getRecentEntries(sql, 5),
+      getRecentEntries(sql, 9),
       getDashboardStats(sql),
       getLatestDigest(sql),
       resolveConfigValue("digest_daily_cron", sql),
@@ -526,13 +477,13 @@ export function createDashboardRoutes(
     const content = `
       ${renderDigest(digest ?? null, cronTime)}
 
-      <div class="shrink-0 flex flex-col gap-3">
+      <div class="shrink-0 flex flex-col gap-3 mt-3">
         ${renderCapture()}
         <div class="grid grid-cols-12 gap-3">
           <div class="col-span-4">
             ${renderStats(stats)}
           </div>
-          <div class="col-span-8 rounded-md border border-border bg-card px-4 py-3 max-h-36 overflow-y-auto scrollbar-thin">
+          <div class="col-span-8 rounded-md border border-border bg-card px-4 py-3 max-h-[258px] overflow-y-auto scrollbar-thin">
             ${renderEntries(entries)}
           </div>
         </div>
