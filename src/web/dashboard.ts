@@ -238,10 +238,10 @@ function renderStats(stats: {
   stalledProjects: number;
 }): string {
   const items = [
-    { key: "entries-week", value: stats.entriesThisWeek, label: "Entries this week", icon: iconZap("size-3"), colorCls: "text-primary" },
-    { key: "entries-total", value: stats.totalEntries ?? 0, label: "Total entries", icon: iconBrain("size-3"), colorCls: "text-foreground" },
-    { key: "open-tasks", value: stats.openTasks, label: "Open tasks", icon: iconCheckSquare("size-3"), colorCls: "text-accent" },
-    { key: "stalled-projects", value: stats.stalledProjects, label: "Stalled projects", icon: iconAlertTriangle("size-3"), colorCls: "text-destructive" },
+    { value: stats.entriesThisWeek, label: "Entries this week", icon: iconZap("size-3"), colorCls: "text-primary", statKey: "week" },
+    { value: stats.totalEntries ?? 0, label: "Total entries", icon: iconBrain("size-3"), colorCls: "text-foreground", statKey: "total" },
+    { value: stats.openTasks, label: "Open tasks", icon: iconCheckSquare("size-3"), colorCls: "text-accent", statKey: "tasks" },
+    { value: stats.stalledProjects, label: "Stalled projects", icon: iconAlertTriangle("size-3"), colorCls: "text-destructive", statKey: "stalled" },
   ];
 
   const cards = items
@@ -249,7 +249,7 @@ function renderStats(stats: {
       (s) => `
       <div class="flex flex-col items-center justify-center gap-0.5 rounded-md border border-border bg-card px-2 py-2">
         <span class="${s.colorCls}">${s.icon}</span>
-        <span data-stat="${s.key}" class="${s.colorCls} text-base font-medium leading-none">${s.value}</span>
+        <span data-stat="${s.statKey}" class="${s.colorCls} text-base font-medium leading-none">${s.value}</span>
         <span class="text-[9px] uppercase tracking-wider text-muted-foreground">${s.label}</span>
       </div>`,
     )
@@ -422,17 +422,19 @@ function renderClientScript(): string {
         var row = document.createElement('div');
         row.innerHTML = entryRowHtml(d);
         var el = row.firstElementChild;
-        var container = list.querySelector('[data-entry-list]');
-        if (container) {
-          container.insertAdjacentElement('afterbegin', el);
-        } else {
-          list.innerHTML = '<h2 class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2 shrink-0">Recent</h2>'
-            + '<div class="mb-3"><div class="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Today</div>'
-            + '<div data-entry-list class="space-y-0.5"></div></div>';
-          list.querySelector('[data-entry-list]').appendChild(el);
-        }
+        var entryList = list.querySelector('.space-y-0\\.5');
+        if (entryList) entryList.insertAdjacentElement('afterbegin', el);
+        else list.appendChild(el);
         requestAnimationFrame(function() { el.classList.remove('opacity-0'); });
-      } catch(err) { console.error('SSE entry:created list error', err); }
+        var weekEl = document.querySelector('[data-stat="week"]');
+        if (weekEl) weekEl.textContent = String((parseInt(weekEl.textContent || '0', 10) || 0) + 1);
+        var totalEl = document.querySelector('[data-stat="total"]');
+        if (totalEl) totalEl.textContent = String((parseInt(totalEl.textContent || '0', 10) || 0) + 1);
+        if (d.category === 'tasks') {
+          var tasksEl = document.querySelector('[data-stat="tasks"]');
+          if (tasksEl) tasksEl.textContent = String((parseInt(tasksEl.textContent || '0', 10) || 0) + 1);
+        }
+      } catch(err) {}
     });
 
     es.addEventListener('entry:updated', function(e) {
@@ -477,7 +479,9 @@ function renderClientScript(): string {
         row.style.transition = 'opacity 0.3s, max-height 0.3s';
         setTimeout(function() { row.style.maxHeight = '0'; row.style.overflow = 'hidden'; row.style.padding = '0'; }, 10);
         setTimeout(function() { row.remove(); }, 350);
-      } catch(err) { console.error('SSE entry:deleted error', err); }
+        var totalEl = document.querySelector('[data-stat="total"]');
+        if (totalEl) totalEl.textContent = String(Math.max(0, (parseInt(totalEl.textContent || '0', 10) || 0) - 1));
+      } catch(err) {}
     });
 
     es.addEventListener('digest:updated', function(e) {
@@ -607,7 +611,6 @@ export function createDashboardRoutes(
         unsubscribe();
       });
 
-      // Keep the stream open until client disconnects
       await new Promise<void>((resolve) => {
         stream.onAbort(resolve);
       });
