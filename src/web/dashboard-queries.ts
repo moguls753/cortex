@@ -36,14 +36,19 @@ export async function getDashboardStats(
   sql: Sql,
 ): Promise<{
   entriesThisWeek: number;
+  totalEntries: number;
   openTasks: number;
   stalledProjects: number;
 }> {
-  const [weekResult, tasksResult, stalledResult] = await Promise.all([
+  const [weekResult, totalResult, tasksResult, stalledResult] = await Promise.all([
     sql`
       SELECT COUNT(*)::int AS count FROM entries
       WHERE deleted_at IS NULL
         AND created_at >= date_trunc('week', CURRENT_DATE)
+    `,
+    sql`
+      SELECT COUNT(*)::int AS count FROM entries
+      WHERE deleted_at IS NULL
     `,
     sql`
       SELECT COUNT(*)::int AS count FROM entries
@@ -62,6 +67,7 @@ export async function getDashboardStats(
 
   return {
     entriesThisWeek: weekResult[0]?.count ?? 0,
+    totalEntries: totalResult[0]?.count ?? 0,
     openTasks: tasksResult[0]?.count ?? 0,
     stalledProjects: stalledResult[0]?.count ?? 0,
   };

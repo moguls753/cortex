@@ -238,10 +238,10 @@ function renderStats(stats: {
   stalledProjects: number;
 }): string {
   const items = [
-    { value: stats.entriesThisWeek, label: "Entries this week", icon: iconZap("size-3"), colorCls: "text-primary" },
-    { value: stats.totalEntries ?? 0, label: "Total entries", icon: iconBrain("size-3"), colorCls: "text-foreground" },
-    { value: stats.openTasks, label: "Open tasks", icon: iconCheckSquare("size-3"), colorCls: "text-accent" },
-    { value: stats.stalledProjects, label: "Stalled projects", icon: iconAlertTriangle("size-3"), colorCls: "text-destructive" },
+    { key: "entries-week", value: stats.entriesThisWeek, label: "Entries this week", icon: iconZap("size-3"), colorCls: "text-primary" },
+    { key: "entries-total", value: stats.totalEntries ?? 0, label: "Total entries", icon: iconBrain("size-3"), colorCls: "text-foreground" },
+    { key: "open-tasks", value: stats.openTasks, label: "Open tasks", icon: iconCheckSquare("size-3"), colorCls: "text-accent" },
+    { key: "stalled-projects", value: stats.stalledProjects, label: "Stalled projects", icon: iconAlertTriangle("size-3"), colorCls: "text-destructive" },
   ];
 
   const cards = items
@@ -249,7 +249,7 @@ function renderStats(stats: {
       (s) => `
       <div class="flex flex-col items-center justify-center gap-0.5 rounded-md border border-border bg-card px-2 py-2">
         <span class="${s.colorCls}">${s.icon}</span>
-        <span class="${s.colorCls} text-base font-medium leading-none">${s.value}</span>
+        <span data-stat="${s.key}" class="${s.colorCls} text-base font-medium leading-none">${s.value}</span>
         <span class="text-[9px] uppercase tracking-wider text-muted-foreground">${s.label}</span>
       </div>`,
     )
@@ -292,7 +292,7 @@ function renderEntries(
   for (const [label, groupEntries] of groups) {
     html += `<div class="mb-3">
       <div class="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">${escapeHtml(label)}</div>
-      <div class="space-y-0.5">`;
+      <div data-entry-list class="space-y-0.5">`;
 
     for (const entry of groupEntries) {
       const badgeLabel = categoryAbbr(entry.category);
@@ -388,16 +388,33 @@ function renderClientScript(): string {
       return '<span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 ' + cls + '">' + abbr + '</span>';
     }
 
+    function esc(s) {
+      var d = document.createElement('div');
+      d.appendChild(document.createTextNode(s));
+      return d.innerHTML;
+    }
+
     function entryRowHtml(d) {
-      return '<a href="/entry/' + d.id + '" data-entry-id="' + d.id + '" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group opacity-0 transition-opacity duration-300">'
+      return '<a href="/entry/' + esc(d.id) + '" data-entry-id="' + esc(d.id) + '" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group opacity-0 transition-opacity duration-300">'
         + badgeHtml(d.category)
-        + '<span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors entry-name">' + (d.name || 'Untitled') + '</span>'
+        + '<span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors entry-name">' + esc(d.name || 'Untitled') + '</span>'
         + '<span class="text-[10px] text-muted-foreground shrink-0">just now</span></a>';
     }
 
+    function incrementStat(key, delta) {
+      var el = document.querySelector('[data-stat="' + key + '"]');
+      if (el) el.textContent = Math.max(0, parseInt(el.textContent || '0', 10) + delta);
+    }
+
     es.addEventListener('entry:created', function(e) {
+      var d;
+      try { d = JSON.parse(e.data); } catch(err) { return; }
+      // Update stats
+      incrementStat('entries-week', 1);
+      incrementStat('entries-total', 1);
+      if (d.category === 'tasks') incrementStat('open-tasks', 1);
+      // Update list
       try {
-        var d = JSON.parse(e.data);
         var list = document.querySelector('[data-entries]');
         if (!list) return;
         var empty = list.querySelector('[data-empty]');
@@ -405,16 +422,23 @@ function renderClientScript(): string {
         var row = document.createElement('div');
         row.innerHTML = entryRowHtml(d);
         var el = row.firstElementChild;
-        var firstGroup = list.firstElementChild;
-        if (firstGroup) firstGroup.insertAdjacentElement('afterbegin', el);
-        else list.appendChild(el);
+        var container = list.querySelector('[data-entry-list]');
+        if (container) {
+          container.insertAdjacentElement('afterbegin', el);
+        } else {
+          list.innerHTML = '<h2 class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2 shrink-0">Recent</h2>'
+            + '<div class="mb-3"><div class="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Today</div>'
+            + '<div data-entry-list class="space-y-0.5"></div></div>';
+          list.querySelector('[data-entry-list]').appendChild(el);
+        }
         requestAnimationFrame(function() { el.classList.remove('opacity-0'); });
-      } catch(err) {}
+      } catch(err) { console.error('SSE entry:created list error', err); }
     });
 
     es.addEventListener('entry:updated', function(e) {
+      var d;
+      try { d = JSON.parse(e.data); } catch(err) { return; }
       try {
-        var d = JSON.parse(e.data);
         var row = document.querySelector('[data-entry-id="' + d.id + '"]');
         if (!row) return;
         row.classList.add('bg-secondary');
@@ -422,28 +446,38 @@ function renderClientScript(): string {
         if (link && d.name) link.textContent = d.name;
         var badge = row.querySelector('[class*="badge-"]');
         if (badge && d.category) {
+          var oldCat = badge.classList.contains('badge-tasks') ? 'tasks' : badge.classList.contains('badge-projects') ? 'projects' : null;
           var abbr = {people:'PEO',projects:'PRO',tasks:'TSK',ideas:'IDE',reference:'REF'}[d.category] || 'UNC';
           var oldBadge = badge.className.match(/badge-\\w+/);
           if (oldBadge) badge.classList.remove(oldBadge[0]);
           var newCls = {people:'badge-people',projects:'badge-projects',tasks:'badge-tasks',ideas:'badge-ideas',reference:'badge-reference'}[d.category] || 'badge-unclassified';
           badge.classList.add(newCls);
           badge.textContent = abbr;
+          if (oldCat !== d.category) {
+            if (oldCat === 'tasks') incrementStat('open-tasks', -1);
+            if (d.category === 'tasks') incrementStat('open-tasks', 1);
+          }
         }
         setTimeout(function() { row.classList.remove('bg-secondary'); }, 500);
-      } catch(err) {}
+      } catch(err) { console.error('SSE entry:updated error', err); }
     });
 
     es.addEventListener('entry:deleted', function(e) {
+      var d;
+      try { d = JSON.parse(e.data); } catch(err) { return; }
       try {
-        var d = JSON.parse(e.data);
         var row = document.querySelector('[data-entry-id="' + d.id + '"]');
         if (!row) return;
+        var badge = row.querySelector('[class*="badge-"]');
+        if (badge && badge.classList.contains('badge-tasks')) incrementStat('open-tasks', -1);
+        incrementStat('entries-week', -1);
+        incrementStat('entries-total', -1);
         row.classList.add('opacity-0');
         row.style.maxHeight = row.offsetHeight + 'px';
         row.style.transition = 'opacity 0.3s, max-height 0.3s';
         setTimeout(function() { row.style.maxHeight = '0'; row.style.overflow = 'hidden'; row.style.padding = '0'; }, 10);
         setTimeout(function() { row.remove(); }, 350);
-      } catch(err) {}
+      } catch(err) { console.error('SSE entry:deleted error', err); }
     });
 
     es.addEventListener('digest:updated', function(e) {
@@ -479,6 +513,7 @@ export function createDashboardRoutes(
     const entries = rawEntries ?? [];
     const stats = rawStats ?? {
       entriesThisWeek: 0,
+      totalEntries: 0,
       openTasks: 0,
       stalledProjects: 0,
     };
