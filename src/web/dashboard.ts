@@ -483,7 +483,7 @@ export function createDashboardRoutes(
           <div class="col-span-4">
             ${renderStats(stats)}
           </div>
-          <div class="col-span-8 rounded-md border border-border bg-card px-4 py-3 max-h-[258px] overflow-y-auto scrollbar-thin">
+          <div class="col-span-8 rounded-md border border-border bg-card px-4 py-3 max-h-[276px] overflow-y-auto scrollbar-thin">
             ${renderEntries(entries)}
           </div>
         </div>
