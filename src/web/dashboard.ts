@@ -507,6 +507,7 @@ export function createDashboardRoutes(
     let content: string | null = text;
 
     let contextEntries: Array<{ name: string; category: string | null; content: string | null }> = [];
+    const outputLanguage = (await resolveConfigValue("output_language", sql)) || undefined;
     try {
       contextEntries = await assembleContext(sql, text);
     } catch {
@@ -514,7 +515,7 @@ export function createDashboardRoutes(
     }
 
     try {
-      const result = await classifyText(text, { contextEntries });
+      const result = await classifyText(text, { contextEntries, outputLanguage });
       if (result) {
         category = result.category ?? null;
         name = result.name ?? null;

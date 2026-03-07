@@ -141,10 +141,13 @@ export async function handleTextMessage(
     if (!(await isAuthorized(chatId, sql))) return;
 
     // Gather context for classification
-    const contextEntries = await assembleContext(sql, text);
+    const [contextEntries, outputLanguage] = await Promise.all([
+      assembleContext(sql, text),
+      resolveConfigValue("output_language", sql).then((v) => v || undefined),
+    ]);
 
     // Classify
-    const classResult = await classifyText(text, { contextEntries });
+    const classResult = await classifyText(text, { contextEntries, outputLanguage });
 
     if (!classResult || classResult.category === null) {
       // Store unclassified
@@ -251,10 +254,13 @@ export async function handleVoiceMessage(
     }
 
     // Gather context for classification
-    const contextEntries = await assembleContext(sql, transcript);
+    const [contextEntries, outputLanguage] = await Promise.all([
+      assembleContext(sql, transcript),
+      resolveConfigValue("output_language", sql).then((v) => v || undefined),
+    ]);
 
     // Classify
-    const classResult = await classifyText(transcript, { contextEntries });
+    const classResult = await classifyText(transcript, { contextEntries, outputLanguage });
     const reply = ctx.reply as (text: string, options?: unknown) => Promise<unknown>;
 
     if (!classResult || classResult.category === null) {
@@ -371,10 +377,12 @@ export async function handleCallbackQuery(
     }
 
     // Re-classify with the correction
+    const outputLanguage = (await resolveConfigValue("output_language", sql)) || undefined;
     const result = await reclassifyEntry(
       entry.content || "",
       newCategory,
       `User selected category: ${newCategory}`,
+      outputLanguage,
     );
 
     const finalCategory = result?.category || newCategory;
@@ -478,10 +486,12 @@ export async function handleFixCommand(
     };
 
     // Re-classify with correction
+    const outputLanguage = (await resolveConfigValue("output_language", sql)) || undefined;
     const result = await reclassifyEntry(
       entry.content || "",
       entry.category || "",
       correctionText,
+      outputLanguage,
     );
 
     if (result) {

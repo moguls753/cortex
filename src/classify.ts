@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createLLMProvider } from "./llm/index.js";
 import { generateEmbedding } from "./embed.js";
 import { createLogger } from "./logger.js";
+import { resolveConfigValue } from "./config.js";
 import { sleep } from "./sleep.js";
 
 const log = createLogger("classify");
@@ -123,6 +124,7 @@ export function assemblePrompt(
   template: string,
   contextEntries: string,
   inputText: string,
+  outputLanguage: string = "English",
 ): string {
   const now = new Date();
   const today = now.toISOString().split("T")[0];
@@ -132,8 +134,17 @@ export function assemblePrompt(
   return template
     .replace(/\{today\}/g, today)
     .replace(/\{tomorrow\}/g, tomorrow)
+    .replace(/\{output_language\}/g, outputLanguage)
     .replace("{context_entries}", contextEntries)
     .replace("{input_text}", inputText);
+}
+
+async function resolveOutputLanguage(sql?: postgres.Sql): Promise<string> {
+  if (sql) {
+    const val = await resolveConfigValue("output_language", sql);
+    if (val) return val;
+  }
+  return process.env.OUTPUT_LANGUAGE || "English";
 }
 
 export function resolveConfidenceThreshold(settingsValue?: string | null): number {
@@ -242,6 +253,7 @@ export async function classifyText(
   options?: {
     entryId?: string;
     contextEntries?: Array<{ name: string; category: string | null; content: string | null }>;
+    outputLanguage?: string;
   },
 ): Promise<{
   category: string | null;
@@ -285,7 +297,7 @@ export async function classifyText(
       )
     : "";
 
-  const prompt = assemblePrompt(template, contextStr, inputText);
+  const prompt = assemblePrompt(template, contextStr, inputText, options?.outputLanguage);
 
   let response: string;
   try {
@@ -338,7 +350,7 @@ export async function classifyEntry(
   // Gather context
   const contextEntries = await assembleContext(sql, text);
 
-  // Load prompt
+  // Load prompt + resolve language
   let template: string;
   try {
     template = await loadPromptTemplate();
@@ -346,6 +358,8 @@ export async function classifyEntry(
     log.error("Failed to load classification prompt template");
     return;
   }
+
+  const outputLanguage = await resolveOutputLanguage(sql);
 
   // Format context
   const contextStr = formatContextEntries(
@@ -364,7 +378,7 @@ export async function classifyEntry(
     inputText = inputText.substring(0, MAX_INPUT_LENGTH);
   }
 
-  const prompt = assemblePrompt(template, contextStr, inputText);
+  const prompt = assemblePrompt(template, contextStr, inputText, outputLanguage);
 
   const provider = createLLMProvider({
     provider: process.env.LLM_PROVIDER || "anthropic",
@@ -427,6 +441,8 @@ export async function retryFailedClassifications(
     return;
   }
 
+  const outputLanguage = await resolveOutputLanguage(sql);
+
   // Gather context for all entries up front
   const prepared: Array<{ id: string; prompt: string }> = [];
   for (const entry of entries) {
@@ -449,7 +465,7 @@ export async function retryFailedClassifications(
       inputText = inputText.substring(0, MAX_INPUT_LENGTH);
     }
 
-    prepared.push({ id: entryId, prompt: assemblePrompt(template, contextStr, inputText) });
+    prepared.push({ id: entryId, prompt: assemblePrompt(template, contextStr, inputText, outputLanguage) });
   }
 
   // LLM calls with exponential backoff on 429s
@@ -510,6 +526,7 @@ export async function reclassifyEntry(
   content: string,
   correctionCategory: string | null,
   correctionText: string,
+  outputLanguage?: string,
 ): Promise<{
   category: string;
   name: string;
@@ -537,7 +554,7 @@ export async function reclassifyEntry(
     : `\n\nUser correction: ${correctionText}`;
 
   const inputText = content + correctionContext;
-  const prompt = assemblePrompt(template, "", inputText);
+  const prompt = assemblePrompt(template, "", inputText, outputLanguage);
 
   let response: string;
   try {
