@@ -9,6 +9,9 @@ import { createAuthMiddleware, createAuthRoutes } from "./web/auth.js";
 import { createDashboardRoutes } from "./web/dashboard.js";
 import { createBrowseRoutes } from "./web/browse.js";
 import { createEntryRoutes } from "./web/entry.js";
+import { createNewNoteRoutes } from "./web/new-note.js";
+import { createSettingsRoutes } from "./web/settings.js";
+import { createMcpHttpHandler } from "./mcp-tools.js";
 import { createSSEBroadcaster } from "./web/sse.js";
 import { initializeEmbedding } from "./embed.js";
 import { startBot } from "./telegram.js";
@@ -94,6 +97,16 @@ async function main(): Promise<void> {
   app.route("/", createDashboardRoutes(sql, broadcaster));
   app.route("/", createBrowseRoutes(sql));
   app.route("/", createEntryRoutes(sql));
+  app.route("/", createNewNoteRoutes(sql));
+  app.route("/", createSettingsRoutes(sql));
+
+  // MCP HTTP endpoint (JSON-RPC)
+  const mcpHandler = createMcpHttpHandler(sql);
+  app.post("/mcp", async (c) => {
+    const body = await c.req.json();
+    const result = await mcpHandler(body);
+    return c.json(result);
+  });
 
   // Start HTTP server
   serve({ fetch: app.fetch, port: config.port }, () => {

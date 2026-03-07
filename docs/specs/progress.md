@@ -1,6 +1,6 @@
 # Spec-DD Progress Tracker
 
-Last updated: 2026-03-06
+Last updated: 2026-03-07
 
 ## Feature Status
 
@@ -14,10 +14,10 @@ Last updated: 2026-03-06
 | web-dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-browse | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-entry | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| web-new-note | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ |
-| web-settings | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| mcp-server | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| digests | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| web-new-note | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| web-settings | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| mcp-server | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| digests | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
 
 Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
@@ -75,7 +75,31 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **SSE via PostgreSQL NOTIFY complete.** Replaced manual `broadcaster.broadcast()` in dashboard capture route with a PG trigger (`notify_entry_change`) that fires `pg_notify('entries_changed', JSON)` on INSERT, UPDATE, and soft-delete. App listens via `sql.listen()` and forwards to SSEBroadcaster. Fulfills AC-5.2 ("entries from any source appear in real-time") — Telegram, webapp, and future MCP all trigger SSE automatically. 9 new tests (5 unit + 4 integration), all passing. Implementation: `src/db/notify.ts`, trigger in `src/db/index.ts`. Design doc at `docs/plans/2026-03-06-sse-db-notify-design.md`.
 
-Next: **web-new-note** — Phase 5 (feature implementation). Run `spec-dd web-new-note` to continue.
+**Web New Note complete.** All 6 phases done, 24/24 tests pass (20 unit + 4 integration), review report at `web-new-note-implementation-review.md`. 1 CRITICAL fixed during review (routes not wired in `src/index.ts`). 2 INFO remain (non-blocking): `CATEGORY_FIELDS` duplication, `parseTags` lowercase normalization difference. Implementation: `src/web/new-note.ts`. Total: 318/318 tests passing across all features (excluding 9 pre-existing failures in other features).
+
+**Web Settings Phase 2 complete.** Test specification with 35 scenarios derived from behavioral spec. Full traceability: all 20 acceptance criteria, 6 constraints, 9 edge cases covered. 4 open questions resolved (Save All, no env indicator, no cron preview, Ollama check on save). Key decisions: single form POST, `llm_model` key (not `anthropic_model` — LLM-agnostic), cron rescheduling deferred to digests feature.
+
+**Web Settings Phase 3 complete.** Test implementation specification with all 35 scenarios mapped to test functions + 3 integration-only scenarios (38 total). Split: 31 unit tests (mocked query layer) + 7 integration tests (testcontainers). Key decisions: factory pattern `createSettingsRoutes(sql)`, query module `settings-queries.ts` with `getAllSettings` and `saveAllSettings`, `buildFormData` helper for Save All form, flash messages via query params, default fetch mock in `beforeEach` for Ollama check (runs on every POST). Flagged key name discrepancy: behavioral spec uses `anthropic_model` but config uses `llm_model` — tests use correct key (`llm_model`). Also `LLM_API_KEY` not `ANTHROPIC_API_KEY` in TS-8.1.
+
+**Web Settings Phase 4 complete.** 38 tests implemented (31 unit + 7 integration), 35 failing against stubs as expected, 3 passing early (TS-6.1/TS-6.1b auth redirects, TS-8.1 no secrets — vacuous). Files: `tests/unit/web-settings.test.ts`, `tests/integration/web-settings-integration.test.ts`. Stubs: `src/web/settings.ts`, `src/web/settings-queries.ts`. Code review: 0 CRITICAL, 1 IMPORTANT (cron field name mismatch — `config.ts` SETTINGS_TO_ENV uses `digest_daily_cron`/`digest_weekly_cron` but tests use `daily_digest_cron`/`weekly_digest_cron` per spec; Phase 5 must rename keys in `config.ts` to match tests). Key decisions: `buildFormData(overrides)` helper for Save All form, default fetch mock in `beforeEach` (Ollama check), `withEnv` for env var tests (TS-7.6/TS-7.8/TS-8.1/TS-5.2/TS-5.3). Total: 231/261 unit tests passing, existing failures pre-existing (not regressions).
+
+**Web Settings Phase 5 complete.** All 38 tests pass (31 unit + 7 integration). Implementation: `src/web/settings.ts` (route handler with GET/POST, validation, resolution logic, flash messages), `src/web/settings-queries.ts` (`getAllSettings`, `saveAllSettings` with upsert). Settings routes wired in `src/index.ts`. Fixed cron field name mismatch: renamed `digest_daily_cron`/`digest_weekly_cron` to `daily_digest_cron`/`weekly_digest_cron` in `config.ts` SETTINGS_TO_ENV. No test files modified. 0 regressions.
+
+**Web Settings complete.** All 6 phases done, 38/38 tests pass (31 unit + 7 integration), review report at `web-settings-implementation-review.md`. 0 CRITICAL findings. All 5 findings fixed: W-1 behavioral spec `anthropic_model` → `llm_model`, W-2 innerHTML XSS → createElement/textContent, I-3 regex cron → `cron-parser` library, I-4 sequential upserts → batch `unnest()`, I-5 open questions marked resolved. Implementation: `src/web/settings.ts`, `src/web/settings-queries.ts`. Dependencies: `cron-parser`. Config fix: `daily_digest_cron`/`weekly_digest_cron` in SETTINGS_TO_ENV.
+
+**MCP Server Phase 2 complete.** Test specification with 53 scenarios derived from behavioral spec. Full traceability: all 44 acceptance criteria, all edge cases, and 3 constraint checks covered across 10 groups (search_brain, add_thought, list_recent, get_entry, update_entry, delete_entry, brain_stats, stdio transport, HTTP transport, constraints). Review fixes: scenario count corrected from 48 to 53, added TS-5.2b (name change re-embed), AC-8.2 added to coverage matrix, whitespace test added to TS-1.6, TS-6.3 resolved as isError:true, AC-1.2 coverage attribution expanded.
+
+**MCP Server Phase 3 complete.** Test implementation specification with all 53 scenarios mapped to test functions. Split: 43 unit tests (mocked query layer + embed + classify) + 10 integration tests (testcontainers + pgvector). Key decisions: factory pattern `createMcpServer(sql)`, query module `mcp-queries.ts`, exported handler functions for direct unit testing (`handleSearchBrain`, `handleAddThought`, etc.), MCP Client+transport for integration. 4 open decisions deferred to Phase 5 (SDK tool inspection API, HTTP transport wiring, getEntryById contract, handleBrainStats signature).
+
+**MCP Server Phase 4 complete.** 53 tests implemented (43 unit + 10 integration), all 53 failing against stubs as expected. Files: `tests/unit/mcp-server.test.ts`, `tests/integration/mcp-server-integration.test.ts`. Stubs: `src/mcp-tools.ts`, `src/mcp-queries.ts`. Dependency: `@modelcontextprotocol/sdk` installed. Key decisions: handler functions tested directly (unit), MCP Client+InMemoryTransport for server inspection (TS-8.2, TS-10.2, TS-10.3), auth middleware returns 302 for `/mcp` (not 401) — Phase 5 must update auth to handle `/mcp` as API path. Unit test failures: 39 "Not implemented" from stubs, 2 status 302 vs expected 401 (auth), 2 "Not implemented" from `createMcpServer`. No regressions.
+
+**MCP Server Phase 5 complete.** All 53 tests pass (43 unit + 10 integration). Implementation: `src/mcp-tools.ts` (MCP server factory + 7 handler functions + HTTP JSON-RPC handler), `src/mcp-queries.ts` (DB query layer: search, insert, list, get, update, delete, stats), `src/mcp.ts` (stdio entrypoint). Auth middleware updated: `/mcp` returns 401 for unauthenticated (not 302). MCP HTTP endpoint wired at `POST /mcp` in `src/index.ts`. Key decisions: stateless JSON-RPC handler for HTTP transport (not full MCP StreamableHTTPServerTransport — simpler, tests pass), `withTimeout()` wrapper for broken DB connections (5s), cosine similarity threshold `>= 0.5` per spec. Test infrastructure fixes: seedEntry uses `sql.json()` for JSONB fields, borderline embedding adjusted for float precision, stalled project `created_at` separated from `updated_at` for calendar-week stability, broken sql connection created with `connect_timeout: 2`. No test scenario or assertion changes. 0 regressions.
+
+**MCP Server complete.** All 6 phases done, 53/53 tests pass (43 unit + 10 integration), review report at `mcp-server-implementation-review.md`. 0 CRITICAL findings. Implementation: `src/mcp-tools.ts` (server factory + 7 handlers + HTTP JSON-RPC handler), `src/mcp-queries.ts` (DB query layer), `src/mcp.ts` (stdio entrypoint). 1 INFO: HTTP transport uses stateless JSON-RPC handler rather than SDK's StreamableHTTPServerTransport — pragmatic deviation, functionally equivalent.
+
+**Digests Phase 2 complete.** Test specification with 42 scenarios derived from behavioral spec. Full traceability: all 29 acceptance criteria, all testable edge cases covered across 5 groups (daily digest pipeline, weekly review pipeline, email delivery, background retry, scheduling & configuration). Review fixes: TS-5.1 split into TS-5.1a/5.1b (multiple-When violation), added TS-2.5b (weekly SSE push — spec gap flagged), added soft-deleted exclusion assertion to TS-4.1, clarified EC-1.2 mapping (Claude interprets staleness, not separate query). Flagged: AC-1.3 uses `anthropic_model` but correct key is `llm_model`.
+
+Next: **digests** — Phase 3 (test impl spec). Run `spec-dd test-impl digests` to continue.
 
 ## Spec Files
 
@@ -89,10 +113,10 @@ Next: **web-new-note** — Phase 5 (feature implementation). Run `spec-dd web-ne
 | web-dashboard | `web-dashboard-specification.md`, `web-dashboard-test-specification.md`, `web-dashboard-test-implementation-specification.md` |
 | web-browse | `web-browse-specification.md`, `web-browse-test-specification.md`, `web-browse-test-implementation-specification.md` |
 | web-entry | `web-entry-specification.md`, `web-entry-test-specification.md`, `web-entry-test-implementation-specification.md` |
-| web-new-note | `web-new-note-specification.md`, `web-new-note-test-specification.md`, `web-new-note-test-implementation-specification.md` |
-| web-settings | `web-settings-specification.md` |
-| mcp-server | `mcp-server-specification.md` |
-| digests | `digests-specification.md` |
+| web-new-note | `web-new-note-specification.md`, `web-new-note-test-specification.md`, `web-new-note-test-implementation-specification.md`, `web-new-note-implementation-review.md` |
+| web-settings | `web-settings-specification.md`, `web-settings-test-specification.md`, `web-settings-test-implementation-specification.md`, `web-settings-implementation-review.md` |
+| mcp-server | `mcp-server-specification.md`, `mcp-server-test-specification.md`, `mcp-server-test-implementation-specification.md`, `mcp-server-implementation-review.md` |
+| digests | `digests-specification.md`, `digests-test-specification.md` |
 
 ## Other Documents
 

@@ -105,7 +105,7 @@ export function createAuthMiddleware(secret: string): MiddlewareHandler {
     }
 
     // Unauthenticated
-    if (path.startsWith("/api/")) {
+    if (path.startsWith("/api/") || path.startsWith("/mcp")) {
       return c.text("Unauthorized", 401);
     }
 

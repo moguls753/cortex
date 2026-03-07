@@ -23,7 +23,7 @@ Allow runtime configuration of preferences without restarting the app. Settings 
 
 ### US-2: As a user, I want to change the classification model.
 
-- **AC-2.1:** A text input shows the current Anthropic model name (from the `anthropic_model` setting or the `ANTHROPIC_MODEL` env var, default: `claude-sonnet-4-20250514`).
+- **AC-2.1:** A text input shows the current LLM model name (from the `llm_model` setting or the `LLM_MODEL` env var, default: `claude-sonnet-4-20250514`).
 - **AC-2.2:** I can change it to any valid model name (e.g., `claude-haiku-4-5-20251001`). The input accepts free text.
 - **AC-2.3:** Changes take effect on the next classification request. No restart or reconnection is needed.
 
@@ -73,13 +73,13 @@ Allow runtime configuration of preferences without restarting the app. Settings 
 - Importing or exporting settings (backup/restore).
 - Settings change history or audit log.
 - Per-category settings (e.g., different confidence thresholds per category).
-- API key management through the settings page. Secrets (`ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `SESSION_SECRET`, `WEBAPP_PASSWORD`, SMTP credentials) remain in env vars only and are not configurable via the UI.
-- Settings validation against external services (e.g., verifying the Anthropic model name is valid by calling the API).
+- API key management through the settings page. Secrets (`LLM_API_KEY`, `TELEGRAM_BOT_TOKEN`, `SESSION_SECRET`, `WEBAPP_PASSWORD`, SMTP credentials) remain in env vars only and are not configurable via the UI.
+- Settings validation against external services (e.g., verifying the LLM model name is valid by calling the API).
 - Resetting individual settings to their default values (the user can manually enter the default).
 
-## Open Questions
+## Open Questions (Resolved)
 
-- Should the settings page have a single "Save All" button or should each setting save independently?
-- Should there be a visual indicator showing which settings are overriding env var defaults vs. using the env var value?
-- Should cron expression inputs include a human-readable preview (e.g., "Every day at 07:30")?
-- Should the Ollama URL setting trigger a connectivity check on save to provide immediate feedback?
+- ~~Should the settings page have a single "Save All" button or should each setting save independently?~~ **Resolved:** Single "Save All" form POST.
+- ~~Should there be a visual indicator showing which settings are overriding env var defaults vs. using the env var value?~~ **Resolved:** No indicator — just show the effective value.
+- ~~Should cron expression inputs include a human-readable preview (e.g., "Every day at 07:30")?~~ **Resolved:** No preview — raw cron expression only.
+- ~~Should the Ollama URL setting trigger a connectivity check on save to provide immediate feedback?~~ **Resolved:** Yes — fetch with 3s timeout, warn if unreachable, still save.

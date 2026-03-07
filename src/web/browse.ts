@@ -11,27 +11,12 @@ import {
 import { generateEmbedding } from "../embed.js";
 import type { EntryRow } from "./dashboard-queries.js";
 import { iconSearch } from "./icons.js";
+import { CATEGORIES, CATEGORY_LABELS, escapeHtml } from "./shared.js";
 
 type Sql = postgres.Sql;
 
-const CATEGORIES = ["people", "projects", "tasks", "ideas", "reference"];
-const CATEGORY_LABELS: Record<string, string> = {
-  people: "People",
-  projects: "Projects",
-  tasks: "Tasks",
-  ideas: "Ideas",
-  reference: "Reference",
-};
 const MAX_VISIBLE_TAGS = 10;
 const MAX_QUERY_LENGTH = 500;
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 function categoryBadgeClass(category: string | null): string {
   if (!category) return "badge-unclassified";

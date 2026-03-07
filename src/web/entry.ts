@@ -18,37 +18,17 @@ import {
   iconGlobe,
   iconCpu,
 } from "./icons.js";
+import {
+  CATEGORIES,
+  CATEGORY_FIELDS,
+  CATEGORY_LABELS,
+  escapeHtml,
+  parseTags,
+} from "./shared.js";
 
 type Sql = postgres.Sql;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const CATEGORIES = ["people", "projects", "tasks", "ideas", "reference"];
-
-const CATEGORY_FIELDS: Record<string, string[]> = {
-  people: ["context", "follow_ups"],
-  projects: ["status", "next_action", "notes"],
-  tasks: ["due_date", "status", "notes"],
-  ideas: ["oneliner", "notes"],
-  reference: ["notes"],
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  people: "People",
-  projects: "Projects",
-  tasks: "Tasks",
-  ideas: "Ideas",
-  reference: "Reference",
-};
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 function categoryBadgeClass(category: string | null): string {
   if (!category) return "badge-unclassified";
@@ -90,14 +70,6 @@ function migrateFields(
     result[field] = submittedFields[field] ?? null;
   }
   return result;
-}
-
-function parseTags(raw: string | undefined): string[] {
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0);
 }
 
 function renderViewPage(entry: {

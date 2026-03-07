@@ -8,10 +8,7 @@ import {
   iconMoon,
   iconLogOut,
 } from "./icons.js";
-
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
+import { escapeHtml } from "./shared.js";
 
 function navItem(
   href: string,

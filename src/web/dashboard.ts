@@ -24,6 +24,7 @@ import {
   iconMic,
 } from "./icons.js";
 import type postgres from "postgres";
+import { escapeHtml } from "./shared.js";
 
 type Sql = postgres.Sql;
 
@@ -58,14 +59,6 @@ function categoryAbbr(category: string | null): string {
     reference: "REF",
   };
   return map[category] ?? "UNC";
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function relativeTime(date: Date): string {
