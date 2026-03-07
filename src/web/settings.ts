@@ -4,6 +4,15 @@ import { CronExpressionParser } from "cron-parser";
 import { renderLayout } from "./layout.js";
 import { getAllSettings, saveAllSettings } from "./settings-queries.js";
 import { escapeHtml } from "./shared.js";
+import {
+  iconBrain,
+  iconClock,
+  iconServer,
+  iconShield,
+  iconCheck,
+  iconX,
+  iconAlertTriangle,
+} from "./icons.js";
 
 type Sql = postgres.Sql;
 
@@ -111,99 +120,174 @@ export function createSettingsRoutes(sql: Sql): Hono {
     const warning = c.req.query("warning") || "";
 
     const flashHtml = [
-      success ? `<div class="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">${escapeHtml(success)}</div>` : "",
-      error ? `<div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">${escapeHtml(error)}</div>` : "",
-      warning ? `<div class="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-600 dark:text-yellow-400">${escapeHtml(warning)}</div>` : "",
+      success
+        ? `<div class="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
+            ${iconCheck("size-3 text-primary")}
+            <span>${escapeHtml(success)}</span>
+          </div>`
+        : "",
+      error
+        ? `<div class="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            ${iconX("size-3 text-destructive")}
+            <span>${escapeHtml(error)}</span>
+          </div>`
+        : "",
+      warning
+        ? `<div class="flex items-center gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-600 dark:text-yellow-400">
+            ${iconAlertTriangle("size-3")}
+            <span>${escapeHtml(warning)}</span>
+          </div>`
+        : "",
     ]
       .filter(Boolean)
       .join("\n");
 
-    const chatIdListHtml = chatIds
+    const chatIdChips = chatIds
       .map(
         (id) =>
-          `<div class="flex items-center gap-2">
-            <span class="text-sm font-mono">${escapeHtml(id)}</span>
-            <button type="button" class="chat-id-remove text-xs text-destructive hover:underline" data-id="${escapeHtml(id)}">remove</button>
-          </div>`,
+          `<span class="inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-1 text-xs font-mono text-foreground" data-chip>
+            <span>${escapeHtml(id)}</span>
+            <button type="button" class="chat-id-remove text-muted-foreground hover:text-destructive transition-colors" data-id="${escapeHtml(id)}" aria-label="Remove ${escapeHtml(id)}">
+              ${iconX("size-3")}
+            </button>
+          </span>`,
       )
       .join("\n");
 
-    const emailNote =
-      email === ""
-        ? `<p class="text-xs text-muted-foreground">Email digests are disabled.</p>`
-        : "";
+    const thresholdPercent = Math.round(parseFloat(threshold) * 100);
 
     const content = `
-    <main class="flex-1 overflow-y-auto space-y-6">
-      <div class="flex items-center justify-between">
-        <h1 class="text-lg font-medium">Settings</h1>
-      </div>
+    <main class="flex-1 overflow-y-auto scrollbar-thin">
+      <form method="POST" action="/settings" class="space-y-3 pb-4">
 
-      ${flashHtml}
+        <div class="flex items-center justify-between">
+          <h1 class="text-lg font-medium tracking-tight">Settings</h1>
+        </div>
 
-      <form method="POST" action="/settings" class="space-y-8">
+        ${flashHtml}
 
-        <!-- Telegram Chat IDs -->
-        <fieldset class="flex flex-col gap-3">
-          <legend class="text-sm font-medium">Telegram Chat IDs</legend>
-          <div id="chat-id-list" class="flex flex-col gap-1.5">
-            ${chatIdListHtml}
+        <!-- ═══ Telegram ═══ -->
+        <div class="rounded-md border border-border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            ${iconShield("size-3 text-primary")}
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Telegram</span>
+            <span class="flex-1 h-px bg-border"></span>
           </div>
-          <div class="flex items-center gap-2">
-            <input type="text" id="new-chat-id" placeholder="Add chat ID" class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-            <button type="button" id="add-chat-id-btn" class="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-secondary transition-colors">Add</button>
+          <div class="space-y-3">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-muted-foreground">Authorized Chat IDs</label>
+              <div id="chat-id-list" class="flex flex-wrap gap-1.5 min-h-[28px]">
+                ${chatIdChips}
+              </div>
+              <div class="flex items-center gap-2 mt-1">
+                <div class="flex items-center gap-0 flex-1 max-w-xs">
+                  <input type="text" id="new-chat-id" placeholder="Enter chat ID..."
+                    class="h-8 flex-1 rounded-l-md border border-r-0 border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+                  <button type="button" id="add-chat-id-btn"
+                    class="h-8 rounded-r-md border border-border bg-secondary px-2.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors">Add</button>
+                </div>
+              </div>
+              <input type="hidden" name="chat_ids" id="chat-ids-input" value="${escapeHtml(chatIds.join(","))}" />
+            </div>
           </div>
-          <input type="hidden" name="chat_ids" id="chat-ids-input" value="${escapeHtml(chatIds.join(","))}" />
-        </fieldset>
-
-        <!-- Classification Model -->
-        <div class="flex flex-col gap-1.5">
-          <label for="llm_model" class="text-sm font-medium">Classification Model</label>
-          <input type="text" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
         </div>
 
-        <!-- Digest Schedules -->
-        <fieldset class="flex flex-col gap-4">
-          <legend class="text-sm font-medium">Digest Schedules</legend>
-          <div class="flex flex-col gap-1.5">
-            <label for="daily_digest_cron" class="text-xs text-muted-foreground">Daily Digest Cron</label>
-            <input type="text" id="daily_digest_cron" name="daily_digest_cron" value="${escapeHtml(dailyCron)}" class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+        <!-- ═══ Classification ═══ -->
+        <div class="rounded-md border border-border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            ${iconBrain("size-3 text-primary")}
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Classification</span>
+            <span class="flex-1 h-px bg-border"></span>
           </div>
-          <div class="flex flex-col gap-1.5">
-            <label for="weekly_digest_cron" class="text-xs text-muted-foreground">Weekly Digest Cron</label>
-            <input type="text" id="weekly_digest_cron" name="weekly_digest_cron" value="${escapeHtml(weeklyCron)}" class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label for="llm_model" class="text-xs text-muted-foreground">Model</label>
+              <input type="text" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label for="confidence_threshold" class="text-xs text-muted-foreground">Confidence Threshold</label>
+              <div class="flex items-center gap-3">
+                <input type="range" id="confidence_range" min="0" max="100" value="${thresholdPercent}"
+                  class="flex-1" />
+                <input type="text" id="confidence_threshold" name="confidence_threshold" value="${escapeHtml(threshold)}"
+                  class="h-8 w-16 rounded-md border border-border bg-transparent px-2 text-xs text-center font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+              </div>
+            </div>
           </div>
-        </fieldset>
-
-        <!-- Timezone -->
-        <div class="flex flex-col gap-1.5">
-          <label for="timezone" class="text-sm font-medium">Timezone</label>
-          <input type="text" id="timezone" name="timezone" value="${escapeHtml(timezone)}" class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
         </div>
 
-        <!-- Confidence Threshold -->
-        <div class="flex flex-col gap-1.5">
-          <label for="confidence_threshold" class="text-sm font-medium">Confidence Threshold</label>
-          <input type="text" id="confidence_threshold" name="confidence_threshold" value="${escapeHtml(threshold)}" class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-          <p class="text-xs text-muted-foreground">Value between 0.0 and 1.0</p>
+        <!-- ═══ Digests ═══ -->
+        <div class="rounded-md border border-border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            ${iconClock("size-3 text-primary")}
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Digests</span>
+            <span class="flex-1 h-px bg-border"></span>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label for="daily_digest_cron" class="text-xs text-muted-foreground">Daily Schedule</label>
+              <div class="flex items-center gap-2">
+                <span class="text-primary text-xs select-none shrink-0">cron</span>
+                <input type="text" id="daily_digest_cron" name="daily_digest_cron" value="${escapeHtml(dailyCron)}"
+                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+              </div>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label for="weekly_digest_cron" class="text-xs text-muted-foreground">Weekly Schedule</label>
+              <div class="flex items-center gap-2">
+                <span class="text-primary text-xs select-none shrink-0">cron</span>
+                <input type="text" id="weekly_digest_cron" name="weekly_digest_cron" value="${escapeHtml(weeklyCron)}"
+                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4 mt-3">
+            <div class="flex flex-col gap-1.5">
+              <label for="digest_email_to" class="text-xs text-muted-foreground">Email Delivery</label>
+              <input type="text" id="digest_email_to" name="digest_email_to" value="${escapeHtml(email)}"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                placeholder="Leave empty to disable" />
+              ${email === "" ? `<span class="text-[10px] text-muted-foreground">Disabled — digests available on dashboard only</span>` : ""}
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label for="timezone" class="text-xs text-muted-foreground">Timezone</label>
+              <input type="text" id="timezone" name="timezone" value="${escapeHtml(timezone)}"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+            </div>
+          </div>
         </div>
 
-        <!-- Digest Email -->
-        <div class="flex flex-col gap-1.5">
-          <label for="digest_email_to" class="text-sm font-medium">Digest Email</label>
-          <input type="text" id="digest_email_to" name="digest_email_to" value="${escapeHtml(email)}" class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Leave empty to disable" />
-          ${emailNote}
+        <!-- ═══ Infrastructure ═══ -->
+        <div class="rounded-md border border-border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            ${iconServer("size-3 text-primary")}
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Infrastructure</span>
+            <span class="flex-1 h-px bg-border"></span>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label for="ollama_url" class="text-xs text-muted-foreground">Ollama Endpoint</label>
+              <div class="flex items-center gap-2">
+                <span class="text-primary text-xs select-none shrink-0">url</span>
+                <input type="text" id="ollama_url" name="ollama_url" value="${escapeHtml(ollamaUrl)}"
+                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+              </div>
+            </div>
+            <div class="flex items-end pb-0.5">
+              <span class="text-[10px] text-muted-foreground">Embeddings via snowflake-arctic-embed2 — connectivity checked on save</span>
+            </div>
+          </div>
         </div>
 
-        <!-- Ollama URL -->
-        <div class="flex flex-col gap-1.5">
-          <label for="ollama_url" class="text-sm font-medium">Ollama URL</label>
-          <input type="text" id="ollama_url" name="ollama_url" value="${escapeHtml(ollamaUrl)}" class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-        </div>
-
-        <!-- Save -->
-        <div>
-          <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Save All</button>
+        <!-- ═══ Save ═══ -->
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-[10px] text-muted-foreground">Changes take effect immediately after save</span>
+          <button type="submit"
+            class="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+            ${iconCheck("size-3")}
+            Save All
+          </button>
         </div>
       </form>
     </main>
@@ -214,7 +298,10 @@ export function createSettingsRoutes(sql: Sql): Hono {
       var hidden = document.getElementById('chat-ids-input');
       var addBtn = document.getElementById('add-chat-id-btn');
       var newInput = document.getElementById('new-chat-id');
+      var range = document.getElementById('confidence_range');
+      var thresholdInput = document.getElementById('confidence_threshold');
 
+      /* ── Chat ID management ── */
       function syncHidden() {
         var ids = [];
         list.querySelectorAll('[data-id]').forEach(function(btn) {
@@ -223,33 +310,55 @@ export function createSettingsRoutes(sql: Sql): Hono {
         hidden.value = ids.join(',');
       }
 
+      function createChip(val) {
+        var span = document.createElement('span');
+        span.className = 'inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-1 text-xs font-mono text-foreground';
+        span.setAttribute('data-chip', '');
+        var text = document.createElement('span');
+        text.textContent = val;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chat-id-remove text-muted-foreground hover:text-destructive transition-colors';
+        btn.setAttribute('data-id', val);
+        btn.setAttribute('aria-label', 'Remove ' + val);
+        btn.innerHTML = '${iconX("size-3").replace(/'/g, "\\'")}';
+        span.appendChild(text);
+        span.appendChild(btn);
+        return span;
+      }
+
       if (addBtn) {
         addBtn.addEventListener('click', function() {
           var val = newInput.value.trim();
           if (!val) return;
-          var div = document.createElement('div');
-          div.className = 'flex items-center gap-2';
-          var span = document.createElement('span');
-          span.className = 'text-sm font-mono';
-          span.textContent = val;
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'chat-id-remove text-xs text-destructive hover:underline';
-          btn.setAttribute('data-id', val);
-          btn.textContent = 'remove';
-          div.appendChild(span);
-          div.appendChild(btn);
-          list.appendChild(div);
+          list.appendChild(createChip(val));
           newInput.value = '';
           syncHidden();
+        });
+        newInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); }
         });
       }
 
       if (list) {
         list.addEventListener('click', function(e) {
-          if (e.target.classList.contains('chat-id-remove')) {
-            e.target.closest('div').remove();
+          var removeBtn = e.target.closest('.chat-id-remove');
+          if (removeBtn) {
+            removeBtn.closest('[data-chip]').remove();
             syncHidden();
+          }
+        });
+      }
+
+      /* ── Confidence threshold slider sync ── */
+      if (range && thresholdInput) {
+        range.addEventListener('input', function() {
+          thresholdInput.value = (parseInt(range.value, 10) / 100).toFixed(2);
+        });
+        thresholdInput.addEventListener('input', function() {
+          var v = parseFloat(thresholdInput.value);
+          if (!isNaN(v) && v >= 0 && v <= 1) {
+            range.value = Math.round(v * 100);
           }
         });
       }
