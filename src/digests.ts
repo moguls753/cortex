@@ -5,6 +5,7 @@ import type { Sql } from "postgres";
 import type { SSEBroadcaster } from "./web/sse.js";
 import { createLLMProvider } from "./llm/index.js";
 import { config, resolveConfigValue } from "./config.js";
+import { getLLMConfig } from "./llm/config.js";
 import {
   getDailyDigestData,
   getWeeklyReviewData,
@@ -146,12 +147,12 @@ export async function generateDailyDigest(sql: Sql, broadcaster?: SSEBroadcaster
     const data = await getDailyDigestData(sql);
     const prompt = formatDailyPrompt(data);
 
-    const model = (await resolveConfigValue("llm_model", sql)) || config.llmModel;
+    const llmConfig = await getLLMConfig(sql);
     const provider = createLLMProvider({
-      provider: config.llmProvider,
-      apiKey: config.llmApiKey,
-      model,
-      baseUrl: config.llmBaseUrl || undefined,
+      provider: llmConfig.provider,
+      apiKey: llmConfig.apiKeys[llmConfig.provider] ?? "",
+      model: llmConfig.model,
+      baseUrl: llmConfig.baseUrl || undefined,
     });
 
     const response = await provider.chat(prompt);
@@ -194,12 +195,12 @@ export async function generateWeeklyReview(sql: Sql, broadcaster?: SSEBroadcaste
     const data = await getWeeklyReviewData(sql);
     const prompt = formatWeeklyPrompt(data);
 
-    const model = (await resolveConfigValue("llm_model", sql)) || config.llmModel;
+    const llmConfig = await getLLMConfig(sql);
     const provider = createLLMProvider({
-      provider: config.llmProvider,
-      apiKey: config.llmApiKey,
-      model,
-      baseUrl: config.llmBaseUrl || undefined,
+      provider: llmConfig.provider,
+      apiKey: llmConfig.apiKeys[llmConfig.provider] ?? "",
+      model: llmConfig.model,
+      baseUrl: llmConfig.baseUrl || undefined,
     });
 
     const response = await provider.chat(prompt);

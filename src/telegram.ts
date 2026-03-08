@@ -147,7 +147,7 @@ export async function handleTextMessage(
     ]);
 
     // Classify
-    const classResult = await classifyText(text, { contextEntries, outputLanguage });
+    const classResult = await classifyText(text, { contextEntries, outputLanguage, sql });
 
     if (!classResult || classResult.category === null) {
       // Store unclassified
@@ -260,7 +260,7 @@ export async function handleVoiceMessage(
     ]);
 
     // Classify
-    const classResult = await classifyText(transcript, { contextEntries, outputLanguage });
+    const classResult = await classifyText(transcript, { contextEntries, outputLanguage, sql });
     const reply = ctx.reply as (text: string, options?: unknown) => Promise<unknown>;
 
     if (!classResult || classResult.category === null) {
@@ -383,6 +383,7 @@ export async function handleCallbackQuery(
       newCategory,
       `User selected category: ${newCategory}`,
       outputLanguage,
+      sql,
     );
 
     const finalCategory = result?.category || newCategory;
@@ -492,6 +493,7 @@ export async function handleFixCommand(
       entry.category || "",
       correctionText,
       outputLanguage,
+      sql,
     );
 
     if (result) {

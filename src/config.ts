@@ -2,7 +2,6 @@ import type postgres from "postgres";
 
 const REQUIRED_VARS = [
   "DATABASE_URL",
-  "LLM_API_KEY",
   "TELEGRAM_BOT_TOKEN",
   "WEBAPP_PASSWORD",
   "SESSION_SECRET",
@@ -28,7 +27,7 @@ if (
 export const config = {
   databaseUrl,
   llmProvider: process.env.LLM_PROVIDER || "anthropic",
-  llmApiKey: process.env.LLM_API_KEY!,
+  llmApiKey: process.env.LLM_API_KEY ?? "",
   llmModel: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
   llmBaseUrl: process.env.LLM_BASE_URL || "",
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN!,
@@ -41,10 +40,7 @@ export const config = {
   weeklyDigestCron: process.env.WEEKLY_DIGEST_CRON || "0 16 * * 0",
 };
 
-const SETTINGS_TO_ENV: Record<string, string> = {
-  llm_provider: "LLM_PROVIDER",
-  llm_model: "LLM_MODEL",
-  llm_base_url: "LLM_BASE_URL",
+export const SETTINGS_TO_ENV: Record<string, string> = {
   timezone: "TZ",
   daily_digest_cron: "DAILY_DIGEST_CRON",
   weekly_digest_cron: "WEEKLY_DIGEST_CRON",

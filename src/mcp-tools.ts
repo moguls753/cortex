@@ -167,6 +167,7 @@ export async function handleAddThought(sql: any, params: { text: string }): Prom
     const contextEntries = await assembleContext(sql, params.text);
     classification = await classifyText(params.text, {
       contextEntries: Array.isArray(contextEntries) ? contextEntries : [],
+      sql,
     });
   } catch {
     // Classification failed — store unclassified

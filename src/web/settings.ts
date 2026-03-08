@@ -3,7 +3,10 @@ import type postgres from "postgres";
 import { CronExpressionParser } from "cron-parser";
 import { renderLayout } from "./layout.js";
 import { getAllSettings, saveAllSettings } from "./settings-queries.js";
+import { SETTINGS_TO_ENV } from "../config.js";
 import { escapeHtml } from "./shared.js";
+import { getLLMConfig, saveLLMConfig } from "../llm/config.js";
+import type { LLMConfig } from "../llm/config.js";
 import {
   iconBrain,
   iconClock,
@@ -17,7 +20,6 @@ import {
 type Sql = postgres.Sql;
 
 const DEFAULTS: Record<string, string> = {
-  llm_model: "claude-sonnet-4-20250514",
   daily_digest_cron: "30 7 * * *",
   weekly_digest_cron: "0 16 * * 0",
   timezone: "Europe/Berlin",
@@ -26,15 +28,41 @@ const DEFAULTS: Record<string, string> = {
   digest_email_to: "",
 };
 
-const SETTINGS_TO_ENV: Record<string, string> = {
-  llm_model: "LLM_MODEL",
-  daily_digest_cron: "DAILY_DIGEST_CRON",
-  weekly_digest_cron: "WEEKLY_DIGEST_CRON",
-  timezone: "TZ",
-  confidence_threshold: "CONFIDENCE_THRESHOLD",
-  ollama_url: "OLLAMA_URL",
-  digest_email_to: "DIGEST_EMAIL_TO",
+
+const PROVIDER_PRESETS: Record<string, { label: string; baseUrl: string; needsKey: boolean }> = {
+  anthropic: { label: "Anthropic", baseUrl: "", needsKey: true },
+  openai:    { label: "OpenAI (ChatGPT)", baseUrl: "https://api.openai.com/v1", needsKey: true },
+  groq:      { label: "Groq", baseUrl: "https://api.groq.com/openai/v1", needsKey: true },
+  gemini:    { label: "Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/", needsKey: true },
+  local:     { label: "Local LLM", baseUrl: "http://localhost:1234/v1", needsKey: false },
+  ollama:    { label: "Ollama", baseUrl: "http://ollama:11434/v1", needsKey: false },
 };
+
+async function fetchProviderModels(provider: string, apiKey: string, baseUrl: string): Promise<string[]> {
+  if (!apiKey) return [];
+  try {
+    if (provider === "anthropic") {
+      const res = await fetch("https://api.anthropic.com/v1/models", {
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!res.ok) return [];
+      const data = await res.json() as { data?: { id: string }[] };
+      return (data.data ?? []).map((m) => m.id);
+    }
+    // OpenAI-compatible: openai, groq, gemini
+    const url = `${baseUrl}/models`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { data?: { id: string }[] };
+    return (data.data ?? []).map((m) => m.id).sort();
+  } catch {
+    return [];
+  }
+}
 
 function resolveEffective(
   dbSettings: Record<string, string>,
@@ -106,7 +134,10 @@ export function createSettingsRoutes(sql: Sql): Hono {
   app.get("/settings", async (c) => {
     const dbSettings = (await getAllSettings(sql)) ?? {};
 
-    const llmModel = resolveEffective(dbSettings, "llm_model", DEFAULTS.llm_model);
+    const llmConfig = await getLLMConfig(sql);
+    const llmProvider = llmConfig.provider;
+    const llmModel = llmConfig.model;
+    const llmBaseUrl = llmConfig.baseUrl;
     const dailyCron = resolveEffective(dbSettings, "daily_digest_cron", DEFAULTS.daily_digest_cron);
     const weeklyCron = resolveEffective(dbSettings, "weekly_digest_cron", DEFAULTS.weekly_digest_cron);
     const timezone = resolveEffective(dbSettings, "timezone", DEFAULTS.timezone);
@@ -114,6 +145,24 @@ export function createSettingsRoutes(sql: Sql): Hono {
     const ollamaUrl = resolveEffective(dbSettings, "ollama_url", DEFAULTS.ollama_url);
     const email = resolveEffective(dbSettings, "digest_email_to", DEFAULTS.digest_email_to);
     const chatIds = resolveChatIds(dbSettings);
+
+    // Fetch models for the currently selected provider
+    let providerModels: string[] = [];
+    const activePreset = PROVIDER_PRESETS[llmProvider];
+    if (activePreset?.needsKey) {
+      const key = llmConfig.apiKeys[llmProvider] ?? "";
+      providerModels = await fetchProviderModels(llmProvider, key, llmBaseUrl);
+    }
+
+    // Fetch available Ollama models
+    let ollamaModels: string[] = [];
+    try {
+      const tagsRes = await fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(2000) });
+      if (tagsRes.ok) {
+        const tagsData = await tagsRes.json() as { models?: { name: string }[] };
+        ollamaModels = (tagsData.models ?? []).map((m) => m.name);
+      }
+    } catch { /* Ollama unreachable — show empty list */ }
 
     const success = c.req.query("success") || "";
     const error = c.req.query("error") || "";
@@ -199,12 +248,122 @@ export function createSettingsRoutes(sql: Sql): Hono {
             <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Classification</span>
             <span class="flex-1 h-px bg-border"></span>
           </div>
+
+          <!-- Row 1: Provider + Model -->
           <div class="grid grid-cols-2 gap-4">
             <div class="flex flex-col gap-1.5">
-              <label for="llm_model" class="text-xs text-muted-foreground">Model</label>
-              <input type="text" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}"
-                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+              <label for="llm_provider" class="text-xs text-muted-foreground">Provider</label>
+              <select id="llm_provider" name="llm_provider"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                ${Object.entries(PROVIDER_PRESETS).map(([value, p]) =>
+                  `<option value="${escapeHtml(value)}"${llmProvider === value ? " selected" : ""}>${escapeHtml(p.label)}</option>`
+                ).join("")}
+              </select>
             </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-muted-foreground">Model</label>
+              ${(() => {
+                const isTextProvider = llmProvider === "local" || llmProvider === "ollama";
+                if (isTextProvider) {
+                  return `<input type="text" id="llm_model_text"
+                    value="${escapeHtml(llmModel)}"
+                    placeholder="e.g. qwen2.5:7b"
+                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                  <input type="hidden" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" />`;
+                }
+                if (providerModels.length > 0) {
+                  const otherSel = !providerModels.includes(llmModel) ? " selected" : "";
+                  const opts = providerModels.map(m =>
+                    `<option value="${escapeHtml(m)}"${llmModel === m ? " selected" : ""}>${escapeHtml(m)}</option>`
+                  ).join("") + `<option value="__other__"${otherSel}>Other...</option>`;
+                  return `<select id="llm_model_select"
+                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                    ${opts}
+                  </select>
+                  <input type="text" id="llm_model_text"
+                    value="${escapeHtml(llmModel)}"
+                    placeholder="Model name..."
+                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary hidden" />
+                  <input type="hidden" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" />`;
+                }
+                return `<span class="text-[10px] text-muted-foreground italic">Enter an API key below to see available models</span>
+                  <input type="text" id="llm_model_text"
+                    value="${escapeHtml(llmModel)}"
+                    placeholder="or type model name..."
+                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                  <input type="hidden" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" />`;
+              })()}
+            </div>
+          </div>
+
+          <!-- Row 2: API Keys -->
+          <div class="mt-3 space-y-2">
+            <div class="text-[10px] uppercase tracking-widest text-muted-foreground">API Keys</div>
+            <div class="grid grid-cols-2 gap-3">
+              ${(["anthropic", "openai", "groq", "gemini"] as const).map(p => {
+                const label = PROVIDER_PRESETS[p]?.label ?? p;
+                const val = escapeHtml(llmConfig.apiKeys[p] ?? "");
+                return `<div class="flex flex-col gap-1">
+                  <label for="apikey_${p}" class="text-[10px] text-muted-foreground">${escapeHtml(label)}</label>
+                  <input type="password" id="apikey_${p}" name="apikey_${p}" value="${val}"
+                    autocomplete="off"
+                    placeholder="Paste key..."
+                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+                </div>`;
+              }).join("")}
+            </div>
+          </div>
+
+          <!-- Row 3: Base URL (hidden for anthropic) -->
+          <div id="base-url-row" class="mt-3 flex flex-col gap-1.5${llmProvider === "anthropic" ? " hidden" : ""}">
+            <label for="llm_base_url" class="text-xs text-muted-foreground">Base URL</label>
+            <div class="flex items-center gap-2">
+              <span class="text-primary text-xs select-none shrink-0">url</span>
+              <input type="text" id="llm_base_url" name="llm_base_url" value="${escapeHtml(llmBaseUrl)}"
+                class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+            </div>
+            <span id="ollama-url-note" class="text-[10px] text-muted-foreground${llmProvider !== "ollama" ? " hidden" : ""}">The <code class="font-mono">/v1</code> suffix is required for chat and is separate from the Ollama embeddings URL above. No API key needed for Ollama.</span>
+          </div>
+
+          <!-- Row 3: Ollama model picker + RAM table -->
+          <div id="ollama-section" class="mt-3 space-y-3${llmProvider !== "ollama" ? " hidden" : ""}">
+            <div>
+              <div class="text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5">Available in Ollama</div>
+              ${ollamaModels.length > 0
+                ? `<div class="flex flex-wrap gap-1.5">
+                    ${ollamaModels.map(m =>
+                      `<button type="button" data-ollama-model="${escapeHtml(m)}"
+                        class="ollama-model-chip rounded border border-border bg-secondary px-2 py-0.5 text-[10px] font-mono text-muted-foreground hover:border-primary hover:text-primary transition-colors${llmModel === m ? " border-primary text-primary" : ""}">
+                        ${escapeHtml(m)}
+                      </button>`
+                    ).join("")}
+                  </div>`
+                : `<span class="text-[10px] text-muted-foreground">No models pulled yet — run <code class="font-mono">ollama pull qwen2.5:7b</code> in your Ollama container.</span>`
+              }
+            </div>
+            <div>
+              <div class="text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5">Recommended Models</div>
+              <table class="w-full text-[10px]">
+                <thead>
+                  <tr class="text-muted-foreground">
+                    <th class="text-left pb-1 font-medium">Model</th>
+                    <th class="text-left pb-1 font-medium">RAM</th>
+                    <th class="text-left pb-1 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                  <tr><td class="py-1 font-mono pr-4">qwen2.5:3b</td><td class="py-1 pr-4 text-muted-foreground">~2.5 GB</td><td class="py-1 text-muted-foreground">Fast, basic quality</td></tr>
+                  <tr><td class="py-1 font-mono pr-4">qwen2.5:7b</td><td class="py-1 pr-4 text-muted-foreground">~4.7 GB</td><td class="py-1 text-primary font-medium">Recommended</td></tr>
+                  <tr><td class="py-1 font-mono pr-4">qwen2.5:14b</td><td class="py-1 pr-4 text-muted-foreground">~9 GB</td><td class="py-1 text-muted-foreground">Best quality</td></tr>
+                  <tr><td class="py-1 font-mono pr-4">mistral-nemo:12b</td><td class="py-1 pr-4 text-muted-foreground">~7.5 GB</td><td class="py-1 text-muted-foreground">Alternative</td></tr>
+                  <tr><td class="py-1 font-mono pr-4">llama3.2:3b</td><td class="py-1 pr-4 text-muted-foreground">~2.5 GB</td><td class="py-1 text-muted-foreground">Fast, EN only</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Row 4: Confidence -->
+          <div class="mt-3 grid grid-cols-2 gap-4">
             <div class="flex flex-col gap-1.5">
               <label for="confidence_threshold" class="text-xs text-muted-foreground">Confidence Threshold</label>
               <div class="flex items-center gap-3">
@@ -290,6 +449,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
           </button>
         </div>
       </form>
+      <template id="icon-x-tpl">${iconX("size-3")}</template>
     </main>
 
     <script>
@@ -321,7 +481,8 @@ export function createSettingsRoutes(sql: Sql): Hono {
         btn.className = 'chat-id-remove text-muted-foreground hover:text-destructive transition-colors';
         btn.setAttribute('data-id', val);
         btn.setAttribute('aria-label', 'Remove ' + val);
-        btn.innerHTML = '${iconX("size-3").replace(/'/g, "\\'")}';
+        var tpl = document.getElementById('icon-x-tpl');
+        if (tpl) btn.appendChild(tpl.content.cloneNode(true));
         span.appendChild(text);
         span.appendChild(btn);
         return span;
@@ -350,6 +511,97 @@ export function createSettingsRoutes(sql: Sql): Hono {
         });
       }
 
+      /* ── Provider preset + model picker ── */
+      var PRESETS = ${JSON.stringify(
+        Object.fromEntries(Object.entries(PROVIDER_PRESETS).map(([k, v]) => [k, { baseUrl: v.baseUrl }]))
+      )};
+      var OLLAMA_MODELS = ${JSON.stringify(ollamaModels)};
+
+      var providerSelect = document.getElementById('llm_provider');
+      var modelSelect = document.getElementById('llm_model_select');
+      var modelText = document.getElementById('llm_model_text');
+      var modelHidden = document.getElementById('llm_model');
+      var baseUrlRow = document.getElementById('base-url-row');
+      var baseUrlInput = document.getElementById('llm_base_url');
+      var ollamaSection = document.getElementById('ollama-section');
+      var ollamaUrlNote = document.getElementById('ollama-url-note');
+
+      function applyProvider(provider, currentModel, skipBaseUrl) {
+        var preset = PRESETS[provider] || { baseUrl: '' };
+        var isLocal = provider === 'local';
+        var isOllama = provider === 'ollama';
+
+        // Base URL
+        if (baseUrlRow) {
+          if (provider === 'anthropic') {
+            baseUrlRow.classList.add('hidden');
+          } else {
+            baseUrlRow.classList.remove('hidden');
+          }
+          if (!skipBaseUrl && baseUrlInput) {
+            baseUrlInput.value = preset.baseUrl;
+          }
+        }
+
+        // Ollama section + URL note
+        if (ollamaSection) {
+          isOllama ? ollamaSection.classList.remove('hidden') : ollamaSection.classList.add('hidden');
+        }
+        if (ollamaUrlNote) {
+          isOllama ? ollamaUrlNote.classList.remove('hidden') : ollamaUrlNote.classList.add('hidden');
+        }
+
+        // When switching providers, show text input (models reload on save)
+        if (modelSelect) modelSelect.classList.add('hidden');
+        if (modelText) {
+          modelText.classList.remove('hidden');
+          if (isOllama && OLLAMA_MODELS.length > 0 && !currentModel) {
+            modelText.value = OLLAMA_MODELS[0];
+          }
+          modelHidden.value = modelText.value;
+        }
+      }
+
+      if (providerSelect) {
+        // Sync model hidden on select change
+        if (modelSelect) {
+          modelSelect.addEventListener('change', function() {
+            if (modelSelect.value === '__other__') {
+              modelText.classList.remove('hidden');
+              modelSelect.classList.add('hidden');
+              modelText.focus();
+              modelHidden.value = modelText.value;
+            } else {
+              modelHidden.value = modelSelect.value;
+            }
+          });
+        }
+
+        if (modelText) {
+          modelText.addEventListener('input', function() {
+            modelHidden.value = modelText.value;
+          });
+        }
+
+        // Ollama chip click
+        document.addEventListener('click', function(e) {
+          var chip = e.target.closest('[data-ollama-model]');
+          if (!chip) return;
+          var m = chip.getAttribute('data-ollama-model');
+          modelText.value = m;
+          modelHidden.value = m;
+          document.querySelectorAll('.ollama-model-chip').forEach(function(c) {
+            c.classList.remove('border-primary', 'text-primary');
+          });
+          chip.classList.add('border-primary', 'text-primary');
+        });
+
+        providerSelect.addEventListener('change', function() {
+          var currentModel = modelHidden.value;
+          applyProvider(providerSelect.value, currentModel, false);
+        });
+      }
+
       /* ── Confidence threshold slider sync ── */
       if (range && thresholdInput) {
         range.addEventListener('input', function() {
@@ -373,7 +625,6 @@ export function createSettingsRoutes(sql: Sql): Hono {
 
     const form: Record<string, string> = {
       chat_ids: (body.chat_ids as string) || "",
-      llm_model: (body.llm_model as string) || "",
       daily_digest_cron: (body.daily_digest_cron as string) || "",
       weekly_digest_cron: (body.weekly_digest_cron as string) || "",
       timezone: (body.timezone as string) || "",
@@ -382,7 +633,22 @@ export function createSettingsRoutes(sql: Sql): Hono {
       ollama_url: (body.ollama_url as string) || "",
     };
 
+    const llmConfig: LLMConfig = {
+      provider: (body.llm_provider as string) || "anthropic",
+      model: (body.llm_model as string) || "",
+      baseUrl: (body.llm_base_url as string) || "",
+      apiKeys: {
+        anthropic: (body.apikey_anthropic as string) || "",
+        openai:    (body.apikey_openai as string) || "",
+        groq:      (body.apikey_groq as string) || "",
+        gemini:    (body.apikey_gemini as string) || "",
+      },
+    };
+
     // Validate
+    if (!llmConfig.model.trim()) {
+      return c.redirect(`/settings?error=${encodeURIComponent("Model name is required.")}`, 302);
+    }
     const validationError = validateSettings(form);
     if (validationError) {
       return c.redirect(
@@ -395,12 +661,10 @@ export function createSettingsRoutes(sql: Sql): Hono {
     const chatIds = form.chat_ids
       .split(",")
       .map((id) => id.trim())
-      .filter((id) => id.length > 0)
-      .join(",");
+      .filter((id) => id.length > 0);
 
     const toSave: Record<string, string> = {
-      telegram_chat_ids: chatIds,
-      llm_model: form.llm_model,
+      telegram_chat_ids: JSON.stringify(chatIds),
       daily_digest_cron: form.daily_digest_cron,
       weekly_digest_cron: form.weekly_digest_cron,
       timezone: form.timezone,
@@ -410,13 +674,14 @@ export function createSettingsRoutes(sql: Sql): Hono {
     };
 
     await saveAllSettings(sql, toSave);
+    await saveLLMConfig(sql, llmConfig);
 
     // Ollama connectivity check
     let warning = "";
     try {
       await fetch(form.ollama_url, { signal: AbortSignal.timeout(3000) });
     } catch {
-      warning = `Could not connect to Ollama at ${form.ollama_url}. Embedding generation may fail.`;
+      warning = "Could not connect to the configured Ollama endpoint. Embedding generation may fail.";
     }
 
     const params = new URLSearchParams({ success: "Settings saved" });

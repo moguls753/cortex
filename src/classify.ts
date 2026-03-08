@@ -5,10 +5,29 @@ import { fileURLToPath } from "node:url";
 import { createLLMProvider } from "./llm/index.js";
 import { generateEmbedding } from "./embed.js";
 import { createLogger } from "./logger.js";
+import { getLLMConfig } from "./llm/config.js";
 import { resolveConfigValue } from "./config.js";
 import { sleep } from "./sleep.js";
 
 const log = createLogger("classify");
+
+async function resolveLLMConfig(sql?: postgres.Sql): Promise<{ provider: string; apiKey: string; model: string; baseUrl?: string }> {
+  if (!sql) {
+    return {
+      provider: process.env.LLM_PROVIDER || "anthropic",
+      apiKey: process.env.LLM_API_KEY || "",
+      model: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
+      baseUrl: process.env.LLM_BASE_URL || undefined,
+    };
+  }
+  const config = await getLLMConfig(sql);
+  return {
+    provider: config.provider,
+    apiKey: config.apiKeys[config.provider] ?? "",
+    model: config.model,
+    baseUrl: config.baseUrl || undefined,
+  };
+}
 
 const VALID_CATEGORIES = [
   "people",
@@ -254,6 +273,7 @@ export async function classifyText(
     entryId?: string;
     contextEntries?: Array<{ name: string; category: string | null; content: string | null }>;
     outputLanguage?: string;
+    sql?: postgres.Sql;
   },
 ): Promise<{
   category: string | null;
@@ -265,12 +285,7 @@ export async function classifyText(
   calendar_date?: string | null;
   content: string;
 } | null> {
-  const provider = createLLMProvider({
-    provider: process.env.LLM_PROVIDER || "anthropic",
-    apiKey: process.env.LLM_API_KEY || "",
-    model: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
-    baseUrl: process.env.LLM_BASE_URL || undefined,
-  });
+  const provider = createLLMProvider(await resolveLLMConfig(options?.sql));
 
   let template: string;
   try {
@@ -347,73 +362,29 @@ export async function classifyEntry(
   const entry = rows[0] as { name: string; content: string | null };
   const text = entry.content || entry.name;
 
-  // Gather context
-  const contextEntries = await assembleContext(sql, text);
+  const [contextRaw, outputLanguage] = await Promise.all([
+    assembleContext(sql, text),
+    resolveOutputLanguage(sql),
+  ]);
 
-  // Load prompt + resolve language
-  let template: string;
-  try {
-    template = await loadPromptTemplate();
-  } catch {
-    log.error("Failed to load classification prompt template");
-    return;
-  }
+  const contextEntries = contextRaw
+    .filter((e) => e.id !== entryId)
+    .map((e) => ({ name: e.name, category: e.category ?? null, content: e.content ?? null }));
 
-  const outputLanguage = await resolveOutputLanguage(sql);
-
-  // Format context
-  const contextStr = formatContextEntries(
-    contextEntries
-      .filter((e) => e.id !== entryId)
-      .map((e) => ({
-        name: e.name,
-        category: e.category ?? "unclassified",
-        content: e.content,
-      })),
-  );
-
-  // Truncate input
-  let inputText = text;
-  if (inputText.length > MAX_INPUT_LENGTH) {
-    inputText = inputText.substring(0, MAX_INPUT_LENGTH);
-  }
-
-  const prompt = assemblePrompt(template, contextStr, inputText, outputLanguage);
-
-  const provider = createLLMProvider({
-    provider: process.env.LLM_PROVIDER || "anthropic",
-    apiKey: process.env.LLM_API_KEY || "",
-    model: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
-    baseUrl: process.env.LLM_BASE_URL || undefined,
-  });
-
-  let response: string;
-  try {
-    response = await provider.chat(prompt);
-  } catch (error) {
-    const err = error as Error & { status?: number };
-    log.error("Classification failed for entry", {
-      entryId,
-      status: err.status ?? null,
-      error: err.message,
-    });
-    return;
-  }
-
-  const validated = validateClassificationResponse(response);
-  if (!validated) {
-    log.error("Invalid classification response for entry", { entryId });
+  const result = await classifyText(text, { entryId, contextEntries, outputLanguage, sql });
+  if (!result) {
+    log.error("Classification returned no result for entry", { entryId });
     return;
   }
 
   // Update entry — do NOT store calendar fields
   await sql`
     UPDATE entries SET
-      category = ${validated.category},
-      name = ${validated.name},
-      confidence = ${validated.confidence},
-      fields = ${JSON.stringify(validated.fields)}::jsonb,
-      tags = ${validated.tags}
+      category = ${result.category},
+      name = ${result.name},
+      confidence = ${result.confidence},
+      fields = ${JSON.stringify(result.fields)}::jsonb,
+      tags = ${result.tags}
     WHERE id = ${entryId}
   `;
 }
@@ -471,13 +442,8 @@ export async function retryFailedClassifications(
   // LLM calls with exponential backoff on 429s
   let backoffMs = 1_000;
 
+  const provider = createLLMProvider(await resolveLLMConfig(sql));
   for (const { id, prompt } of prepared) {
-    const provider = createLLMProvider({
-      provider: process.env.LLM_PROVIDER || "anthropic",
-      apiKey: process.env.LLM_API_KEY || "",
-      model: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
-      baseUrl: process.env.LLM_BASE_URL || undefined,
-    });
 
     let response: string;
     try {
@@ -527,6 +493,7 @@ export async function reclassifyEntry(
   correctionCategory: string | null,
   correctionText: string,
   outputLanguage?: string,
+  sql?: postgres.Sql,
 ): Promise<{
   category: string;
   name: string;
@@ -534,12 +501,7 @@ export async function reclassifyEntry(
   fields: Record<string, unknown>;
   tags: string[];
 } | null> {
-  const provider = createLLMProvider({
-    provider: process.env.LLM_PROVIDER || "anthropic",
-    apiKey: process.env.LLM_API_KEY || "",
-    model: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
-    baseUrl: process.env.LLM_BASE_URL || undefined,
-  });
+  const provider = createLLMProvider(await resolveLLMConfig(sql));
 
   let template: string;
   try {

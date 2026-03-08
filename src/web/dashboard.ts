@@ -510,7 +510,7 @@ export function createDashboardRoutes(
     }
 
     try {
-      const result = await classifyText(text, { contextEntries, outputLanguage });
+      const result = await classifyText(text, { contextEntries, outputLanguage, sql });
       if (result) {
         category = result.category ?? null;
         name = result.name ?? null;

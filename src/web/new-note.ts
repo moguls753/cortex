@@ -209,7 +209,7 @@ export function createNewNoteRoutes(sql: Sql): Hono {
 
     try {
       const contextEntries = await assembleContext(sql, text);
-      const result = await classifyText(text, { contextEntries });
+      const result = await classifyText(text, { contextEntries, sql });
 
       if (!result) {
         return c.json({
