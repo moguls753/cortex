@@ -138,7 +138,7 @@ function renderSearchBar(
       ${currentTag ? `<input type="hidden" name="tag" value="${escapeHtml(currentTag)}">` : ""}
       <div class="flex items-center gap-2 flex-1 rounded-md border border-border bg-secondary px-3 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
         ${iconSearch("size-3 text-muted-foreground")}
-        <input type="text" name="q" value="${escapeHtml(currentQuery ?? "")}" placeholder="Search entries..." autocomplete="off" class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-sans">
+        <input type="text" name="q" value="${escapeHtml(currentQuery ?? "")}" placeholder="Search entries..." autocomplete="off" class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none font-sans">
       </div>
     </form>`;
 }

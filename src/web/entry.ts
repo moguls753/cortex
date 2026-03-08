@@ -127,12 +127,12 @@ function renderViewPage(entry: {
   html += `<div class="flex items-center gap-2 shrink-0">`;
   if (entry.deleted_at) {
     html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/restore">`;
-    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-xs text-primary border border-primary hover:bg-primary hover:text-primary-foreground transition-colors">Restore</button>`;
+    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-primary border border-primary hover:bg-primary hover:text-primary-foreground transition-colors">Restore</button>`;
     html += `</form>`;
   } else {
-    html += `<a href="/entry/${escapeHtml(entry.id)}/edit" class="rounded-md px-2.5 py-1.5 text-xs text-foreground border border-border hover:bg-secondary transition-colors">Edit</a>`;
+    html += `<a href="/entry/${escapeHtml(entry.id)}/edit" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Edit</a>`;
     html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/delete" onsubmit="return confirm('Are you sure you want to delete this entry?')">`;
-    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-xs text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1">${iconTrash2("size-3")} Delete</button>`;
+    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1">${iconTrash2("size-3")} Delete</button>`;
     html += `</form>`;
   }
   html += `</div>`;
@@ -203,13 +203,13 @@ function renderEditPage(
   // Name
   html += `<div>`;
   html += `<label class="block text-xs font-medium text-muted-foreground mb-1">Name</label>`;
-  html += `<input type="text" name="name" value="${escapeHtml(entry.name)}" required class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+  html += `<input type="text" name="name" value="${escapeHtml(entry.name)}" required class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
   html += `</div>`;
 
   // Category
   html += `<div>`;
   html += `<label class="block text-xs font-medium text-muted-foreground mb-1">Category</label>`;
-  html += `<select name="category" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+  html += `<select name="category" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
   html += `<option value="">-- Select category --</option>`;
   for (const cat of CATEGORIES) {
     const selected = entry.category === cat ? " selected" : "";
@@ -221,7 +221,7 @@ function renderEditPage(
   // Tags
   html += `<div>`;
   html += `<label class="block text-xs font-medium text-muted-foreground mb-1">Tags</label>`;
-  html += `<input type="text" name="tags" value="${escapeHtml(entry.tags.join(", "))}" list="tag-suggestions" placeholder="Comma-separated tags" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+  html += `<input type="text" name="tags" value="${escapeHtml(entry.tags.join(", "))}" list="tag-suggestions" placeholder="Comma-separated tags" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
   html += `<datalist id="tag-suggestions">`;
   for (const tag of allTags) {
     html += `<option value="${escapeHtml(tag)}">`;
@@ -232,7 +232,7 @@ function renderEditPage(
   // Content
   html += `<div>`;
   html += `<label class="block text-xs font-medium text-muted-foreground mb-1">Content</label>`;
-  html += `<textarea name="content" rows="10" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans resize-y">${escapeHtml(entry.content ?? "")}</textarea>`;
+  html += `<textarea name="content" rows="10" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans resize-y">${escapeHtml(entry.content ?? "")}</textarea>`;
   html += `</div>`;
 
   // Category-specific fields
@@ -246,7 +246,7 @@ function renderEditPage(
       if (field === "status" && entry.category === "projects") {
         html += `<div>`;
         html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<select name="fields[${escapeHtml(field)}]" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+        html += `<select name="fields[${escapeHtml(field)}]" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
         for (const opt of ["active", "paused", "done", "cancelled"]) {
           const sel = String(value) === opt ? " selected" : "";
           html += `<option value="${opt}"${sel}>${opt}</option>`;
@@ -255,7 +255,7 @@ function renderEditPage(
       } else if (field === "status" && entry.category === "tasks") {
         html += `<div>`;
         html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<select name="fields[${escapeHtml(field)}]" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+        html += `<select name="fields[${escapeHtml(field)}]" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
         for (const opt of ["pending", "done", "cancelled"]) {
           const sel = String(value) === opt ? " selected" : "";
           html += `<option value="${opt}"${sel}>${opt}</option>`;
@@ -264,17 +264,17 @@ function renderEditPage(
       } else if (field === "due_date") {
         html += `<div>`;
         html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<input type="date" name="fields[${escapeHtml(field)}]" value="${escapeHtml(String(value ?? ""))}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+        html += `<input type="date" name="fields[${escapeHtml(field)}]" value="${escapeHtml(String(value ?? ""))}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
         html += `</div>`;
       } else if (field === "context" || field === "follow_ups" || field === "notes") {
         html += `<div>`;
         html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<textarea name="fields[${escapeHtml(field)}]" rows="3" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans resize-y">${escapeHtml(String(value ?? ""))}</textarea>`;
+        html += `<textarea name="fields[${escapeHtml(field)}]" rows="3" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans resize-y">${escapeHtml(String(value ?? ""))}</textarea>`;
         html += `</div>`;
       } else {
         html += `<div>`;
         html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<input type="text" name="fields[${escapeHtml(field)}]" value="${escapeHtml(String(value ?? ""))}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+        html += `<input type="text" name="fields[${escapeHtml(field)}]" value="${escapeHtml(String(value ?? ""))}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
         html += `</div>`;
       }
     }
@@ -283,7 +283,7 @@ function renderEditPage(
 
   // Submit
   html += `<div class="flex items-center gap-2">`;
-  html += `<button type="submit" class="rounded-md px-4 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save</button>`;
+  html += `<button type="submit" class="rounded-md px-4 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save</button>`;
   html += `<a href="/entry/${escapeHtml(entry.id)}" class="rounded-md px-4 py-1.5 text-xs text-muted-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
   html += `</div>`;
 

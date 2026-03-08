@@ -17,7 +17,7 @@ function navItem(
   active: boolean,
 ): string {
   const activeCls = active ? "text-foreground bg-secondary" : "";
-  return `<a href="${href}" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ${activeCls}" title="${label}">${iconHtml}<span class="hidden sm:inline">${label}</span></a>`;
+  return `<a href="${href}" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ${activeCls}" title="${label}">${iconHtml}<span class="hidden sm:inline">${label}</span></a>`;
 }
 
 export function renderLayout(
@@ -76,7 +76,7 @@ export function renderLayout(
           <span id="theme-icon-moon">${iconMoon("size-3.5")}</span>
         </button>
         <form method="POST" action="/logout" class="inline">
-          <button type="submit" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Log out">
+          <button type="submit" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Log out">
             ${iconLogOut("size-3.5")}
             <span class="hidden sm:inline">Log out</span>
           </button>

@@ -231,7 +231,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
               <div class="flex items-center gap-2 mt-1">
                 <div class="flex items-center gap-0 flex-1 max-w-xs">
                   <input type="text" id="new-chat-id" placeholder="Enter chat ID..."
-                    class="h-8 flex-1 rounded-l-md border border-r-0 border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+                    class="h-8 flex-1 rounded-l-md border border-r-0 border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
                   <button type="button" id="add-chat-id-btn"
                     class="h-8 rounded-r-md border border-border bg-secondary px-2.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors">Add</button>
                 </div>
@@ -254,7 +254,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
             <div class="flex flex-col gap-1.5">
               <label for="llm_provider" class="text-xs text-muted-foreground">Provider</label>
               <select id="llm_provider" name="llm_provider"
-                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
                 ${Object.entries(PROVIDER_PRESETS).map(([value, p]) =>
                   `<option value="${escapeHtml(value)}"${llmProvider === value ? " selected" : ""}>${escapeHtml(p.label)}</option>`
                 ).join("")}
@@ -268,7 +268,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
                   return `<input type="text" id="llm_model_text"
                     value="${escapeHtml(llmModel)}"
                     placeholder="e.g. qwen2.5:7b"
-                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
                   <input type="hidden" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" />`;
                 }
                 if (providerModels.length > 0) {
@@ -277,42 +277,56 @@ export function createSettingsRoutes(sql: Sql): Hono {
                     `<option value="${escapeHtml(m)}"${llmModel === m ? " selected" : ""}>${escapeHtml(m)}</option>`
                   ).join("") + `<option value="__other__"${otherSel}>Other...</option>`;
                   return `<select id="llm_model_select"
-                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
                     ${opts}
                   </select>
                   <input type="text" id="llm_model_text"
                     value="${escapeHtml(llmModel)}"
                     placeholder="Model name..."
-                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary hidden" />
+                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary hidden" />
                   <input type="hidden" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" />`;
                 }
-                return `<span class="text-[10px] text-muted-foreground italic">Enter an API key below to see available models</span>
-                  <input type="text" id="llm_model_text"
+                return `<input type="text" id="llm_model_text"
                     value="${escapeHtml(llmModel)}"
-                    placeholder="or type model name..."
-                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                    placeholder="Type model name..."
+                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                  <span id="model-key-hint" class="text-[10px] text-muted-foreground italic">Enter an API key to see available models</span>
                   <input type="hidden" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" />`;
               })()}
             </div>
           </div>
 
-          <!-- Row 2: API Keys -->
-          <div class="mt-3 space-y-2">
-            <div class="text-[10px] uppercase tracking-widest text-muted-foreground">API Keys</div>
-            <div class="grid grid-cols-2 gap-3">
-              ${(["anthropic", "openai", "groq", "gemini"] as const).map(p => {
-                const label = PROVIDER_PRESETS[p]?.label ?? p;
-                const val = escapeHtml(llmConfig.apiKeys[p] ?? "");
-                return `<div class="flex flex-col gap-1">
-                  <label for="apikey_${p}" class="text-[10px] text-muted-foreground">${escapeHtml(label)}</label>
-                  <input type="password" id="apikey_${p}" name="apikey_${p}" value="${val}"
-                    autocomplete="off"
-                    placeholder="Paste key..."
-                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
-                </div>`;
-              }).join("")}
-            </div>
-          </div>
+          <!-- Row 2: API Key (scoped to active provider) -->
+          ${(() => {
+            const activeNeedsKey = PROVIDER_PRESETS[llmProvider]?.needsKey ?? false;
+            const otherSavedCount = (["anthropic", "openai", "groq", "gemini"] as const)
+              .filter(p => p !== llmProvider && (llmConfig.apiKeys[p] ?? "").length > 0)
+              .length;
+            const activeLabel = PROVIDER_PRESETS[llmProvider]?.label ?? llmProvider;
+            const activeVal = escapeHtml(llmConfig.apiKeys[llmProvider as keyof typeof llmConfig.apiKeys] ?? "");
+
+            return `<div id="apikey-row" class="mt-3 flex flex-col gap-1.5${!activeNeedsKey ? " hidden" : ""}">
+              <div class="flex items-center justify-between">
+                <label id="apikey-label" class="text-xs text-muted-foreground">
+                  <span id="apikey-provider-name">${escapeHtml(activeLabel)}</span> API Key
+                </label>
+                <span id="other-keys-indicator" class="text-[10px] text-muted-foreground">${
+                  otherSavedCount > 0
+                    ? `${otherSavedCount} other key${otherSavedCount > 1 ? "s" : ""} saved`
+                    : ""
+                }</span>
+              </div>
+              <input type="password" id="apikey_active" value="${activeVal}"
+                autocomplete="new-password"
+                placeholder="Paste key..."
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+            </div>`;
+          })()}
+          <!-- Hidden inputs carry all API keys for form submission -->
+          ${(["anthropic", "openai", "groq", "gemini"] as const).map(p => {
+            const val = escapeHtml(llmConfig.apiKeys[p] ?? "");
+            return `<input type="hidden" id="apikey_${p}" name="apikey_${p}" value="${val}" />`;
+          }).join("\n          ")}
 
           <!-- Row 3: Base URL (hidden for anthropic) -->
           <div id="base-url-row" class="mt-3 flex flex-col gap-1.5${llmProvider === "anthropic" ? " hidden" : ""}">
@@ -320,7 +334,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
             <div class="flex items-center gap-2">
               <span class="text-primary text-xs select-none shrink-0">url</span>
               <input type="text" id="llm_base_url" name="llm_base_url" value="${escapeHtml(llmBaseUrl)}"
-                class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
             </div>
             <span id="ollama-url-note" class="text-[10px] text-muted-foreground${llmProvider !== "ollama" ? " hidden" : ""}">The <code class="font-mono">/v1</code> suffix is required for chat and is separate from the Ollama embeddings URL above. No API key needed for Ollama.</span>
           </div>
@@ -370,7 +384,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
                 <input type="range" id="confidence_range" min="0" max="100" value="${thresholdPercent}"
                   class="flex-1" />
                 <input type="text" id="confidence_threshold" name="confidence_threshold" value="${escapeHtml(threshold)}"
-                  class="h-8 w-16 rounded-md border border-border bg-transparent px-2 text-xs text-center font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                  class="h-8 w-16 rounded-md border border-border bg-transparent px-2 text-sm text-center font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
               </div>
             </div>
           </div>
@@ -389,7 +403,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
               <div class="flex items-center gap-2">
                 <span class="text-primary text-xs select-none shrink-0">cron</span>
                 <input type="text" id="daily_digest_cron" name="daily_digest_cron" value="${escapeHtml(dailyCron)}"
-                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
               </div>
             </div>
             <div class="flex flex-col gap-1.5">
@@ -397,7 +411,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
               <div class="flex items-center gap-2">
                 <span class="text-primary text-xs select-none shrink-0">cron</span>
                 <input type="text" id="weekly_digest_cron" name="weekly_digest_cron" value="${escapeHtml(weeklyCron)}"
-                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
               </div>
             </div>
           </div>
@@ -405,14 +419,14 @@ export function createSettingsRoutes(sql: Sql): Hono {
             <div class="flex flex-col gap-1.5">
               <label for="digest_email_to" class="text-xs text-muted-foreground">Email Delivery</label>
               <input type="text" id="digest_email_to" name="digest_email_to" value="${escapeHtml(email)}"
-                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                 placeholder="Leave empty to disable" />
               ${email === "" ? `<span class="text-[10px] text-muted-foreground">Disabled — digests available on dashboard only</span>` : ""}
             </div>
             <div class="flex flex-col gap-1.5">
               <label for="timezone" class="text-xs text-muted-foreground">Timezone</label>
               <input type="text" id="timezone" name="timezone" value="${escapeHtml(timezone)}"
-                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
             </div>
           </div>
         </div>
@@ -430,7 +444,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
               <div class="flex items-center gap-2">
                 <span class="text-primary text-xs select-none shrink-0">url</span>
                 <input type="text" id="ollama_url" name="ollama_url" value="${escapeHtml(ollamaUrl)}"
-                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
               </div>
             </div>
             <div class="flex items-end pb-0.5">
@@ -443,7 +457,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
         <div class="flex items-center justify-between pt-1">
           <span class="text-[10px] text-muted-foreground">Changes take effect immediately after save</span>
           <button type="submit"
-            class="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+            class="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
             ${iconCheck("size-3")}
             Save All
           </button>
@@ -513,18 +527,89 @@ export function createSettingsRoutes(sql: Sql): Hono {
 
       /* ── Provider preset + model picker ── */
       var PRESETS = ${JSON.stringify(
-        Object.fromEntries(Object.entries(PROVIDER_PRESETS).map(([k, v]) => [k, { baseUrl: v.baseUrl }]))
+        Object.fromEntries(Object.entries(PROVIDER_PRESETS).map(([k, v]) => [k, { baseUrl: v.baseUrl, needsKey: v.needsKey, label: v.label }]))
       )};
       var OLLAMA_MODELS = ${JSON.stringify(ollamaModels)};
+      var KEY_PROVIDERS = ['anthropic', 'openai', 'groq', 'gemini'];
 
       var providerSelect = document.getElementById('llm_provider');
       var modelSelect = document.getElementById('llm_model_select');
       var modelText = document.getElementById('llm_model_text');
       var modelHidden = document.getElementById('llm_model');
+      var modelKeyHint = document.getElementById('model-key-hint');
       var baseUrlRow = document.getElementById('base-url-row');
       var baseUrlInput = document.getElementById('llm_base_url');
       var ollamaSection = document.getElementById('ollama-section');
       var ollamaUrlNote = document.getElementById('ollama-url-note');
+      var apikeyRow = document.getElementById('apikey-row');
+      var apikeyActive = document.getElementById('apikey_active');
+      var apikeyLabel = document.getElementById('apikey-provider-name');
+      var otherKeysIndicator = document.getElementById('other-keys-indicator');
+      var currentKeyProvider = '${escapeHtml(llmProvider)}';
+
+      /* ── API Key scoping ── */
+      function saveActiveKeyToHidden() {
+        var hidden = document.getElementById('apikey_' + currentKeyProvider);
+        if (hidden && apikeyActive) {
+          hidden.value = apikeyActive.value;
+        }
+      }
+
+      function loadKeyForProvider(provider) {
+        saveActiveKeyToHidden();
+        currentKeyProvider = provider;
+        var preset = PRESETS[provider] || {};
+
+        // Show/hide the key row
+        if (apikeyRow) {
+          if (preset.needsKey) {
+            apikeyRow.classList.remove('hidden');
+            var hidden = document.getElementById('apikey_' + provider);
+            if (apikeyActive) apikeyActive.value = hidden ? hidden.value : '';
+            if (apikeyLabel) apikeyLabel.textContent = preset.label || provider;
+          } else {
+            apikeyRow.classList.add('hidden');
+          }
+        }
+
+        // Update "N other keys saved" indicator
+        if (otherKeysIndicator) {
+          var count = 0;
+          KEY_PROVIDERS.forEach(function(p) {
+            if (p !== provider) {
+              var h = document.getElementById('apikey_' + p);
+              if (h && h.value) count++;
+            }
+          });
+          if (count > 0) {
+            otherKeysIndicator.textContent = count + ' other key' + (count > 1 ? 's' : '') + ' saved';
+          } else {
+            otherKeysIndicator.textContent = '';
+          }
+        }
+
+        // Update model key hint visibility
+        if (modelKeyHint) {
+          var activeHidden = document.getElementById('apikey_' + provider);
+          var hasKey = activeHidden && activeHidden.value;
+          if (!preset.needsKey || hasKey) {
+            modelKeyHint.classList.add('hidden');
+          } else {
+            modelKeyHint.classList.remove('hidden');
+          }
+        }
+      }
+
+      // Sync active key input → hidden on every keystroke
+      if (apikeyActive) {
+        apikeyActive.addEventListener('input', function() {
+          saveActiveKeyToHidden();
+          // Update hint when key is entered/cleared
+          if (modelKeyHint) {
+            modelKeyHint.classList.toggle('hidden', !!apikeyActive.value);
+          }
+        });
+      }
 
       function applyProvider(provider, currentModel, skipBaseUrl) {
         var preset = PRESETS[provider] || { baseUrl: '' };
@@ -550,6 +635,9 @@ export function createSettingsRoutes(sql: Sql): Hono {
         if (ollamaUrlNote) {
           isOllama ? ollamaUrlNote.classList.remove('hidden') : ollamaUrlNote.classList.add('hidden');
         }
+
+        // Swap API key field
+        loadKeyForProvider(provider);
 
         // When switching providers, show text input (models reload on save)
         if (modelSelect) modelSelect.classList.add('hidden');

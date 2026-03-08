@@ -41,13 +41,13 @@ function renderNewNotePage(allTags: string[], error?: string): string {
   // Name
   html += `<div>`;
   html += `<label class="block text-xs font-medium text-muted-foreground mb-1">Name</label>`;
-  html += `<input type="text" name="name" required class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+  html += `<input type="text" name="name" required class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
   html += `</div>`;
 
   // Category
   html += `<div>`;
   html += `<label class="block text-xs font-medium text-muted-foreground mb-1">Category</label>`;
-  html += `<select name="category" id="note-category" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+  html += `<select name="category" id="note-category" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
   html += `<option value="">-- Select category --</option>`;
   for (const cat of CATEGORIES) {
     html += `<option value="${escapeHtml(cat)}">${escapeHtml(CATEGORY_LABELS[cat] ?? cat)}</option>`;
@@ -58,7 +58,7 @@ function renderNewNotePage(allTags: string[], error?: string): string {
   // Tags
   html += `<div>`;
   html += `<label class="block text-xs font-medium text-muted-foreground mb-1">Tags</label>`;
-  html += `<input type="text" name="tags" list="tag-suggestions" placeholder="Comma-separated tags" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+  html += `<input type="text" name="tags" list="tag-suggestions" placeholder="Comma-separated tags" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
   html += `<datalist id="tag-suggestions">`;
   for (const tag of allTags) {
     html += `<option value="${escapeHtml(tag)}">`;
@@ -69,13 +69,13 @@ function renderNewNotePage(allTags: string[], error?: string): string {
   // Content
   html += `<div>`;
   html += `<label class="block text-xs font-medium text-muted-foreground mb-1">Content</label>`;
-  html += `<textarea name="content" rows="10" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans resize-y"></textarea>`;
+  html += `<textarea name="content" rows="10" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans resize-y"></textarea>`;
   html += `</div>`;
 
   // Buttons
   html += `<div class="flex items-center gap-2">`;
-  html += `<button type="submit" class="rounded-md px-4 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save</button>`;
-  html += `<button type="button" id="ai-suggest-btn" class="rounded-md px-4 py-1.5 text-xs text-primary border border-primary hover:bg-primary hover:text-primary-foreground transition-colors">AI Suggest</button>`;
+  html += `<button type="submit" class="rounded-md px-4 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save</button>`;
+  html += `<button type="button" id="ai-suggest-btn" class="rounded-md px-4 py-1.5 text-sm text-primary border border-primary hover:bg-primary hover:text-primary-foreground transition-colors">AI Suggest</button>`;
   html += `</div>`;
 
   html += `</form>`;
