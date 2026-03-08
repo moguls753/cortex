@@ -17,7 +17,7 @@ Last updated: 2026-03-07
 | web-new-note | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | web-settings | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | mcp-server | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| digests | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ |
+| digests | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
@@ -99,7 +99,11 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Digests Phase 2 complete.** Test specification with 42 scenarios derived from behavioral spec. Full traceability: all 29 acceptance criteria, all testable edge cases covered across 5 groups (daily digest pipeline, weekly review pipeline, email delivery, background retry, scheduling & configuration). Review fixes: TS-5.1 split into TS-5.1a/5.1b (multiple-When violation), added TS-2.5b (weekly SSE push — spec gap flagged), added soft-deleted exclusion assertion to TS-4.1, clarified EC-1.2 mapping (Claude interprets staleness, not separate query). Flagged: AC-1.3 uses `anthropic_model` but correct key is `llm_model`.
 
-Next: **digests** — Phase 3 (test impl spec). Run `spec-dd test-impl digests` to continue.
+**Digests Phase 3 complete.** Test implementation specification with all 42 scenarios mapped to test functions. Split: 35 unit tests (mocked query layer + LLM + email + embed + classify + cron) + 7 integration tests (testcontainers). Key decisions: factory pattern with `generateDailyDigest(sql, broadcaster)` / `generateWeeklyReview(sql, broadcaster)` / `runBackgroundRetry(sql)` / `startScheduler(sql, broadcaster)`, query module `digests-queries.ts` with 5 functions (getDailyDigestData, getWeeklyReviewData, cacheDigest, getLatestDigest, getEntriesNeedingRetry), email module `email.ts` with `sendDigestEmail` + `isSmtpConfigured`, new `digests` table (type/content/generated_at, 2-row upsert). Background retry reuses `embedEntry` from embed.ts and `classifyEntry` from classify.ts. Scheduler uses `node-cron` with timezone support. Dependencies: `node-cron`, `nodemailer`, `@types/nodemailer`. 5 open decisions deferred to Phase 5.
+
+**Digests complete.** All 6 phases done, 42/42 tests pass (35 unit + 7 integration), review report at `digests-implementation-review.md`. 0 CRITICAL findings. 3 WARNINGs fixed during review: W-1 behavioral spec `anthropic_model` → `llm_model`, W-2 added AC-2.7 for weekly SSE push, W-3 overdue tasks inclusion kept as better UX. 1 code fix: removed redundant `DIGEST_EMAIL_TO` env var fallback. Implementation: `src/digests.ts` (pipeline + scheduler), `src/digests-queries.ts` (queries), `src/email.ts` (SMTP). Dependencies: `node-cron`, `nodemailer`. Timezone-aware date formatting for email subjects.
+
+All features complete. All 6 phases of the implementation plan are done.
 
 ## Spec Files
 
@@ -116,7 +120,7 @@ Next: **digests** — Phase 3 (test impl spec). Run `spec-dd test-impl digests` 
 | web-new-note | `web-new-note-specification.md`, `web-new-note-test-specification.md`, `web-new-note-test-implementation-specification.md`, `web-new-note-implementation-review.md` |
 | web-settings | `web-settings-specification.md`, `web-settings-test-specification.md`, `web-settings-test-implementation-specification.md`, `web-settings-implementation-review.md` |
 | mcp-server | `mcp-server-specification.md`, `mcp-server-test-specification.md`, `mcp-server-test-implementation-specification.md`, `mcp-server-implementation-review.md` |
-| digests | `digests-specification.md`, `digests-test-specification.md` |
+| digests | `digests-specification.md`, `digests-test-specification.md`, `digests-test-implementation-specification.md`, `digests-implementation-review.md` |
 
 ## Other Documents
 

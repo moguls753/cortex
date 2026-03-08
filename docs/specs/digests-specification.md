@@ -26,7 +26,7 @@ The digest system runs three scheduled jobs via node-cron: a daily morning brief
   - Tasks due within 7 days (`category: 'tasks'`, `fields->>'status': 'pending'`, where `fields->>'due_date'` is within the next 7 days).
   - Entries captured yesterday (any category, `created_at` within the previous calendar day).
   - All queries exclude soft-deleted entries.
-- **AC-1.3:** This data is formatted and sent to Claude (using the model configured by the `anthropic_model` setting, default `claude-sonnet-4-20250514`) with the daily digest prompt. The prompt instructs Claude to produce a plain text briefing with a maximum of 150 words and 3 fixed sections: TOP 3 TODAY, STUCK ON, SMALL WIN.
+- **AC-1.3:** This data is formatted and sent to Claude (using the model configured by the `llm_model` setting, default `claude-sonnet-4-20250514`) with the daily digest prompt. The prompt instructs Claude to produce a plain text briefing with a maximum of 150 words and 3 fixed sections: TOP 3 TODAY, STUCK ON, SMALL WIN.
 - **AC-1.4:** Claude returns a plain text digest. The digest is validated to be non-empty. The format contains sections as specified by the daily digest prompt: `TOP 3 TODAY`, `STUCK ON`, and `SMALL WIN`. The response is used as-is (no post-processing of Claude's output beyond trimming whitespace).
 - **AC-1.5:** The digest is cached for dashboard display. The cache stores the latest daily digest content and its generation timestamp. Only the most recent daily digest is kept; previous ones are overwritten.
 - **AC-1.6:** The digest is pushed to all connected dashboard clients via Server-Sent Events (SSE). Connected browsers update the digest section without requiring a page refresh.
@@ -45,6 +45,7 @@ The digest system runs three scheduled jobs via node-cron: a daily morning brief
 - **AC-2.4:** Claude returns a plain text review. The review is validated to be non-empty. The response is used as-is (no post-processing beyond trimming whitespace).
 - **AC-2.5:** The review is cached for dashboard display. The cache stores the latest weekly review content and its generation timestamp. Only the most recent weekly review is kept; previous ones are overwritten. The weekly review is stored separately from the daily digest (both can be displayed on the dashboard simultaneously).
 - **AC-2.6:** The review is sent via email to the configured recipient (see US-3).
+- **AC-2.7:** The review is pushed to all connected dashboard clients via Server-Sent Events (SSE). Connected browsers update the review section without requiring a page refresh.
 
 ### US-3: Email Delivery via SMTP
 

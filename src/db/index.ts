@@ -111,6 +111,12 @@ export async function runMigrations(url: string): Promise<void> {
         AFTER INSERT OR UPDATE ON entries
         FOR EACH ROW
         EXECUTE FUNCTION notify_entry_change();
+
+      CREATE TABLE IF NOT EXISTS digests (
+        type          TEXT PRIMARY KEY,
+        content       TEXT NOT NULL,
+        generated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
     `);
   } finally {
     await sql.end();
