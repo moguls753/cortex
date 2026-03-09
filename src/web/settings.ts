@@ -15,6 +15,7 @@ import {
   iconX,
   iconAlertTriangle,
   iconPlay,
+  iconDownload,
 } from "./icons.js";
 import { generateDailyDigest, generateWeeklyReview } from "../digests.js";
 import type { SSEBroadcaster } from "./sse.js";
@@ -339,9 +340,15 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
           <!-- Row 3: Ollama model picker + RAM table -->
           <div id="ollama-section" class="mt-3 space-y-3${llmProvider !== "ollama" ? " hidden" : ""}">
             <div>
-              <div class="text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5">Available in Ollama</div>
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="text-[10px] uppercase tracking-widest text-muted-foreground">Available in Ollama</div>
+                <button type="button" id="ollama-pull-btn"
+                  class="flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:border-primary transition-colors">
+                  ${iconDownload("size-3")} Pull Model
+                </button>
+              </div>
               ${ollamaModels.length > 0
-                ? `<div class="flex flex-wrap gap-1.5">
+                ? `<div id="ollama-model-chips" class="flex flex-wrap gap-1.5">
                     ${ollamaModels.map(m =>
                       `<button type="button" data-ollama-model="${escapeHtml(m)}"
                         class="ollama-model-chip rounded border border-border bg-secondary px-2 py-0.5 text-[10px] font-mono text-muted-foreground hover:border-primary hover:text-primary transition-colors${llmModel === m ? " border-primary text-primary" : ""}">
@@ -349,8 +356,21 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
                       </button>`
                     ).join("")}
                   </div>`
-                : `<span class="text-[10px] text-muted-foreground">No models pulled yet — run <code class="font-mono">ollama pull qwen2.5:7b</code> in your Ollama container.</span>`
+                : `<div id="ollama-model-chips" class="flex flex-wrap gap-1.5">
+                    <span id="no-models-hint" class="text-[10px] text-muted-foreground">No models pulled yet — click Pull Model or type a name below.</span>
+                  </div>`
               }
+              <!-- Pull progress -->
+              <div id="ollama-pull-progress" class="hidden mt-2">
+                <div class="flex items-center justify-between mb-1">
+                  <span id="pull-status-text" class="text-[10px] font-mono text-muted-foreground">Preparing...</span>
+                  <span id="pull-percent-text" class="text-[10px] font-mono text-primary"></span>
+                </div>
+                <div class="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                  <div id="pull-progress-bar" class="h-full rounded-full bg-primary transition-all duration-300 w-0"></div>
+                </div>
+                <div id="pull-layer-detail" class="text-[10px] font-mono text-muted-foreground mt-1 truncate"></div>
+              </div>
             </div>
             <div>
               <div class="text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5">Recommended Models</div>
@@ -702,6 +722,165 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       var weeklyBtn = document.getElementById('trigger-weekly');
       if (dailyBtn) dailyBtn.addEventListener('click', function() { triggerDigest('daily'); });
       if (weeklyBtn) weeklyBtn.addEventListener('click', function() { triggerDigest('weekly'); });
+
+      /* ── Ollama model pull ── */
+      var pullBtn = document.getElementById('ollama-pull-btn');
+      var pullProgress = document.getElementById('ollama-pull-progress');
+      var pullStatusText = document.getElementById('pull-status-text');
+      var pullPercentText = document.getElementById('pull-percent-text');
+      var pullProgressBar = document.getElementById('pull-progress-bar');
+      var pullLayerDetail = document.getElementById('pull-layer-detail');
+
+      function formatBytes(bytes) {
+        if (!bytes) return '';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+      }
+
+      function addModelChip(name) {
+        var chips = document.getElementById('ollama-model-chips');
+        if (!chips) return;
+        var hint = document.getElementById('no-models-hint');
+        if (hint) hint.remove();
+        // Don't add if already exists (safe attribute check without selector injection)
+        var found = false;
+        chips.querySelectorAll('[data-ollama-model]').forEach(function(el) {
+          if (el.getAttribute('data-ollama-model') === name) found = true;
+        });
+        if (found) return;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('data-ollama-model', name);
+        btn.className = 'ollama-model-chip rounded border border-primary bg-secondary px-2 py-0.5 text-[10px] font-mono text-primary transition-colors';
+        btn.textContent = name;
+        chips.appendChild(btn);
+        if (OLLAMA_MODELS.indexOf(name) === -1) OLLAMA_MODELS.push(name);
+      }
+
+      if (pullBtn) {
+        pullBtn.addEventListener('click', function() {
+          var model = modelHidden ? modelHidden.value.trim() : '';
+          if (!model) {
+            alert('Enter a model name first');
+            return;
+          }
+
+          // Check if already pulled
+          if (OLLAMA_MODELS.indexOf(model) !== -1) {
+            alert('Model "' + model + '" is already available');
+            return;
+          }
+
+          pullBtn.disabled = true;
+          pullBtn.classList.add('opacity-50');
+          pullProgress.classList.remove('hidden');
+          pullStatusText.textContent = 'Connecting...';
+          pullPercentText.textContent = '';
+          pullProgressBar.style.width = '0%';
+          pullLayerDetail.textContent = '';
+
+          var pullDone = false;
+          fetch('/api/ollama/pull', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: model })
+          }).then(function(res) {
+            if (!res.ok) {
+              return res.json().then(function(d) { throw new Error(d.error || 'Pull failed'); });
+            }
+
+            var reader = res.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = '';
+
+            function readStream() {
+              reader.read().then(function(result) {
+                if (result.done) {
+                  if (!pullDone) { pullDone = true; onPullDone(model); }
+                  return;
+                }
+                buffer += decoder.decode(result.value, { stream: true });
+                var lines = buffer.split('\\n');
+                buffer = lines.pop() || '';
+                for (var i = 0; i < lines.length; i++) {
+                  var line = lines[i].trim();
+                  if (!line.startsWith('data: ')) continue;
+                  var payload = line.slice(6);
+                  if (payload === '[DONE]') {
+                    if (!pullDone) { pullDone = true; onPullDone(model); }
+                    return;
+                  }
+                  try {
+                    var msg = JSON.parse(payload);
+                    updatePullProgress(msg);
+                  } catch(e) {}
+                }
+                readStream();
+              }).catch(function(err) {
+                pullStatusText.textContent = 'Stream error: ' + err.message;
+                resetPullBtn();
+              });
+            }
+            readStream();
+          }).catch(function(err) {
+            pullStatusText.textContent = 'Error: ' + err.message;
+            pullPercentText.textContent = '';
+            pullProgressBar.style.width = '0%';
+            resetPullBtn();
+          });
+        });
+      }
+
+      function updatePullProgress(msg) {
+        var status = msg.status || '';
+        pullStatusText.textContent = status;
+
+        if (msg.total && msg.completed !== undefined) {
+          var pct = Math.round((msg.completed / msg.total) * 100);
+          pullPercentText.textContent = pct + '%';
+          pullProgressBar.style.width = pct + '%';
+          pullLayerDetail.textContent = formatBytes(msg.completed) + ' / ' + formatBytes(msg.total);
+        } else {
+          // Indeterminate states (e.g. "verifying sha256 digest")
+          pullPercentText.textContent = '';
+          pullLayerDetail.textContent = '';
+        }
+
+        if (msg.error) {
+          pullStatusText.textContent = 'Error: ' + msg.error;
+          pullPercentText.textContent = '';
+          pullProgressBar.style.width = '0%';
+          resetPullBtn();
+        }
+      }
+
+      function onPullDone(model) {
+        pullStatusText.textContent = 'Done — ' + model + ' is ready';
+        pullPercentText.textContent = '100%';
+        pullProgressBar.style.width = '100%';
+        pullLayerDetail.textContent = '';
+        addModelChip(model);
+        // Select the newly pulled model
+        if (modelText) modelText.value = model;
+        if (modelHidden) modelHidden.value = model;
+        document.querySelectorAll('.ollama-model-chip').forEach(function(c) {
+          if (c.getAttribute('data-ollama-model') === model) {
+            c.classList.add('border-primary', 'text-primary');
+          } else {
+            c.classList.remove('border-primary', 'text-primary');
+          }
+        });
+        resetPullBtn();
+        setTimeout(function() { pullProgress.classList.add('hidden'); }, 5000);
+      }
+
+      function resetPullBtn() {
+        if (pullBtn) {
+          pullBtn.disabled = false;
+          pullBtn.classList.remove('opacity-50');
+        }
+      }
     })();
     </script>`;
 
@@ -794,6 +973,70 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     } catch (err) {
       return c.json({ ok: false, error: err instanceof Error ? err.message : "Generation failed" }, 500);
     }
+  });
+
+  // Ollama model pull — streams progress as SSE
+  app.post("/api/ollama/pull", async (c) => {
+    const body = await c.req.json<{ model?: string }>().catch(() => ({} as { model?: string }));
+    const model = body.model?.trim();
+    if (!model) {
+      return c.json({ error: "Model name required" }, 400);
+    }
+
+    const dbSettings = (await getAllSettings(sql)) ?? {};
+    const ollamaUrl = resolveEffective(dbSettings, "ollama_url", DEFAULTS.ollama_url);
+
+    let ollamaRes: Response;
+    try {
+      ollamaRes = await fetch(`${ollamaUrl}/api/pull`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: model, stream: true }),
+        signal: AbortSignal.timeout(600_000), // 10 min for large models
+      });
+    } catch {
+      return c.json({ error: "Could not connect to Ollama" }, 502);
+    }
+
+    if (!ollamaRes.ok || !ollamaRes.body) {
+      const text = await ollamaRes.text().catch(() => "");
+      return c.json({ error: text || `Ollama returned ${ollamaRes.status}` }, 502);
+    }
+
+    // Stream Ollama's NDJSON as SSE
+    const reader = ollamaRes.body.getReader();
+    const decoder = new TextDecoder();
+    const stream = new ReadableStream({
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+          if (done) {
+            controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+            controller.close();
+            return;
+          }
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n").filter((l) => l.trim());
+          for (const line of lines) {
+            controller.enqueue(new TextEncoder().encode(`data: ${line}\n\n`));
+          }
+        } catch {
+          controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+          controller.close();
+        }
+      },
+      cancel() {
+        reader.cancel().catch(() => {});
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   });
 
   return app;
