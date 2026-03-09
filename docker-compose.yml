@@ -40,6 +40,8 @@ services:
 
   postgres:
     image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cortex}
       POSTGRES_USER: ${POSTGRES_USER:-cortex}
