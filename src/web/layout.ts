@@ -28,7 +28,7 @@ export function renderLayout(
   const nav = [
     { href: "/browse?q=", icon: iconSearch("size-3.5"), label: "Search" },
     { href: "/browse", icon: iconFolderOpen("size-3.5"), label: "Browse" },
-    { href: "/trash", icon: iconTrash2("size-3.5"), label: "Trash" },
+    // { href: "/trash", icon: iconTrash2("size-3.5"), label: "Trash" },  // TODO: implement trash page
     { href: "/settings", icon: iconSettings("size-3.5"), label: "Settings" },
   ];
 
