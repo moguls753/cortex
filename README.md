@@ -12,10 +12,10 @@
 ## How It Works
 
 ```
-You ──→ Capture ──→ Classify ──→ Store ──→ Access
-        Telegram     LLM          PostgreSQL   Web Dashboard
-        Web Editor   (any)        + pgvector   MCP Server
-        MCP                       Embeddings   Email Digests
+You --> Capture --> Classify --> Store --> Access
+        Telegram    LLM         PostgreSQL  Web Dashboard
+        Web Editor  (any)       + pgvector  MCP Server
+        MCP                     Embeddings  Email Digests
 ```
 
 1. **Capture** - send a Telegram message, write in the web editor, or add a thought via MCP from any AI tool.
