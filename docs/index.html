@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cortex — Demo</title>
+  <meta name="description" content="A self-hosted, agent-readable second brain. Capture from Telegram or the web, classify with AI, search by meaning, access via MCP.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23141917'/%3E%3Cg transform='translate(4,4)' fill='none' stroke='%2355c97a' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z'/%3E%3Cpath d='M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem("cortex-theme");
+        var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (t === "dark" || (!t && prefersDark)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch(e) {}
+    })();
+  </script>
+</head>
+<body class="font-sans antialiased">
+  <!-- Demo banner -->
+  <div class="bg-secondary border-b border-border px-4 py-2 text-center text-xs text-muted-foreground shrink-0">
+    Static demo with mock data &mdash; click <strong class="text-foreground">Dashboard</strong>, <strong class="text-foreground">Browse</strong>, or any entry to navigate. <a href="https://github.com/era/cortex" class="text-primary hover:underline">View on GitHub &rarr;</a>
+  </div>
+
+  <div class="h-dvh flex flex-col px-6 py-4 gap-4 max-w-5xl mx-auto w-full">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between shrink-0">
+      <div class="flex items-center gap-2.5">
+        <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg>
+        <a href="#" onclick="switchView('dashboard');return false" class="text-sm font-medium text-foreground tracking-tight hover:text-primary transition-colors">cortex</a>
+        <span class="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">v0.1</span>
+      </div>
+      <nav class="flex items-center gap-1">
+        <a href="#" onclick="switchView('browse');return false" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" data-nav="search" title="Search">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span class="hidden sm:inline">Search</span>
+        </a>
+        <a href="#" onclick="switchView('browse');return false" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" data-nav="browse" title="Browse">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+          <span class="hidden sm:inline">Browse</span>
+        </a>
+        <a href="#" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Trash">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+          <span class="hidden sm:inline">Trash</span>
+        </a>
+        <a href="#" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Settings">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span class="hidden sm:inline">Settings</span>
+        </a>
+        <button id="theme-toggle" class="flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" aria-label="Toggle theme">
+          <span id="theme-icon-sun" class="hidden"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></span>
+          <span id="theme-icon-moon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
+        </button>
+        <span class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer" title="Log out">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          <span class="hidden sm:inline">Log out</span>
+        </span>
+      </nav>
+    </header>
+
+    <!-- ═══════════════════ DASHBOARD ═══════════════════ -->
+    <div id="view-dashboard" class="view-panel">
+
+      <!-- Digest hero -->
+      <div class="h-[55vh] shrink-0 rounded-md border border-border bg-card p-6 flex flex-col">
+        <div class="flex items-start justify-between mb-5 shrink-0">
+          <div>
+            <p class="text-sm text-muted-foreground">Monday, March 9</p>
+            <h1 class="text-lg font-medium text-foreground mt-0.5 tracking-tight text-balance">Good morning. Here is what needs your attention.</h1>
+          </div>
+          <div class="flex items-center gap-1 shrink-0 mt-0.5">
+            <button data-digest-tab="daily" class="rounded-md px-2.5 py-1 text-xs transition-colors bg-primary text-primary-foreground">Daily</button>
+            <button data-digest-tab="weekly" class="rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary">Weekly</button>
+          </div>
+        </div>
+
+        <!-- Daily digest -->
+        <div data-digest-panel="daily" class="flex-1 min-h-0 flex flex-col">
+          <div class="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-3">
+            <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>
+            <span>Generated 07:30</span>
+          </div>
+          <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+            <div class="leading-normal">
+              <div class="space-y-5">
+                <div class="border-l-[3px] border-primary pl-3">
+                  <div class="text-[10px] font-medium uppercase tracking-widest text-primary mb-1.5">TOP 3 TODAY</div>
+                  <div class="text-sm text-foreground">
+                    <ol class="space-y-0.5 my-1">
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">1.</span><span>Call landlord about the Sendling apartment &mdash; viewing is Thursday</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">2.</span><span>Send invoice to DataFlow GmbH (1020&euro;, due March 10)</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">3.</span><span>Configure automatic backups on the home server</span></li>
+                    </ol>
+                  </div>
+                </div>
+                <div class="border-l-[3px] border-accent pl-3">
+                  <div class="text-[10px] font-medium uppercase tracking-widest text-accent mb-1.5">STUCK ON</div>
+                  <div class="text-sm text-foreground">
+                    <p class="my-0.5">Health insurance card renewal &mdash; need to take a biometric photo first</p>
+                  </div>
+                </div>
+                <div class="border-l-[3px] border-primary/50 pl-3">
+                  <div class="text-[10px] font-medium uppercase tracking-widest text-primary/80 mb-1.5">SMALL WIN</div>
+                  <div class="text-sm text-foreground">
+                    <p class="my-0.5">Thesis officially submitted! Prof. Weber even suggested turning chapter 3 into a conference paper.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly digest -->
+        <div data-digest-panel="weekly" class="flex-1 min-h-0 flex flex-col hidden">
+          <div class="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-3">
+            <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>
+            <span>Generated Sunday 16:00</span>
+          </div>
+          <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+            <div class="leading-normal">
+              <div class="space-y-5">
+                <div class="border-l-[3px] border-muted-foreground/40 pl-3">
+                  <div class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground mb-1.5">WHAT HAPPENED</div>
+                  <div class="text-sm text-foreground">
+                    <p class="my-0.5">14 entries captured this week. Most active category: Tasks (5). Busiest day: Wednesday (4 entries).</p>
+                  </div>
+                </div>
+                <div class="border-l-[3px] border-accent pl-3">
+                  <div class="text-[10px] font-medium uppercase tracking-widest text-accent mb-1.5">OPEN LOOPS</div>
+                  <div class="text-sm text-foreground">
+                    <ul class="space-y-0.5 my-1">
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Apartment search: viewing Thursday, but no backup options yet</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>4 pending tasks including the overdue dentist appointment</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Blog migration paused &mdash; revisit after home server is stable</span></li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="border-l-[3px] border-primary pl-3">
+                  <div class="text-[10px] font-medium uppercase tracking-widest text-primary mb-1.5">NEXT WEEK</div>
+                  <div class="text-sm text-foreground">
+                    <ul class="space-y-0.5 my-1">
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Apartment viewing Thursday 14:00</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Bouldering with Max on Saturday</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Easter visit to Dad &mdash; bring FritzBox manual</span></li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="border-l-[3px] border-primary/50 pl-3">
+                  <div class="text-[10px] font-medium uppercase tracking-widest text-primary/80 mb-1.5">RECURRING THEME</div>
+                  <div class="text-sm text-foreground">
+                    <p class="my-0.5">Infrastructure week &mdash; home server, Docker, and self-hosting dominated. The foundation is coming together.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Capture + Stats + Entries -->
+      <div class="shrink-0 flex flex-col gap-3 mt-3">
+        <!-- Capture bar -->
+        <div>
+          <div class="flex items-center gap-3 rounded-md border border-border bg-secondary px-3 py-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
+            <span class="text-primary text-sm select-none shrink-0">&gt;</span>
+            <input type="text" placeholder="capture a thought..." autocomplete="off" class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50 font-sans" readonly>
+            <button class="flex items-center text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
+            </button>
+          </div>
+          <div class="text-[11px] pl-3 min-h-4"><span class="text-primary">Captured as <strong class="font-medium">tasks</strong>: Send invoice to freelance client (96%)</span></div>
+        </div>
+
+        <!-- Stats + Recent -->
+        <div class="grid grid-cols-12 gap-3">
+          <!-- Stats -->
+          <div class="col-span-4">
+            <div class="grid grid-cols-2 gap-2 h-full">
+              <div class="flex flex-col items-center justify-center gap-0.5 rounded-md border border-border bg-card px-2 py-2">
+                <span class="text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
+                <span class="text-primary text-base font-medium leading-none">8</span>
+                <span class="text-[9px] uppercase tracking-wider text-muted-foreground">Entries this week</span>
+              </div>
+              <div class="flex flex-col items-center justify-center gap-0.5 rounded-md border border-border bg-card px-2 py-2">
+                <span class="text-foreground"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg></span>
+                <span class="text-foreground text-base font-medium leading-none">29</span>
+                <span class="text-[9px] uppercase tracking-wider text-muted-foreground">Total entries</span>
+              </div>
+              <div class="flex flex-col items-center justify-center gap-0.5 rounded-md border border-border bg-card px-2 py-2">
+                <span class="text-accent"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>
+                <span class="text-accent text-base font-medium leading-none">6</span>
+                <span class="text-[9px] uppercase tracking-wider text-muted-foreground">Open tasks</span>
+              </div>
+              <div class="flex flex-col items-center justify-center gap-0.5 rounded-md border border-border bg-card px-2 py-2">
+                <span class="text-destructive"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+                <span class="text-destructive text-base font-medium leading-none">1</span>
+                <span class="text-[9px] uppercase tracking-wider text-muted-foreground">Stalled projects</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent entries -->
+          <div class="col-span-8 rounded-md border border-border bg-card px-4 py-3 max-h-[276px] overflow-y-auto scrollbar-thin">
+            <div class="space-y-0.5">
+              <!-- Max — Climbing Partner (1d ago, people, telegram/text) -->
+              <a href="#" onclick="showEntry('max');return false" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+                <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-people">People</span>
+                <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Max &mdash; Climbing Partner</span>
+                <span class="shrink-0"><svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="text-[10px] text-muted-foreground shrink-0">1d ago</span>
+              </a>
+              <!-- Neighbor Julia (1d ago, people, telegram/text) -->
+              <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+                <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-people">People</span>
+                <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Neighbor Julia &mdash; Package</span>
+                <span class="shrink-0"><svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="text-[10px] text-muted-foreground shrink-0">1d ago</span>
+              </a>
+              <!-- Send invoice (2d ago, tasks, telegram/text) -->
+              <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+                <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-tasks">Task</span>
+                <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Send invoice to freelance client</span>
+                <span class="shrink-0"><svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="text-[10px] text-muted-foreground shrink-0">2d ago</span>
+              </a>
+              <!-- Call with Dad (2d ago, people, telegram/voice) -->
+              <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+                <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-people">People</span>
+                <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Call with Dad</span>
+                <span class="shrink-0"><svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></span>
+                <span class="text-[10px] text-muted-foreground shrink-0">2d ago</span>
+              </a>
+              <!-- Coffee with Lisa (3d ago, people, telegram/text) -->
+              <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+                <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-people">People</span>
+                <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Coffee with Lisa</span>
+                <span class="shrink-0"><svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="text-[10px] text-muted-foreground shrink-0">3d ago</span>
+              </a>
+              <!-- Reply to Aunt Monika (3d ago, tasks, telegram/text) -->
+              <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+                <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-tasks">Task</span>
+                <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Reply to Aunt Monika&#39;s birthday email</span>
+                <span class="shrink-0"><svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="text-[10px] text-muted-foreground shrink-0">3d ago</span>
+              </a>
+              <!-- Book dentist (4d ago, tasks, telegram/text) -->
+              <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+                <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-tasks">Task</span>
+                <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Book dentist appointment</span>
+                <span class="shrink-0"><svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="text-[10px] text-muted-foreground shrink-0">4d ago</span>
+              </a>
+              <!-- Buy groceries (5d ago, tasks, telegram/voice) -->
+              <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+                <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-tasks">Task</span>
+                <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Buy groceries for the week</span>
+                <span class="shrink-0"><svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></span>
+                <span class="text-[10px] text-muted-foreground shrink-0">5d ago</span>
+              </a>
+              <!-- Update CV (5d ago, tasks, webapp/text) -->
+              <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
+                <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-tasks">Task</span>
+                <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Update CV with thesis topic</span>
+                <span class="shrink-0"><svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span>
+                <span class="text-[10px] text-muted-foreground shrink-0">5d ago</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ BROWSE ═══════════════════ -->
+    <div id="view-browse" class="view-panel hidden">
+      <div class="flex-1 min-h-0 flex flex-col gap-3">
+        <div class="shrink-0 flex flex-col gap-2">
+          <!-- Search bar -->
+          <form class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-1 rounded-md border border-border bg-secondary px-3 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
+              <svg class="text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input type="text" placeholder="Search entries..." autocomplete="off" class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none font-sans" readonly>
+            </div>
+          </form>
+          <!-- Category tabs -->
+          <div class="flex items-center gap-1 flex-wrap">
+            <a href="#" class="rounded-md px-2.5 py-1 text-xs transition-colors bg-primary text-primary-foreground">All</a>
+            <a href="#" class="rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary">People</a>
+            <a href="#" class="rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary">Projects</a>
+            <a href="#" class="rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary">Tasks</a>
+            <a href="#" class="rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary">Ideas</a>
+            <a href="#" class="rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary">Reference</a>
+          </div>
+          <!-- Tag pills -->
+          <div class="flex items-center gap-1 flex-wrap">
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">cortex</a>
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">side-project</a>
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">apartment</a>
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">climbing</a>
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">freelance</a>
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">homelab</a>
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">guitar</a>
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">university</a>
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">docker</a>
+            <a href="#" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors border-border text-muted-foreground hover:text-foreground hover:border-foreground">family</a>
+          </div>
+        </div>
+        <!-- Entry list -->
+        <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin rounded-md border border-border bg-card px-4 py-3">
+          <div class="space-y-0.5">
+            <a href="#" onclick="showEntry('max');return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-people">People</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Max &mdash; Climbing Partner</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">1d ago</span>
+            </a>
+            <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-people">People</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Neighbor Julia &mdash; Package</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">1d ago</span>
+            </a>
+            <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-tasks">Task</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Send invoice to freelance client</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">2d ago</span>
+            </a>
+            <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-people">People</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Call with Dad</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">2d ago</span>
+            </a>
+            <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-people">People</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Coffee with Lisa</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">3d ago</span>
+            </a>
+            <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-reference">Ref</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Espresso Dial-In Parameters</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">8d ago</span>
+            </a>
+            <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-ideas">Idea</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Teach a Workshop on Self-Hosting</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">9d ago</span>
+            </a>
+            <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-projects">Project</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Home Server Setup</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">10d ago</span>
+            </a>
+            <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-ideas">Idea</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Pomodoro Timer with Spotify Integration</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">11d ago</span>
+            </a>
+            <a href="#" onclick="showEntry('jsonb');return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-reference">Ref</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">PostgreSQL JSONB Query Cheatsheet</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">16d ago</span>
+            </a>
+            <a href="#" onclick="showEntry('cortex');return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-projects">Project</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Cortex &mdash; Second Brain App</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">18d ago</span>
+            </a>
+            <a href="#" onclick="return false" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
+              <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 badge-projects">Project</span>
+              <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">Guitar Practice Routine</span>
+              <span class="text-[10px] text-muted-foreground shrink-0">20d ago</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ ENTRY: Cortex ═══════════════════ -->
+    <div id="view-entry-cortex" class="view-panel hidden">
+      <div class="flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto scrollbar-thin">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <h1 class="text-lg font-medium text-foreground tracking-tight">Cortex &mdash; Second Brain App</h1>
+            <div class="flex items-center gap-2 mt-1 flex-wrap">
+              <span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium badge-projects">Projects</span>
+              <span class="flex items-center gap-1 text-[10px] text-muted-foreground"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> telegram</span>
+              <span class="text-[10px] text-muted-foreground">0.95</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <a href="#" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Edit</a>
+            <button class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> Delete</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 flex-wrap">
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">cortex</span>
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">side-project</span>
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">typescript</span>
+        </div>
+        <div class="rounded-md border border-border bg-card p-4 prose-sm">
+          <p>Building a self-hosted second brain. Telegram capture working, web dashboard next. Using PostgreSQL + pgvector for semantic search.</p>
+        </div>
+        <div class="rounded-md border border-border bg-card p-4">
+          <h2 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Fields</h2>
+          <dl class="grid grid-cols-2 gap-x-4 gap-y-1">
+            <dt class="text-xs text-muted-foreground">status</dt>
+            <dd class="text-xs text-foreground">active</dd>
+            <dt class="text-xs text-muted-foreground">next_action</dt>
+            <dd class="text-xs text-foreground">Deploy to home server and test MCP integration</dd>
+            <dt class="text-xs text-muted-foreground">notes</dt>
+            <dd class="text-xs text-foreground">All 12 features complete, 318 tests passing</dd>
+          </dl>
+        </div>
+        <div class="flex items-center gap-4 text-[10px] text-muted-foreground">
+          <span>Created: February 19, 2026, 09:00</span>
+          <span>Updated: February 19, 2026, 09:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ ENTRY: Max ═══════════════════ -->
+    <div id="view-entry-max" class="view-panel hidden">
+      <div class="flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto scrollbar-thin">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <h1 class="text-lg font-medium text-foreground tracking-tight">Max &mdash; Climbing Partner</h1>
+            <div class="flex items-center gap-2 mt-1 flex-wrap">
+              <span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium badge-people">People</span>
+              <span class="flex items-center gap-1 text-[10px] text-muted-foreground"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> telegram</span>
+              <span class="text-[10px] text-muted-foreground">0.94</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <a href="#" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Edit</a>
+            <button class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> Delete</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 flex-wrap">
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">max</span>
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">climbing</span>
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">sports</span>
+        </div>
+        <div class="rounded-md border border-border bg-card p-4 prose-sm">
+          <p>Max is back from his trip to Spain. Wants to go bouldering at the DAV center this weekend. He also asked if I want to join a multi-pitch course in May.</p>
+        </div>
+        <div class="rounded-md border border-border bg-card p-4">
+          <h2 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Fields</h2>
+          <dl class="grid grid-cols-2 gap-x-4 gap-y-1">
+            <dt class="text-xs text-muted-foreground">context</dt>
+            <dd class="text-xs text-foreground">Climbing buddy, met at DAV Munich</dd>
+            <dt class="text-xs text-muted-foreground">follow_ups</dt>
+            <dd class="text-xs text-foreground">Confirm Saturday bouldering, check May calendar for multi-pitch</dd>
+          </dl>
+        </div>
+        <div class="flex items-center gap-4 text-[10px] text-muted-foreground">
+          <span>Created: March 8, 2026, 12:00</span>
+          <span>Updated: March 8, 2026, 12:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ ENTRY: JSONB Cheatsheet ═══════════════════ -->
+    <div id="view-entry-jsonb" class="view-panel hidden">
+      <div class="flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto scrollbar-thin">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <h1 class="text-lg font-medium text-foreground tracking-tight">PostgreSQL JSONB Query Cheatsheet</h1>
+            <div class="flex items-center gap-2 mt-1 flex-wrap">
+              <span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium badge-reference">Reference</span>
+              <span class="flex items-center gap-1 text-[10px] text-muted-foreground"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg> webapp</span>
+              <span class="text-[10px] text-muted-foreground">0.94</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <a href="#" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Edit</a>
+            <button class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> Delete</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 flex-wrap">
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">postgresql</span>
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">jsonb</span>
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">cheatsheet</span>
+          <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">database</span>
+        </div>
+        <div class="rounded-md border border-border bg-card p-4 prose-sm">
+          <p><strong>Accessing fields:</strong></p>
+          <ul>
+            <li><code>fields-&gt;&gt;'key'</code> &mdash; text value</li>
+            <li><code>fields-&gt;'key'</code> &mdash; JSON value</li>
+            <li><code>fields @&gt; '{"status": "active"}'</code> &mdash; contains</li>
+          </ul>
+          <p><strong>Indexing:</strong></p>
+          <ul>
+            <li><code>CREATE INDEX ON entries USING GIN (fields);</code></li>
+            <li>For specific paths: <code>CREATE INDEX ON entries ((fields-&gt;&gt;'status'));</code></li>
+          </ul>
+        </div>
+        <div class="rounded-md border border-border bg-card p-4">
+          <h2 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Fields</h2>
+          <dl class="grid grid-cols-2 gap-x-4 gap-y-1">
+            <dt class="text-xs text-muted-foreground">notes</dt>
+            <dd class="text-xs text-foreground">From PostgreSQL docs + practical experience with Cortex</dd>
+          </dl>
+        </div>
+        <div class="flex items-center gap-4 text-[10px] text-muted-foreground">
+          <span>Created: February 21, 2026, 13:00</span>
+          <span>Updated: February 21, 2026, 13:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <footer class="flex items-center justify-between text-[10px] text-muted-foreground shrink-0">
+      <div class="flex items-center gap-3">
+        <span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-primary animate-pulse"></span> postgres</span>
+        <span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-primary animate-pulse"></span> ollama</span>
+        <span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-primary animate-pulse"></span> whisper</span>
+        <span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-primary animate-pulse"></span> telegram</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span>SSE connected</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    // View switching
+    function switchView(name) {
+      document.querySelectorAll('.view-panel').forEach(function(v) { v.classList.add('hidden'); });
+      var el = document.getElementById('view-' + name);
+      if (el) el.classList.remove('hidden');
+      // Update nav active state
+      document.querySelectorAll('[data-nav]').forEach(function(n) {
+        n.classList.remove('text-foreground', 'bg-secondary');
+      });
+      if (name === 'browse') {
+        document.querySelectorAll('[data-nav="browse"]').forEach(function(n) {
+          n.classList.add('text-foreground', 'bg-secondary');
+        });
+      }
+    }
+
+    function showEntry(id) {
+      document.querySelectorAll('.view-panel').forEach(function(v) { v.classList.add('hidden'); });
+      var el = document.getElementById('view-entry-' + id);
+      if (el) el.classList.remove('hidden');
+    }
+
+    // Digest tab switching
+    document.querySelectorAll('[data-digest-tab]').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var type = tab.getAttribute('data-digest-tab');
+        document.querySelectorAll('[data-digest-tab]').forEach(function(t) {
+          t.className = 'rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary';
+        });
+        tab.className = 'rounded-md px-2.5 py-1 text-xs transition-colors bg-primary text-primary-foreground';
+        document.querySelectorAll('[data-digest-panel]').forEach(function(p) { p.classList.add('hidden'); });
+        var panel = document.querySelector('[data-digest-panel="' + type + '"]');
+        if (panel) panel.classList.remove('hidden');
+      });
+    });
+
+    // Theme toggle
+    (function() {
+      var toggle = document.getElementById('theme-toggle');
+      var sunIcon = document.getElementById('theme-icon-sun');
+      var moonIcon = document.getElementById('theme-icon-moon');
+      function updateIcons() {
+        var isDark = document.documentElement.classList.contains('dark');
+        sunIcon.classList.toggle('hidden', !isDark);
+        moonIcon.classList.toggle('hidden', isDark);
+      }
+      updateIcons();
+      if (toggle) {
+        toggle.addEventListener('click', function() {
+          var isDark = document.documentElement.classList.toggle('dark');
+          localStorage.setItem('cortex-theme', isDark ? 'dark' : 'light');
+          updateIcons();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

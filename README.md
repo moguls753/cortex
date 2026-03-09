@@ -7,9 +7,7 @@
 
 <br>
 
-<p align="center">
-  <img src="docs/screenshots/capture-demo.gif" alt="Quick capture with AI classification" width="720">
-</p>
+**[Live Demo](https://era.github.io/cortex/)** — see the full UI with mock data, switch between dark/light theme.
 
 <br>
 
@@ -26,38 +24,6 @@ You ──→ Capture ──→ Classify ──→ Store ──→ Access
 2. **Classify** — An LLM sorts your thought into one of five categories (People, Projects, Tasks, Ideas, Reference) and extracts structured fields.
 3. **Store** — PostgreSQL with vector embeddings. Semantic search finds things by meaning, not just keywords.
 4. **Access** — Web dashboard, daily/weekly digests, or let any MCP-compatible AI tool query your brain.
-
-<br>
-
-## Screenshots
-
-<p align="center">
-  <img src="docs/screenshots/demo.webp" alt="Dashboard, Browse, Entry, Settings" width="720">
-</p>
-
-<details>
-<summary>Individual screenshots</summary>
-<br>
-
-**Dashboard** — Daily digest, quick capture, stats, recent entries with live SSE updates.
-<img src="docs/screenshots/dashboard.png" alt="Dashboard" width="720">
-
-<br>
-
-**Browse** — Filter by category, tags. Semantic search powered by pgvector.
-<img src="docs/screenshots/browse.png" alt="Browse" width="720">
-
-<br>
-
-**Entry** — View and edit with markdown rendering, category fields, tags.
-<img src="docs/screenshots/entry.png" alt="Entry view" width="720">
-
-<br>
-
-**Settings** — LLM provider, digest schedule, Ollama, confidence threshold.
-<img src="docs/screenshots/settings.png" alt="Settings" width="720">
-
-</details>
 
 <br>
 
