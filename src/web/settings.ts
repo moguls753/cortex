@@ -402,6 +402,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
               <input type="text" id="confidence_threshold" name="confidence_threshold" value="${escapeHtml(threshold)}"
                 class="h-8 w-16 rounded-md border border-border bg-transparent px-2 text-sm text-center font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
             </div>
+            <span class="text-[10px] text-muted-foreground">Below this threshold, Telegram replies include correction buttons to fix the category.</span>
           </div>
         </div>
 
