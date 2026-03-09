@@ -360,6 +360,10 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
                     <span id="no-models-hint" class="text-[10px] text-muted-foreground">No models pulled yet — click Pull Model or type a name below.</span>
                   </div>`
               }
+              ${llmProvider === "ollama" && llmModel && !ollamaModels.includes(llmModel)
+                ? `<div class="mt-1.5 text-[10px] text-yellow-600 dark:text-yellow-400">${iconAlertTriangle("size-3 inline")} Model <span class="font-mono">${escapeHtml(llmModel)}</span> not available yet — a download may still be in progress. Click Pull Model to start or resume.</div>`
+                : ""
+              }
               <!-- Pull progress -->
               <div id="ollama-pull-progress" class="hidden mt-2">
                 <div class="flex items-center justify-between mb-1">
@@ -977,6 +981,9 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
   });
 
   // Ollama model pull — streams progress as SSE
+  // Active pulls tracked so the download continues even if the browser disconnects
+  const activePulls = new Map<string, { messages: Array<{ data: string; time: number }>; done: boolean }>();
+
   app.post("/api/ollama/pull", async (c) => {
     const body = await c.req.json<{ model?: string }>().catch(() => ({} as { model?: string }));
     const model = body.model?.trim();
@@ -987,47 +994,96 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     const dbSettings = (await getAllSettings(sql)) ?? {};
     const ollamaUrl = resolveEffective(dbSettings, "ollama_url", DEFAULTS.ollama_url);
 
-    let ollamaRes: Response;
-    try {
-      ollamaRes = await fetch(`${ollamaUrl}/api/pull`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: model, stream: true }),
-        signal: AbortSignal.timeout(600_000), // 10 min for large models
-      });
-    } catch {
-      return c.json({ error: "Could not connect to Ollama" }, 502);
+    // If there's already an active pull for this model, reconnect to it
+    const existing = activePulls.get(model);
+    if (existing && !existing.done) {
+      return streamPullProgress(model);
     }
 
-    if (!ollamaRes.ok || !ollamaRes.body) {
-      const text = await ollamaRes.text().catch(() => "");
-      return c.json({ error: text || `Ollama returned ${ollamaRes.status}` }, 502);
+    // Start a new pull — fire and forget, tracked in activePulls
+    const pullState: { messages: Array<{ data: string; time: number }>; done: boolean } = { messages: [], done: false };
+    activePulls.set(model, pullState);
+
+    function pushMessage(data: string) {
+      pullState.messages.push({ data, time: Date.now() });
     }
 
-    // Stream Ollama's NDJSON as SSE
-    const reader = ollamaRes.body.getReader();
-    const decoder = new TextDecoder();
+    (async () => {
+      try {
+        const ollamaRes = await fetch(`${ollamaUrl}/api/pull`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: model, stream: true }),
+          signal: AbortSignal.timeout(1_800_000), // 30 min for large models
+        });
+
+        if (!ollamaRes.ok || !ollamaRes.body) {
+          const text = await ollamaRes.text().catch(() => "");
+          pushMessage(JSON.stringify({ error: text || `Ollama returned ${ollamaRes.status}` }));
+          pullState.done = true;
+          return;
+        }
+
+        const reader = ollamaRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed) pushMessage(trimmed);
+          }
+        }
+      } catch (err) {
+        pushMessage(JSON.stringify({ error: err instanceof Error ? err.message : "Pull failed" }));
+      } finally {
+        pullState.done = true;
+        // Clean up after 60s
+        setTimeout(() => activePulls.delete(model), 60_000);
+      }
+    })();
+
+    return streamPullProgress(model);
+  });
+
+  function streamPullProgress(model: string): Response {
+    const encoder = new TextEncoder();
+    let lastIndex = 0;
+    let closed = false;
+
     const stream = new ReadableStream({
       async pull(controller) {
-        try {
-          const { done, value } = await reader.read();
-          if (done) {
-            controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+        // Poll for new messages from the background pull
+        while (!closed) {
+          const pullState = activePulls.get(model);
+          if (!pullState) {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
+            closed = true;
             return;
           }
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n").filter((l) => l.trim());
-          for (const line of lines) {
-            controller.enqueue(new TextEncoder().encode(`data: ${line}\n\n`));
+
+          // Send any new messages
+          while (lastIndex < pullState.messages.length) {
+            const msg = pullState.messages[lastIndex++];
+            controller.enqueue(encoder.encode(`data: ${msg.data}\n\n`));
           }
-        } catch {
-          controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
-          controller.close();
+
+          if (pullState.done) {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+            closed = true;
+            return;
+          }
+
+          // Wait a bit before checking for more messages
+          await new Promise((r) => setTimeout(r, 200));
         }
-      },
-      cancel() {
-        reader.cancel().catch(() => {});
       },
     });
 
@@ -1038,7 +1094,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
         Connection: "keep-alive",
       },
     });
-  });
+  }
 
   return app;
 }
