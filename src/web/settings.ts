@@ -10,7 +10,6 @@ import type { LLMConfig } from "../llm/config.js";
 import {
   iconBrain,
   iconClock,
-  iconServer,
   iconShield,
   iconCheck,
   iconX,
@@ -30,7 +29,7 @@ const DEFAULTS: Record<string, string> = {
 
 
 const PROVIDER_PRESETS: Record<string, { label: string; baseUrl: string; needsKey: boolean }> = {
-  anthropic: { label: "Anthropic", baseUrl: "", needsKey: true },
+  anthropic: { label: "Anthropic", baseUrl: "https://api.anthropic.com/v1", needsKey: true },
   openai:    { label: "OpenAI (ChatGPT)", baseUrl: "https://api.openai.com/v1", needsKey: true },
   groq:      { label: "Groq", baseUrl: "https://api.groq.com/openai/v1", needsKey: true },
   gemini:    { label: "Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/", needsKey: true },
@@ -42,7 +41,7 @@ async function fetchProviderModels(provider: string, apiKey: string, baseUrl: st
   if (!apiKey) return [];
   try {
     if (provider === "anthropic") {
-      const res = await fetch("https://api.anthropic.com/v1/models", {
+      const res = await fetch(`${baseUrl}/models`, {
         headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
         signal: AbortSignal.timeout(3000),
       });
@@ -151,7 +150,8 @@ export function createSettingsRoutes(sql: Sql): Hono {
     const activePreset = PROVIDER_PRESETS[llmProvider];
     if (activePreset?.needsKey) {
       const key = llmConfig.apiKeys[llmProvider] ?? "";
-      providerModels = await fetchProviderModels(llmProvider, key, llmBaseUrl);
+      const effectiveBaseUrl = llmBaseUrl || activePreset.baseUrl || "";
+      providerModels = await fetchProviderModels(llmProvider, key, effectiveBaseUrl);
     }
 
     // Fetch available Ollama models
@@ -194,7 +194,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
     const chatIdChips = chatIds
       .map(
         (id) =>
-          `<span class="inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-1 text-xs font-mono text-foreground" data-chip>
+          `<span class="inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-1 text-sm font-mono text-foreground" data-chip>
             <span>${escapeHtml(id)}</span>
             <button type="button" class="chat-id-remove text-muted-foreground hover:text-destructive transition-colors" data-id="${escapeHtml(id)}" aria-label="Remove ${escapeHtml(id)}">
               ${iconX("size-3")}
@@ -299,23 +299,13 @@ export function createSettingsRoutes(sql: Sql): Hono {
           <!-- Row 2: API Key (scoped to active provider) -->
           ${(() => {
             const activeNeedsKey = PROVIDER_PRESETS[llmProvider]?.needsKey ?? false;
-            const otherSavedCount = (["anthropic", "openai", "groq", "gemini"] as const)
-              .filter(p => p !== llmProvider && (llmConfig.apiKeys[p] ?? "").length > 0)
-              .length;
             const activeLabel = PROVIDER_PRESETS[llmProvider]?.label ?? llmProvider;
             const activeVal = escapeHtml(llmConfig.apiKeys[llmProvider as keyof typeof llmConfig.apiKeys] ?? "");
 
             return `<div id="apikey-row" class="mt-3 flex flex-col gap-1.5${!activeNeedsKey ? " hidden" : ""}">
-              <div class="flex items-center justify-between">
-                <label id="apikey-label" class="text-xs text-muted-foreground">
-                  <span id="apikey-provider-name">${escapeHtml(activeLabel)}</span> API Key
-                </label>
-                <span id="other-keys-indicator" class="text-[10px] text-muted-foreground">${
-                  otherSavedCount > 0
-                    ? `${otherSavedCount} other key${otherSavedCount > 1 ? "s" : ""} saved`
-                    : ""
-                }</span>
-              </div>
+              <label id="apikey-label" class="text-xs text-muted-foreground">
+                <span id="apikey-provider-name">${escapeHtml(activeLabel)}</span> API Key
+              </label>
               <input type="password" id="apikey_active" value="${activeVal}"
                 autocomplete="new-password"
                 placeholder="Paste key..."
@@ -329,14 +319,10 @@ export function createSettingsRoutes(sql: Sql): Hono {
           }).join("\n          ")}
 
           <!-- Row 3: Base URL (hidden for anthropic) -->
-          <div id="base-url-row" class="mt-3 flex flex-col gap-1.5${llmProvider === "anthropic" ? " hidden" : ""}">
+          <div id="base-url-row" class="mt-3 flex flex-col gap-1.5${llmProvider === "ollama" ? " hidden" : ""}">
             <label for="llm_base_url" class="text-xs text-muted-foreground">Base URL</label>
-            <div class="flex items-center gap-2">
-              <span class="text-primary text-xs select-none shrink-0">url</span>
-              <input type="text" id="llm_base_url" name="llm_base_url" value="${escapeHtml(llmBaseUrl)}"
-                class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-            </div>
-            <span id="ollama-url-note" class="text-[10px] text-muted-foreground${llmProvider !== "ollama" ? " hidden" : ""}">The <code class="font-mono">/v1</code> suffix is required for chat and is separate from the Ollama embeddings URL above. No API key needed for Ollama.</span>
+            <input type="text" id="llm_base_url" name="llm_base_url" value="${escapeHtml(llmBaseUrl)}"
+              class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
           </div>
 
           <!-- Row 3: Ollama model picker + RAM table -->
@@ -377,15 +363,13 @@ export function createSettingsRoutes(sql: Sql): Hono {
           </div>
 
           <!-- Row 4: Confidence -->
-          <div class="mt-3 grid grid-cols-2 gap-4">
-            <div class="flex flex-col gap-1.5">
-              <label for="confidence_threshold" class="text-xs text-muted-foreground">Confidence Threshold</label>
-              <div class="flex items-center gap-3">
-                <input type="range" id="confidence_range" min="0" max="100" value="${thresholdPercent}"
-                  class="flex-1" />
-                <input type="text" id="confidence_threshold" name="confidence_threshold" value="${escapeHtml(threshold)}"
-                  class="h-8 w-16 rounded-md border border-border bg-transparent px-2 text-sm text-center font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-              </div>
+          <div class="mt-3 flex flex-col gap-1.5 max-w-sm">
+            <label for="confidence_threshold" class="text-xs text-muted-foreground">Confidence Threshold</label>
+            <div class="flex items-center gap-3">
+              <input type="range" id="confidence_range" min="0" max="100" value="${thresholdPercent}"
+                class="flex-1" />
+              <input type="text" id="confidence_threshold" name="confidence_threshold" value="${escapeHtml(threshold)}"
+                class="h-8 w-16 rounded-md border border-border bg-transparent px-2 text-sm text-center font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
             </div>
           </div>
         </div>
@@ -426,29 +410,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
             <div class="flex flex-col gap-1.5">
               <label for="timezone" class="text-xs text-muted-foreground">Timezone</label>
               <input type="text" id="timezone" name="timezone" value="${escapeHtml(timezone)}"
-                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-            </div>
-          </div>
-        </div>
-
-        <!-- ═══ Infrastructure ═══ -->
-        <div class="rounded-md border border-border bg-card p-4">
-          <div class="flex items-center gap-2 mb-3">
-            ${iconServer("size-3 text-primary")}
-            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Infrastructure</span>
-            <span class="flex-1 h-px bg-border"></span>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div class="flex flex-col gap-1.5">
-              <label for="ollama_url" class="text-xs text-muted-foreground">Ollama Endpoint</label>
-              <div class="flex items-center gap-2">
-                <span class="text-primary text-xs select-none shrink-0">url</span>
-                <input type="text" id="ollama_url" name="ollama_url" value="${escapeHtml(ollamaUrl)}"
-                  class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-              </div>
-            </div>
-            <div class="flex items-end pb-0.5">
-              <span class="text-[10px] text-muted-foreground">Embeddings via snowflake-arctic-embed2 — connectivity checked on save</span>
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
             </div>
           </div>
         </div>
@@ -486,7 +448,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
 
       function createChip(val) {
         var span = document.createElement('span');
-        span.className = 'inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-1 text-xs font-mono text-foreground';
+        span.className = 'inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-1 text-sm font-mono text-foreground';
         span.setAttribute('data-chip', '');
         var text = document.createElement('span');
         text.textContent = val;
@@ -540,11 +502,9 @@ export function createSettingsRoutes(sql: Sql): Hono {
       var baseUrlRow = document.getElementById('base-url-row');
       var baseUrlInput = document.getElementById('llm_base_url');
       var ollamaSection = document.getElementById('ollama-section');
-      var ollamaUrlNote = document.getElementById('ollama-url-note');
       var apikeyRow = document.getElementById('apikey-row');
       var apikeyActive = document.getElementById('apikey_active');
       var apikeyLabel = document.getElementById('apikey-provider-name');
-      var otherKeysIndicator = document.getElementById('other-keys-indicator');
       var currentKeyProvider = '${escapeHtml(llmProvider)}';
 
       /* ── API Key scoping ── */
@@ -569,22 +529,6 @@ export function createSettingsRoutes(sql: Sql): Hono {
             if (apikeyLabel) apikeyLabel.textContent = preset.label || provider;
           } else {
             apikeyRow.classList.add('hidden');
-          }
-        }
-
-        // Update "N other keys saved" indicator
-        if (otherKeysIndicator) {
-          var count = 0;
-          KEY_PROVIDERS.forEach(function(p) {
-            if (p !== provider) {
-              var h = document.getElementById('apikey_' + p);
-              if (h && h.value) count++;
-            }
-          });
-          if (count > 0) {
-            otherKeysIndicator.textContent = count + ' other key' + (count > 1 ? 's' : '') + ' saved';
-          } else {
-            otherKeysIndicator.textContent = '';
           }
         }
 
@@ -618,7 +562,7 @@ export function createSettingsRoutes(sql: Sql): Hono {
 
         // Base URL
         if (baseUrlRow) {
-          if (provider === 'anthropic') {
+          if (isOllama) {
             baseUrlRow.classList.add('hidden');
           } else {
             baseUrlRow.classList.remove('hidden');
@@ -631,9 +575,6 @@ export function createSettingsRoutes(sql: Sql): Hono {
         // Ollama section + URL note
         if (ollamaSection) {
           isOllama ? ollamaSection.classList.remove('hidden') : ollamaSection.classList.add('hidden');
-        }
-        if (ollamaUrlNote) {
-          isOllama ? ollamaUrlNote.classList.remove('hidden') : ollamaUrlNote.classList.add('hidden');
         }
 
         // Swap API key field
@@ -718,7 +659,6 @@ export function createSettingsRoutes(sql: Sql): Hono {
       timezone: (body.timezone as string) || "",
       confidence_threshold: (body.confidence_threshold as string) || "",
       digest_email_to: (body.digest_email_to as string) || "",
-      ollama_url: (body.ollama_url as string) || "",
     };
 
     const llmConfig: LLMConfig = {
@@ -752,13 +692,12 @@ export function createSettingsRoutes(sql: Sql): Hono {
       .filter((id) => id.length > 0);
 
     const toSave: Record<string, string> = {
-      telegram_chat_ids: JSON.stringify(chatIds),
+      telegram_chat_ids: chatIds.join(","),
       daily_digest_cron: form.daily_digest_cron,
       weekly_digest_cron: form.weekly_digest_cron,
       timezone: form.timezone,
       confidence_threshold: form.confidence_threshold,
       digest_email_to: form.digest_email_to,
-      ollama_url: form.ollama_url,
     };
 
     await saveAllSettings(sql, toSave);
@@ -767,7 +706,8 @@ export function createSettingsRoutes(sql: Sql): Hono {
     // Ollama connectivity check
     let warning = "";
     try {
-      await fetch(form.ollama_url, { signal: AbortSignal.timeout(3000) });
+      const ollamaCheckUrl = resolveEffective((await getAllSettings(sql)) ?? {}, "ollama_url", DEFAULTS.ollama_url);
+      await fetch(ollamaCheckUrl, { signal: AbortSignal.timeout(3000) });
     } catch {
       warning = "Could not connect to the configured Ollama endpoint. Embedding generation may fail.";
     }

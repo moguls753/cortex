@@ -10,7 +10,7 @@ export interface LLMConfig {
 const DEFAULT_CONFIG: LLMConfig = {
   provider: process.env.LLM_PROVIDER || "anthropic",
   model: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
-  baseUrl: process.env.LLM_BASE_URL || "",
+  baseUrl: process.env.LLM_BASE_URL || "https://api.anthropic.com/v1",
   apiKeys: {
     anthropic: process.env.LLM_API_KEY || "",
   },

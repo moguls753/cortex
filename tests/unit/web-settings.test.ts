@@ -26,6 +26,16 @@ vi.mock("../../src/web/settings-queries.js", () => ({
   saveAllSettings: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("../../src/llm/config.js", () => ({
+  getLLMConfig: vi.fn().mockResolvedValue({
+    provider: "anthropic",
+    model: "claude-sonnet-4-20250514",
+    baseUrl: "https://api.anthropic.com/v1",
+    apiKeys: { anthropic: "", openai: "", groq: "", gemini: "" },
+  }),
+  saveLLMConfig: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 async function createTestSettings(): Promise<{ app: Hono }> {
@@ -65,13 +75,18 @@ function buildFormData(
 ): URLSearchParams {
   return new URLSearchParams({
     chat_ids: "123456",
+    llm_provider: "anthropic",
     llm_model: "claude-sonnet-4-20250514",
+    llm_base_url: "https://api.anthropic.com/v1",
+    apikey_anthropic: "",
+    apikey_openai: "",
+    apikey_groq: "",
+    apikey_gemini: "",
     daily_digest_cron: "30 7 * * *",
     weekly_digest_cron: "0 16 * * 0",
     timezone: "Europe/Berlin",
     confidence_threshold: "0.6",
     digest_email_to: "",
-    ollama_url: "http://ollama:11434",
     ...overrides,
   });
 }
@@ -79,8 +94,26 @@ function buildFormData(
 // ─── Test Suite ─────────────────────────────────────────────────────
 
 describe("Web Settings", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+
+    // Re-apply default mock implementations after clearAllMocks
+    const { getAllSettings } = await import(
+      "../../src/web/settings-queries.js"
+    );
+    (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const { getLLMConfig, saveLLMConfig } = await import(
+      "../../src/llm/config.js"
+    );
+    (getLLMConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+      provider: "anthropic",
+      model: "claude-sonnet-4-20250514",
+      baseUrl: "https://api.anthropic.com/v1",
+      apiKeys: { anthropic: "", openai: "", groq: "", gemini: "" },
+    });
+    (saveLLMConfig as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
     // Default fetch mock — Ollama check runs on every POST save
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("OK", { status: 200 }),
@@ -149,6 +182,10 @@ describe("Web Settings", () => {
           telegram_chat_ids: "123456,789012",
         }),
       );
+
+      // Verify LLM config was also saved
+      const { saveLLMConfig } = await import("../../src/llm/config.js");
+      expect(saveLLMConfig).toHaveBeenCalled();
     });
 
     // TS-1.3
@@ -216,11 +253,12 @@ describe("Web Settings", () => {
   describe("Classification Model (US-2)", () => {
     // TS-2.1
     it("displays current LLM model name", async () => {
-      const { getAllSettings } = await import(
-        "../../src/web/settings-queries.js"
-      );
-      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
-        llm_model: "claude-haiku-4-5-20251001",
+      const { getLLMConfig } = await import("../../src/llm/config.js");
+      (getLLMConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+        provider: "anthropic",
+        model: "claude-haiku-4-5-20251001",
+        baseUrl: "https://api.anthropic.com/v1",
+        apiKeys: { anthropic: "", openai: "", groq: "", gemini: "" },
       });
 
       const { app } = await createTestSettings();
@@ -255,10 +293,12 @@ describe("Web Settings", () => {
 
       expect(res.status).toBe(302);
       expect(res.headers.get("location")).toMatch(/success/);
-      expect(saveAllSettings).toHaveBeenCalledWith(
+
+      const { saveLLMConfig } = await import("../../src/llm/config.js");
+      expect(saveLLMConfig).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          llm_model: "claude-haiku-4-5-20251001",
+          model: "claude-haiku-4-5-20251001",
         }),
       );
     });
@@ -459,25 +499,9 @@ describe("Web Settings", () => {
       expect(body).toContain("user@example.com");
     });
 
-    // TS-4.4
-    it("displays current Ollama URL", async () => {
-      const { getAllSettings } = await import(
-        "../../src/web/settings-queries.js"
-      );
-      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ollama_url: "http://localhost:11434",
-      });
-
-      const { app } = await createTestSettings();
-      const cookie = await loginAndGetCookie(app);
-
-      const res = await app.request("/settings", {
-        headers: { Cookie: cookie },
-      });
-
-      const body = await res.text();
-      expect(body).toContain("http://localhost:11434");
-    });
+    // TS-4.4 — Ollama URL is no longer displayed in UI (env-var only)
+    // Infrastructure section was removed; URL is resolved internally for
+    // model listing and connectivity checks but not shown to the user.
 
     // TS-4.5
     it("saves all preferences in one submission", async () => {
@@ -495,7 +519,6 @@ describe("Web Settings", () => {
           timezone: "UTC",
           confidence_threshold: "0.7",
           digest_email_to: "new@example.com",
-          ollama_url: "http://ollama:11434",
         }),
         headers: {
           Cookie: cookie,
@@ -511,7 +534,6 @@ describe("Web Settings", () => {
           timezone: "UTC",
           confidence_threshold: "0.7",
           digest_email_to: "new@example.com",
-          ollama_url: "http://ollama:11434",
         }),
       );
     });
@@ -714,7 +736,7 @@ describe("Web Settings", () => {
     });
 
     // TS-7.2
-    it("saves unreachable Ollama URL with warning", async () => {
+    it("saves settings with warning when Ollama is unreachable", async () => {
       const { getAllSettings, saveAllSettings } = await import(
         "../../src/web/settings-queries.js"
       );
@@ -730,7 +752,7 @@ describe("Web Settings", () => {
 
       const res = await app.request("/settings", {
         method: "POST",
-        body: buildFormData({ ollama_url: "http://unreachable:11434" }),
+        body: buildFormData(),
         headers: {
           Cookie: cookie,
           "Content-Type": "application/x-www-form-urlencoded",
@@ -742,7 +764,7 @@ describe("Web Settings", () => {
       expect(location).toMatch(/success/);
       expect(location).toMatch(/warning/);
       expect(decodeURIComponent(location)).toMatch(/ollama/i);
-      // Setting saved despite unreachable
+      // Settings saved despite unreachable Ollama
       expect(saveAllSettings).toHaveBeenCalled();
     });
 
