@@ -79,7 +79,15 @@ function resolveEffective(
 
 function resolveChatIds(dbSettings: Record<string, string>): string[] {
   if (dbSettings.telegram_chat_ids) {
-    return dbSettings.telegram_chat_ids
+    let raw = dbSettings.telegram_chat_ids;
+    // Handle legacy JSON array format (e.g. '["123","456"]')
+    if (raw.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) raw = parsed.join(",");
+      } catch { /* fall through to comma split */ }
+    }
+    return raw
       .split(",")
       .map((id) => id.trim())
       .filter((id) => id.length > 0);
@@ -248,7 +256,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
         <div class="rounded-md border border-border bg-card p-4">
           <div class="flex items-center gap-2 mb-3">
             ${iconBrain("size-3 text-primary")}
-            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Classification</span>
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Language Model</span>
             <span class="flex-1 h-px bg-border"></span>
           </div>
 

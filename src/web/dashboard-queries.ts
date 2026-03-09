@@ -77,18 +77,10 @@ export async function getLatestDigest(
   sql: Sql,
 ): Promise<{ content: string; created_at: Date } | null> {
   const rows = await sql`
-    SELECT value FROM settings WHERE key = 'latest_daily_digest_content'
+    SELECT content, generated_at FROM digests WHERE type = 'daily'
   `;
-  if (!rows.length || !rows[0]?.value) return null;
-
-  const tsRows = await sql`
-    SELECT value FROM settings WHERE key = 'latest_daily_digest_timestamp'
-  `;
-  const timestamp = tsRows[0]?.value
-    ? new Date(tsRows[0].value)
-    : new Date();
-
-  return { content: rows[0].value, created_at: timestamp };
+  if (!rows.length) return null;
+  return { content: rows[0].content, created_at: rows[0].generated_at };
 }
 
 export async function insertEntry(
