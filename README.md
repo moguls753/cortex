@@ -11,13 +11,6 @@
 
 ## How It Works
 
-```
-You --> Capture --> Classify --> Store --> Access
-        Telegram    LLM         PostgreSQL  Web Dashboard
-        Web Editor  (any)       + pgvector  MCP Server
-        MCP                     Embeddings  Email Digests
-```
-
 1. **Capture** - send a Telegram message, write in the web editor, or add a thought via MCP from any AI tool.
 2. **Classify** - an LLM sorts it into one of five categories (People, Projects, Tasks, Ideas, Reference) and extracts structured fields.
 3. **Store** - PostgreSQL with pgvector embeddings. Search by meaning, not just keywords.
