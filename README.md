@@ -7,7 +7,7 @@
 
 <br>
 
-**[Live Demo](https://era.github.io/cortex/)** — see the full UI with mock data, switch between dark/light theme.
+**[Live Demo](https://moguls753.github.io/cortex/)** — see the full UI with mock data, switch between dark/light theme.
 
 <br>
 

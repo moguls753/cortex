@@ -25,7 +25,7 @@
 <body class="font-sans antialiased">
   <!-- Demo banner -->
   <div class="bg-secondary border-b border-border px-4 py-2 text-center text-xs text-muted-foreground shrink-0">
-    Static demo with mock data &mdash; click <strong class="text-foreground">Dashboard</strong>, <strong class="text-foreground">Browse</strong>, or any entry to navigate. <a href="https://github.com/era/cortex" class="text-primary hover:underline">View on GitHub &rarr;</a>
+    Static demo with mock data &mdash; click <strong class="text-foreground">Dashboard</strong>, <strong class="text-foreground">Browse</strong>, or any entry to navigate. <a href="https://github.com/moguls753/cortex" class="text-primary hover:underline">View on GitHub &rarr;</a>
   </div>
 
   <div class="h-dvh flex flex-col px-6 py-4 gap-4 max-w-5xl mx-auto w-full">
@@ -46,11 +46,11 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
           <span class="hidden sm:inline">Browse</span>
         </a>
-        <a href="#" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Trash">
+        <a href="#" onclick="switchView('trash');return false" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" data-nav="trash" title="Trash">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
           <span class="hidden sm:inline">Trash</span>
         </a>
-        <a href="#" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Settings">
+        <a href="#" onclick="switchView('settings');return false" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" data-nav="settings" title="Settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
           <span class="hidden sm:inline">Settings</span>
         </a>
@@ -85,7 +85,7 @@
         <div data-digest-panel="daily" class="flex-1 min-h-0 flex flex-col">
           <div class="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-3">
             <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>
-            <span>Generated 07:30</span>
+            <span>Monday, March 9 &middot; Late night &middot; Generated 21:59</span>
           </div>
           <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
             <div class="leading-normal">
@@ -94,22 +94,22 @@
                   <div class="text-[10px] font-medium uppercase tracking-widest text-primary mb-1.5">TOP 3 TODAY</div>
                   <div class="text-sm text-foreground">
                     <ol class="space-y-0.5 my-1">
-                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">1.</span><span>Call landlord about the Sendling apartment &mdash; viewing is Thursday</span></li>
-                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">2.</span><span>Send invoice to DataFlow GmbH (1020&euro;, due March 10)</span></li>
-                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">3.</span><span>Configure automatic backups on the home server</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">1.</span><span>Call the landlord about the Sendling apartment. This could influence your options quickly, so get it done today.</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">2.</span><span>Email Prof. Weber to thank him for his thesis feedback, and inquire about suitable conferences for your paper.</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">3.</span><span>Pick up the package from Neighbor Julia and ask her about the building meeting date.</span></li>
                     </ol>
                   </div>
                 </div>
                 <div class="border-l-[3px] border-accent pl-3">
                   <div class="text-[10px] font-medium uppercase tracking-widest text-accent mb-1.5">STUCK ON</div>
                   <div class="text-sm text-foreground">
-                    <p class="my-0.5">Health insurance card renewal &mdash; need to take a biometric photo first</p>
+                    <p class="my-0.5">Cortex &mdash; Second Brain App: Deployment is pending and needs MCP integration testing. Ensure the server environment is ready to proceed.</p>
                   </div>
                 </div>
                 <div class="border-l-[3px] border-primary/50 pl-3">
                   <div class="text-[10px] font-medium uppercase tracking-widest text-primary/80 mb-1.5">SMALL WIN</div>
                   <div class="text-sm text-foreground">
-                    <p class="my-0.5">Thesis officially submitted! Prof. Weber even suggested turning chapter 3 into a conference paper.</p>
+                    <p class="my-0.5">Send the fast.ai link to Lisa and quickly ask about her Anthropic contact. This will strengthen your professional network.</p>
                   </div>
                 </div>
               </div>
@@ -121,7 +121,7 @@
         <div data-digest-panel="weekly" class="flex-1 min-h-0 flex flex-col hidden">
           <div class="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-3">
             <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>
-            <span>Generated Sunday 16:00</span>
+            <span>Monday, March 9 &middot; Late night &middot; Generated 21:59</span>
           </div>
           <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
             <div class="leading-normal">
@@ -129,16 +129,21 @@
                 <div class="border-l-[3px] border-muted-foreground/40 pl-3">
                   <div class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground mb-1.5">WHAT HAPPENED</div>
                   <div class="text-sm text-foreground">
-                    <p class="my-0.5">14 entries captured this week. Most active category: Tasks (5). Busiest day: Wednesday (4 entries).</p>
+                    <ul class="space-y-0.5 my-1">
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Made progress on personal errands, including sending an invoice for DataFlow GmbH and replying to Aunt Monika&rsquo;s birthday email.</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Interacted with family, including a call with Dad about Easter dinner and router issues, and coffee with Lisa discussing her career shift to ML engineering.</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Social interactions included Max, confirming bouldering plans, and neighbor Julia, who is holding a package for you.</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Explored new ideas at a meetup, notably edge computing with WebAssembly, and considered incorporating a weekly review ritual.</span></li>
+                    </ul>
                   </div>
                 </div>
                 <div class="border-l-[3px] border-accent pl-3">
                   <div class="text-[10px] font-medium uppercase tracking-widest text-accent mb-1.5">OPEN LOOPS</div>
                   <div class="text-sm text-foreground">
                     <ul class="space-y-0.5 my-1">
-                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Apartment search: viewing Thursday, but no backup options yet</span></li>
-                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>4 pending tasks including the overdue dentist appointment</span></li>
-                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Blog migration paused &mdash; revisit after home server is stable</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Renew health insurance card: No action taken yet on the urgent task of uploading a new photo.</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Fix bike rear brake: Remains incomplete despite identification of the issue.</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Book dentist appointment: Important yet deferred task that needs scheduling.</span></li>
                     </ul>
                   </div>
                 </div>
@@ -146,16 +151,16 @@
                   <div class="text-[10px] font-medium uppercase tracking-widest text-primary mb-1.5">NEXT WEEK</div>
                   <div class="text-sm text-foreground">
                     <ul class="space-y-0.5 my-1">
-                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Apartment viewing Thursday 14:00</span></li>
-                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Bouldering with Max on Saturday</span></li>
-                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Easter visit to Dad &mdash; bring FritzBox manual</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Schedule and book an appointment with Dr. Schneider for the overdue dental check-up.</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Follow up with TK to upload the necessary photo for health insurance renewal before it becomes critical.</span></li>
+                      <li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>Pick up the package from Julia and discuss building maintenance as she mentioned an issue.</span></li>
                     </ul>
                   </div>
                 </div>
                 <div class="border-l-[3px] border-primary/50 pl-3">
-                  <div class="text-[10px] font-medium uppercase tracking-widest text-primary/80 mb-1.5">RECURRING THEME</div>
+                  <div class="text-[10px] font-medium uppercase tracking-widest text-primary/80 mb-1.5">PATTERN</div>
                   <div class="text-sm text-foreground">
-                    <p class="my-0.5">Infrastructure week &mdash; home server, Docker, and self-hosting dominated. The foundation is coming together.</p>
+                    <p class="my-0.5">While personal interactions and task completions were active, essential health-related tasks like the dentist appointment and insurance renewal are being avoided, risking last-minute stress.</p>
                   </div>
                 </div>
               </div>
@@ -175,7 +180,7 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg>
             </button>
           </div>
-          <div class="text-[11px] pl-3 min-h-4"><span class="text-primary">Captured as <strong class="font-medium">tasks</strong>: Send invoice to freelance client (96%)</span></div>
+          <div class="text-[11px] pl-3 min-h-4"></div>
         </div>
 
         <!-- Stats + Recent -->
@@ -514,6 +519,152 @@
       </div>
     </div>
 
+    <!-- ═══════════════════ SETTINGS ═══════════════════ -->
+    <div id="view-settings" class="view-panel hidden">
+      <main class="flex-1 overflow-y-auto scrollbar-thin">
+        <div class="space-y-3 pb-4">
+
+          <div class="flex items-center justify-between">
+            <h1 class="text-lg font-medium tracking-tight">Settings</h1>
+          </div>
+
+          <!-- Telegram -->
+          <div class="rounded-md border border-border bg-card p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+              <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Telegram</span>
+              <span class="flex-1 h-px bg-border"></span>
+            </div>
+            <div class="space-y-3">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Authorized Chat IDs</label>
+                <div class="flex flex-wrap gap-1.5 min-h-[28px]">
+                  <span class="inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-1 text-sm font-mono text-foreground">
+                    <span>482716395</span>
+                    <button type="button" class="text-muted-foreground hover:text-destructive transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                  </span>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                  <div class="flex items-center gap-0 flex-1 max-w-xs">
+                    <input type="text" placeholder="Enter chat ID..." class="h-8 flex-1 rounded-l-md border border-r-0 border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                    <button type="button" class="h-8 rounded-r-md border border-border bg-secondary px-2.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors">Add</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Language Model -->
+          <div class="rounded-md border border-border bg-card p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg>
+              <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Language Model</span>
+              <span class="flex-1 h-px bg-border"></span>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Provider</label>
+                <select class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                  <option selected>Anthropic</option>
+                  <option>OpenAI (ChatGPT)</option>
+                  <option>Groq</option>
+                  <option>Gemini</option>
+                  <option>Local LLM</option>
+                  <option>Ollama</option>
+                </select>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Model</label>
+                <input type="text" value="claude-sonnet-4-20250514" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
+              </div>
+            </div>
+            <div class="mt-3 flex flex-col gap-1.5">
+              <label class="text-xs text-muted-foreground">Anthropic API Key</label>
+              <input type="password" value="sk-ant-xxxxxxxx" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+            </div>
+            <div class="mt-3 flex flex-col gap-1.5">
+              <label class="text-xs text-muted-foreground">Base URL</label>
+              <input type="text" value="https://api.anthropic.com/v1" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
+            </div>
+            <div class="mt-3 flex flex-col gap-1.5 max-w-sm">
+              <label class="text-xs text-muted-foreground">Confidence Threshold</label>
+              <div class="flex items-center gap-3">
+                <input type="range" min="0" max="100" value="60" class="flex-1">
+                <input type="text" value="0.6" class="h-8 w-16 rounded-md border border-border bg-transparent px-2 text-sm text-center font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
+              </div>
+              <span class="text-[10px] text-muted-foreground">Below this threshold, Telegram replies include correction buttons to fix the category.</span>
+            </div>
+          </div>
+
+          <!-- Digests -->
+          <div class="rounded-md border border-border bg-card p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Digests</span>
+              <span class="flex-1 h-px bg-border"></span>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Daily Schedule</label>
+                <div class="flex items-center gap-2">
+                  <span class="text-primary text-xs select-none shrink-0">cron</span>
+                  <input type="text" value="30 7 * * *" class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
+                </div>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Weekly Schedule</label>
+                <div class="flex items-center gap-2">
+                  <span class="text-primary text-xs select-none shrink-0">cron</span>
+                  <input type="text" value="0 16 * * 0" class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-3">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Email Delivery</label>
+                <input type="text" value="" placeholder="Leave empty to disable" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
+                <span class="text-[10px] text-muted-foreground">Disabled &mdash; digests available on dashboard only</span>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Timezone</label>
+                <input type="text" value="Europe/Berlin" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
+              </div>
+            </div>
+            <div class="mt-3 flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">Generate now</span>
+              <button type="button" class="flex items-center gap-1 rounded-md border border-border bg-secondary px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg> Daily
+              </button>
+              <button type="button" class="flex items-center gap-1 rounded-md border border-border bg-secondary px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg> Weekly
+              </button>
+            </div>
+          </div>
+
+          <!-- Save -->
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-[10px] text-muted-foreground">Changes take effect immediately after save</span>
+            <button type="button" class="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Save All
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- ═══════════════════ TRASH ═══════════════════ -->
+    <div id="view-trash" class="view-panel hidden">
+      <div class="flex-1 min-h-0 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <h1 class="text-lg font-medium tracking-tight">Trash</h1>
+        </div>
+        <div class="flex-1 flex items-center justify-center">
+          <p class="text-sm text-muted-foreground">Trash is empty.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Status bar -->
     <footer class="flex items-center justify-between text-[10px] text-muted-foreground shrink-0">
       <div class="flex items-center gap-3">
@@ -539,8 +690,11 @@
       document.querySelectorAll('[data-nav]').forEach(function(n) {
         n.classList.remove('text-foreground', 'bg-secondary');
       });
+      document.querySelectorAll('[data-nav="' + name + '"]').forEach(function(n) {
+        n.classList.add('text-foreground', 'bg-secondary');
+      });
       if (name === 'browse') {
-        document.querySelectorAll('[data-nav="browse"]').forEach(function(n) {
+        document.querySelectorAll('[data-nav="search"]').forEach(function(n) {
           n.classList.add('text-foreground', 'bg-secondary');
         });
       }
