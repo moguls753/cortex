@@ -225,7 +225,7 @@ function renderDigest(
 ): string {
   const today = new Date();
   const hour = today.getHours();
-  const greeting = hour < 5 ? "Late night." : hour < 12 ? "Good morning." : hour < 18 ? "Good afternoon." : hour < 22 ? "Good evening." : "Late night.";
+  const greeting = hour < 5 ? "Late night." : hour < 12 ? "Good morning." : hour < 14 ? "Good day." : hour < 18 ? "Good afternoon." : hour < 22 ? "Good evening." : "Late night.";
   const dateLine = today.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
