@@ -127,7 +127,7 @@ function renderDigestMarkdown(text: string): string {
     return renderPlainBody(text);
   }
 
-  let html = '<div class="space-y-3">';
+  let html = '<div class="space-y-5">';
   for (const part of parts) {
     if (!part.title && !part.body) continue;
     const style = SECTION_STYLES[part.title] ?? { border: "border-border", label: "text-muted-foreground" };
