@@ -5,11 +5,9 @@
   Capture from Telegram or the web, classify with AI, search by meaning, access via MCP.
 </p>
 
-<br>
-
-**[Live Demo](https://moguls753.github.io/cortex/)** — see the full UI with mock data, switch between dark/light theme.
-
-<br>
+<p align="center">
+  <a href="https://moguls753.github.io/cortex/"><strong>Live Demo</strong></a>
+</p>
 
 ## How It Works
 
@@ -20,32 +18,24 @@ You ──→ Capture ──→ Classify ──→ Store ──→ Access
         MCP                       Embeddings   Email Digests
 ```
 
-1. **Capture** — Send a Telegram message, write in the web editor, or add a thought from any AI tool via MCP.
-2. **Classify** — An LLM sorts your thought into one of five categories (People, Projects, Tasks, Ideas, Reference) and extracts structured fields.
-3. **Store** — PostgreSQL with vector embeddings. Semantic search finds things by meaning, not just keywords.
-4. **Access** — Web dashboard, daily/weekly digests, or let any MCP-compatible AI tool query your brain.
-
-<br>
+1. **Capture** - send a Telegram message, write in the web editor, or add a thought via MCP from any AI tool.
+2. **Classify** - an LLM sorts it into one of five categories (People, Projects, Tasks, Ideas, Reference) and extracts structured fields.
+3. **Store** - PostgreSQL with pgvector embeddings. Search by meaning, not just keywords.
+4. **Access** - web dashboard, daily/weekly email digests, or query your brain from any MCP-compatible tool.
 
 ## Features
 
-**Capture** — Telegram bot (text + voice via faster-whisper), web dashboard with quick capture and full editor, MCP server for any AI tool.
-
-**Intelligence** — LLM classification into 5 categories with confidence scoring. Context-aware: uses recent and similar entries. Low-confidence entries get inline Telegram buttons. `/fix` to reclassify.
-
-**Search** — Semantic search via pgvector + snowflake-arctic-embed2. Text fallback. Filter by category, tags, date. Multilingual (EN/DE).
-
-**Digests** — Daily briefing and weekly review, delivered by email and on the dashboard.
-
-**Self-hosted** — PostgreSQL, local embeddings, local voice transcription. LLM-agnostic: Anthropic, OpenAI, or any compatible endpoint. Soft delete with trash. MCP with 7 CRUD tools.
-
-<br>
+- **Capture** - Telegram bot with text and voice (faster-whisper), web dashboard with quick capture and full editor, MCP server
+- **Intelligence** - LLM classification into 5 categories with confidence scoring, context-aware (uses recent + similar entries), inline Telegram buttons for low-confidence entries, `/fix` to reclassify
+- **Search** - semantic search via pgvector + snowflake-arctic-embed2 with text fallback, filter by category/tags/date, multilingual (EN/DE)
+- **Digests** - daily briefing and weekly review, delivered by email and shown on the dashboard
+- **Self-hosted** - local embeddings, local voice transcription, LLM-agnostic (Anthropic, OpenAI, or any compatible endpoint), soft delete, 7 MCP tools
 
 ## Quick Start
 
 ```bash
-git clone <repo-url> && cd cortex
-cp .env.example .env    # edit with your values
+git clone https://github.com/moguls753/cortex.git && cd cortex
+cp .env.example .env    # fill in your values
 docker compose up -d
 ```
 
@@ -58,11 +48,9 @@ docker compose up -d
 | `SESSION_SECRET` | `openssl rand -hex 32` |
 | `POSTGRES_PASSWORD` | Database password |
 
-Dashboard at `http://localhost:3000`. All settings overridable at runtime via the Settings page.
+Dashboard at `http://localhost:3000`. All settings can be changed at runtime from the Settings page.
 
-<br>
-
-## MCP Integration
+## MCP
 
 Add to your Claude Code config (`~/.claude.json`):
 
@@ -77,51 +65,37 @@ Add to your Claude Code config (`~/.claude.json`):
 }
 ```
 
-7 tools: `search_brain` · `add_thought` · `list_recent` · `get_entry` · `update_entry` · `delete_entry` · `brain_stats`
-
-<br>
+Tools: `search_brain` · `add_thought` · `list_recent` · `get_entry` · `update_entry` · `delete_entry` · `brain_stats`
 
 ## Configuration
 
-All settings can be overridden at runtime via the web Settings page. Env vars serve as defaults.
+Env vars serve as defaults. Everything is overridable from the Settings page at runtime.
 
 | Variable | Default | Description |
 |---|---|---|
 | `LLM_PROVIDER` | `anthropic` | `anthropic` or `openai-compatible` |
-| `LLM_API_KEY` | — | API key for classification and digests |
+| `LLM_API_KEY` | | API key for classification and digests |
 | `LLM_MODEL` | `claude-sonnet-4-20250514` | Model for classification and digests |
-| `LLM_BASE_URL` | — | Base URL for OpenAI-compatible endpoints |
+| `LLM_BASE_URL` | | Base URL for OpenAI-compatible endpoints |
 | `OLLAMA_MODEL` | `snowflake-arctic-embed2` | Embedding model |
 | `PORT` | `3000` | Web server port |
 | `TZ` | `Europe/Berlin` | Timezone for digest scheduling |
 | `DAILY_DIGEST_CRON` | `30 7 * * *` | Daily digest schedule |
 | `WEEKLY_DIGEST_CRON` | `0 16 * * 0` | Weekly review schedule |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | — | SMTP for email digests |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | | SMTP for email digests |
 
-<br>
+## Development
 
-## For Developers
-
-**Stack** — Node.js, TypeScript, Hono, PostgreSQL + pgvector + Drizzle ORM, Ollama, grammY, Vitest, Tailwind CSS, Docker Compose.
+Stack: Node.js, TypeScript, Hono, PostgreSQL + pgvector + Drizzle ORM, Ollama, grammY, Vitest, Tailwind CSS, Docker Compose.
 
 ```bash
-npm install && npm run dev    # local development
-npm test                      # all 318 tests
+npm install && npm run dev    # local dev
+npm test                      # 318 tests
 npm run test:unit             # fast, no Docker
 npm run test:integration      # needs Docker (testcontainers)
 ```
 
-**Architecture** — See [ARCHITECTURE.md](ARCHITECTURE.md) for database schema, capture flows, prompt contracts, error handling, and Docker Compose config.
-
-**Spec-driven development** — Every feature went through: behavioral spec → test spec → test implementation spec → failing tests → passing code → review. All artifacts in `docs/specs/`.
-
-<br>
-
-## Status
-
-All 12 features complete. 318 tests passing (234 unit + 84 integration).
-
-<br>
+Architecture, schema, and prompt contracts are documented in [ARCHITECTURE.md](ARCHITECTURE.md). Spec artifacts in `docs/specs/`.
 
 ## License
 
