@@ -67,5 +67,8 @@ services:
 
 volumes:
   postgres_data:
+    name: cortex_postgres_data
   ollama_data:
+    name: cortex_ollama_data
   whisper_data:
+    name: cortex_whisper_data
