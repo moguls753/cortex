@@ -224,6 +224,8 @@ function renderDigest(
   weeklyCronTime: string,
 ): string {
   const today = new Date();
+  const hour = today.getHours();
+  const greeting = hour < 5 ? "Late night." : hour < 12 ? "Good morning." : hour < 18 ? "Good afternoon." : hour < 22 ? "Good evening." : "Late night.";
   const dateLine = today.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -234,7 +236,7 @@ function renderDigest(
     <div class="flex items-start justify-between mb-5 shrink-0">
       <div>
         <p class="text-sm text-muted-foreground">${escapeHtml(dateLine)}</p>
-        <h1 class="text-lg font-medium text-foreground mt-0.5 tracking-tight text-balance">Here is what needs your attention.</h1>
+        <h1 class="text-lg font-medium text-foreground mt-0.5 tracking-tight text-balance">${greeting} Here is what needs your attention.</h1>
       </div>
       <div class="flex items-center gap-1 shrink-0 mt-0.5">
         <button type="button" data-digest-tab="daily" class="rounded-md px-2.5 py-1 text-xs transition-colors bg-primary text-primary-foreground">Daily</button>
