@@ -88,52 +88,105 @@ function formatTime(date: Date): string {
   });
 }
 
-function renderMarkdown(text: string): string {
+const SECTION_STYLES: Record<string, { border: string; label: string }> = {
+  // Daily sections
+  "TOP 3 TODAY":      { border: "border-primary",            label: "text-primary" },
+  "STUCK ON":         { border: "border-accent",             label: "text-accent" },
+  "SMALL WIN":        { border: "border-primary/50",         label: "text-primary/80" },
+  // Weekly sections
+  "WHAT HAPPENED":    { border: "border-muted-foreground/40", label: "text-muted-foreground" },
+  "OPEN LOOPS":       { border: "border-accent",             label: "text-accent" },
+  "NEXT WEEK":        { border: "border-primary",            label: "text-primary" },
+  "RECURRING THEME":  { border: "border-primary/50",         label: "text-primary/80" },
+};
+
+function renderDigestMarkdown(text: string): string {
+  // Split on bold section headers like **TOP 3 TODAY**
+  const sectionPattern = /\*\*([A-Z][A-Z0-9 ]+)\*\*/g;
+  const parts: { title: string; body: string }[] = [];
+  let lastIndex = 0;
+  let lastTitle = "";
+  let match: RegExpExecArray | null;
+
+  while ((match = sectionPattern.exec(text)) !== null) {
+    if (lastTitle || lastIndex > 0) {
+      parts.push({ title: lastTitle, body: text.slice(lastIndex, match.index).trim() });
+    } else {
+      const preamble = text.slice(0, match.index).trim();
+      if (preamble) parts.push({ title: "", body: preamble });
+    }
+    lastTitle = match[1]!;
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastTitle || lastIndex < text.length) {
+    parts.push({ title: lastTitle, body: text.slice(lastIndex).trim() });
+  }
+
+  // If no sections detected, fall back to simple rendering
+  if (parts.length <= 1 && !parts[0]?.title) {
+    return renderPlainBody(text);
+  }
+
+  let html = '<div class="space-y-3">';
+  for (const part of parts) {
+    if (!part.title && !part.body) continue;
+    const style = SECTION_STYLES[part.title] ?? { border: "border-border", label: "text-muted-foreground" };
+
+    if (part.title) {
+      html += `<div class="border-l-[3px] ${style.border} pl-3">`;
+      html += `<div class="text-[10px] font-medium uppercase tracking-widest ${style.label} mb-1.5">${escapeHtml(part.title)}</div>`;
+      if (part.body) html += `<div class="text-sm text-foreground">${renderPlainBody(part.body)}</div>`;
+      html += `</div>`;
+    } else if (part.body) {
+      html += `<div class="text-sm text-foreground">${renderPlainBody(part.body)}</div>`;
+    }
+  }
+  html += "</div>";
+  return html;
+}
+
+function renderPlainBody(text: string): string {
   const lines = text.split("\n");
   let html = "";
-  let inList = false;
+  let listTag = ""; // "ul" or "ol" or ""
+
+  function closeList() {
+    if (listTag) { html += `</${listTag}>`; listTag = ""; }
+  }
 
   for (const line of lines) {
     const trimmed = line.trim();
 
     if (!trimmed) {
-      if (inList) { html += "</ul>"; inList = false; }
-      html += "<br>";
-      continue;
-    }
-
-    const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
-    if (headingMatch) {
-      if (inList) { html += "</ul>"; inList = false; }
-      const level = headingMatch[1]!.length;
-      const tag = `h${level + 1}`;
-      html += `<${tag} class="text-sm font-medium mt-4 mb-2">${inlineMarkdown(escapeHtml(headingMatch[2]!))}</${tag}>`;
-      continue;
-    }
-
-    if (trimmed.startsWith("> ")) {
-      if (inList) { html += "</ul>"; inList = false; }
-      html += `<blockquote class="border-l-[3px] border-primary pl-3 my-2 text-muted-foreground italic">${inlineMarkdown(escapeHtml(trimmed.slice(2)))}</blockquote>`;
+      closeList();
       continue;
     }
 
     if (/^[-*]\s+/.test(trimmed)) {
-      if (!inList) { html += '<ul class="my-2 pl-5 list-disc">'; inList = true; }
-      html += `<li>${inlineMarkdown(escapeHtml(trimmed.replace(/^[-*]\s+/, "")))}</li>`;
+      if (listTag !== "ul") { closeList(); html += '<ul class="space-y-0.5 my-1">'; listTag = "ul"; }
+      html += `<li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0">&mdash;</span><span>${inlineFormat(escapeHtml(trimmed.replace(/^[-*]\s+/, "")))}</span></li>`;
       continue;
     }
 
-    if (inList) { html += "</ul>"; inList = false; }
-    html += `<p class="my-1">${inlineMarkdown(escapeHtml(trimmed))}</p>`;
+    if (/^\d+[.)]\s+/.test(trimmed)) {
+      if (listTag !== "ol") { closeList(); html += '<ol class="space-y-0.5 my-1">'; listTag = "ol"; }
+      const num = trimmed.match(/^(\d+)/)?.[1] ?? "";
+      const content = trimmed.replace(/^\d+[.)]\s+/, "");
+      html += `<li class="flex gap-2 items-baseline"><span class="text-muted-foreground select-none shrink-0 tabular-nums">${num}.</span><span>${inlineFormat(escapeHtml(content))}</span></li>`;
+      continue;
+    }
+
+    closeList();
+    html += `<p class="my-0.5">${inlineFormat(escapeHtml(trimmed))}</p>`;
   }
 
-  if (inList) html += "</ul>";
+  closeList();
   return html;
 }
 
-function inlineMarkdown(text: string): string {
+function inlineFormat(text: string): string {
   return text
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-medium text-foreground">$1</strong>')
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(/`(.+?)`/g, '<code class="text-[13px] bg-secondary px-1 py-px rounded">$1</code>');
 }
@@ -151,8 +204,8 @@ function renderDigestContent(
         <span>Generated ${genTime}</span>
       </div>
       <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
-        <div data-digest class="leading-relaxed">
-          ${renderMarkdown(digest.content)}
+        <div data-digest class="leading-normal">
+          ${renderDigestMarkdown(digest.content)}
         </div>
       </div>`;
   }
