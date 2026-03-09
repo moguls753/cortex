@@ -177,7 +177,7 @@ function renderDigest(
     day: "numeric",
   });
 
-  return `<div class="h-[80vh] rounded-md border border-border bg-card p-6 flex flex-col">
+  return `<div class="h-[80vh] shrink-0 rounded-md border border-border bg-card p-6 flex flex-col">
     <div class="flex items-start justify-between mb-5 shrink-0">
       <div>
         <p class="text-sm text-muted-foreground">${escapeHtml(dateLine)}</p>
