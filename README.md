@@ -1,17 +1,14 @@
-# Cortex
+<h1 align="center">Cortex</h1>
 
-A self-hosted second brain. Capture thoughts from Telegram or a web editor, classify them with AI, search by meaning, and expose everything to any AI tool via MCP.
-
-Your data lives on your server. No SaaS middlemen.
+<p align="center">
+  A self-hosted, agent-readable second brain.<br>
+  Capture from Telegram or the web, classify with AI, search by meaning, access via MCP.
+</p>
 
 <br>
 
 <p align="center">
   <img src="docs/screenshots/capture-demo.gif" alt="Quick capture with AI classification" width="720">
-</p>
-
-<p align="center">
-  <sub>Type a thought. AI classifies it instantly.</sub>
 </p>
 
 <br>
@@ -35,7 +32,7 @@ You ──→ Capture ──→ Classify ──→ Store ──→ Access
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/demo.gif" alt="Dashboard, Browse, Entry, Settings" width="720">
+  <img src="docs/screenshots/demo.webp" alt="Dashboard, Browse, Entry, Settings" width="720">
 </p>
 
 <details>
