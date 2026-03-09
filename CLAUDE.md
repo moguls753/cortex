@@ -33,7 +33,7 @@ These were decided during the spec interview and are final:
 - LLM: Provider abstraction (Anthropic SDK / OpenAI SDK)
 - Voice: faster-whisper (medium)
 - Telegram: grammY
-- Testing: Vitest (recommended — not yet set up)
+- Testing: Vitest
 - CSS: Tailwind CLI + oklch CSS custom properties (dark/light theme)
 - Icons: Lucide (inline SVGs via `src/web/icons.ts`)
 - Font: JetBrains Mono (single monospace font)
@@ -81,6 +81,8 @@ All web UI implementation must follow `docs/plans/2026-03-06-web-design-system.m
 - Source: `src/` per `ARCHITECTURE.md` project structure
 - Prompts: `prompts/classify.md`, `prompts/daily-digest.md`, `prompts/weekly-review.md`
 
-## Resuming Work
+## Project Status
 
-To continue spec-dd work: read `docs/specs/progress.md` to see which feature is at which phase, then run the appropriate spec-dd phase. Use the `spec-dd` skill.
+All 12 features are complete through all 6 spec-dd phases. 318/318 tests passing. See `docs/specs/progress.md` for the full history.
+
+Future work is ad-hoc improvements and new features. For new features, use the `spec-dd` skill to follow the same workflow.

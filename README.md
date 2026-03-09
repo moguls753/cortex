@@ -165,11 +165,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture document, inclu
 
 ## Status
 
-**Complete:** Foundation (config, logging, DB, health), Embedding (Ollama integration), Classification (LLM provider abstraction, context-aware classification).
+All 12 features complete, 318 tests passing (234 unit + 84 integration):
 
-**In progress:** Telegram bot (specs done, implementing tests).
-
-**Specs written:** Web auth, dashboard, browse, entry editor, new note, settings, MCP server, digests.
+Foundation, Embedding, Classification, Telegram Bot, Web Auth, Web Dashboard, Web Browse, Web Entry, Web New Note, Web Settings, MCP Server, Digests.
 
 ## License
 
