@@ -16,6 +16,7 @@ import { createSSEBroadcaster } from "./web/sse.js";
 import { initializeEmbedding } from "./embed.js";
 import { startBot } from "./telegram.js";
 import { listenForEntryChanges } from "./db/notify.js";
+import { startScheduler } from "./digests.js";
 
 const log = createLogger("server");
 const startTime = Date.now();
@@ -98,7 +99,7 @@ async function main(): Promise<void> {
   app.route("/", createBrowseRoutes(sql));
   app.route("/", createEntryRoutes(sql));
   app.route("/", createNewNoteRoutes(sql));
-  app.route("/", createSettingsRoutes(sql));
+  app.route("/", createSettingsRoutes(sql, broadcaster));
 
   // MCP HTTP endpoint (JSON-RPC)
   const mcpHandler = createMcpHttpHandler(sql);
@@ -112,6 +113,17 @@ async function main(): Promise<void> {
   serve({ fetch: app.fetch, port: config.port }, () => {
     log.info(`Cortex listening on http://0.0.0.0:${config.port}`);
   });
+
+  // Start digest scheduler (cron jobs for daily/weekly digests + background retry)
+  startScheduler(sql, broadcaster)
+    .then(() => {
+      log.info("Digest scheduler started");
+    })
+    .catch((err) => {
+      log.error("Digest scheduler failed to start", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
   // Start Telegram bot
   startBot(sql)

@@ -14,7 +14,10 @@ import {
   iconCheck,
   iconX,
   iconAlertTriangle,
+  iconPlay,
 } from "./icons.js";
+import { generateDailyDigest, generateWeeklyReview } from "../digests.js";
+import type { SSEBroadcaster } from "./sse.js";
 
 type Sql = postgres.Sql;
 
@@ -127,7 +130,7 @@ function validateSettings(form: Record<string, string>): string | null {
   return null;
 }
 
-export function createSettingsRoutes(sql: Sql): Hono {
+export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Hono {
   const app = new Hono();
 
   app.get("/settings", async (c) => {
@@ -413,6 +416,18 @@ export function createSettingsRoutes(sql: Sql): Hono {
                 class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
             </div>
           </div>
+          <div class="mt-3 flex items-center gap-2">
+            <span class="text-xs text-muted-foreground">Generate now</span>
+            <button type="button" id="trigger-daily"
+              class="flex items-center gap-1 rounded-md border border-border bg-secondary px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary transition-colors">
+              ${iconPlay("size-3")} Daily
+            </button>
+            <button type="button" id="trigger-weekly"
+              class="flex items-center gap-1 rounded-md border border-border bg-secondary px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary transition-colors">
+              ${iconPlay("size-3")} Weekly
+            </button>
+            <span id="digest-status" class="text-[10px] text-muted-foreground hidden"></span>
+          </div>
         </div>
 
         <!-- ═══ Save ═══ -->
@@ -643,6 +658,42 @@ export function createSettingsRoutes(sql: Sql): Hono {
           }
         });
       }
+
+      /* ── Digest trigger buttons ── */
+      function triggerDigest(type) {
+        var btn = document.getElementById('trigger-' + type);
+        var status = document.getElementById('digest-status');
+        if (!btn || !status) return;
+        btn.disabled = true;
+        btn.classList.add('opacity-50');
+        status.textContent = 'Generating ' + type + '...';
+        status.classList.remove('hidden');
+        status.classList.add('animate-pulse');
+        fetch('/api/digest/' + type, { method: 'POST' })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (data.ok) {
+              status.textContent = type.charAt(0).toUpperCase() + type.slice(1) + ' digest generated';
+              status.classList.remove('animate-pulse');
+            } else {
+              status.textContent = 'Failed: ' + (data.error || 'unknown error');
+              status.classList.remove('animate-pulse');
+            }
+          })
+          .catch(function() {
+            status.textContent = 'Request failed';
+            status.classList.remove('animate-pulse');
+          })
+          .finally(function() {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+            setTimeout(function() { status.classList.add('hidden'); }, 5000);
+          });
+      }
+      var dailyBtn = document.getElementById('trigger-daily');
+      var weeklyBtn = document.getElementById('trigger-weekly');
+      if (dailyBtn) dailyBtn.addEventListener('click', function() { triggerDigest('daily'); });
+      if (weeklyBtn) weeklyBtn.addEventListener('click', function() { triggerDigest('weekly'); });
     })();
     </script>`;
 
@@ -716,6 +767,25 @@ export function createSettingsRoutes(sql: Sql): Hono {
     if (warning) params.set("warning", warning);
 
     return c.redirect(`/settings?${params.toString()}`, 302);
+  });
+
+  // Digest trigger endpoints
+  app.post("/api/digest/daily", async (c) => {
+    try {
+      await generateDailyDigest(sql, broadcaster);
+      return c.json({ ok: true });
+    } catch (err) {
+      return c.json({ ok: false, error: err instanceof Error ? err.message : "Generation failed" }, 500);
+    }
+  });
+
+  app.post("/api/digest/weekly", async (c) => {
+    try {
+      await generateWeeklyReview(sql, broadcaster);
+      return c.json({ ok: true });
+    } catch (err) {
+      return c.json({ ok: false, error: err instanceof Error ? err.message : "Generation failed" }, 500);
+    }
   });
 
   return app;
