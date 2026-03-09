@@ -138,9 +138,37 @@ function inlineMarkdown(text: string): string {
     .replace(/`(.+?)`/g, '<code class="text-[13px] bg-secondary px-1 py-px rounded">$1</code>');
 }
 
-function renderDigest(
+function renderDigestContent(
   digest: { content: string; created_at: Date } | null,
   cronTime: string,
+  emptyLabel: string,
+): string {
+  if (digest) {
+    const genTime = formatTime(digest.created_at);
+    return `
+      <div class="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-3">
+        ${iconSparkles("size-3 text-primary")}
+        <span>Generated ${genTime}</span>
+      </div>
+      <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+        <div data-digest class="leading-relaxed">
+          ${renderMarkdown(digest.content)}
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="flex-1 flex items-center justify-center">
+      <p class="text-center italic text-muted-foreground text-sm">
+        No ${emptyLabel} digest yet &mdash; your first one arrives at ${escapeHtml(cronTime)}
+      </p>
+    </div>`;
+}
+
+function renderDigest(
+  daily: { content: string; created_at: Date } | null,
+  weekly: { content: string; created_at: Date } | null,
+  dailyCronTime: string,
+  weeklyCronTime: string,
 ): string {
   const today = new Date();
   const dateLine = today.toLocaleDateString("en-US", {
@@ -149,41 +177,23 @@ function renderDigest(
     day: "numeric",
   });
 
-  let digestBody: string;
-  if (digest) {
-    const genTime = formatTime(digest.created_at);
-    digestBody = `
-      <div class="flex items-baseline justify-between mb-5 shrink-0">
-        <div>
-          <p class="text-sm text-muted-foreground">${escapeHtml(dateLine)}</p>
-          <h1 class="text-lg font-medium text-foreground mt-0.5 tracking-tight text-balance">Good morning. Here is what needs your attention.</h1>
-        </div>
-        <div class="flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0">
-          ${iconSparkles("size-3 text-primary")}
-          <span>Generated ${genTime}</span>
-        </div>
+  return `<div class="min-h-[420px] max-h-[80vh] rounded-md border border-border bg-card p-6 flex flex-col">
+    <div class="flex items-start justify-between mb-5 shrink-0">
+      <div>
+        <p class="text-sm text-muted-foreground">${escapeHtml(dateLine)}</p>
+        <h1 class="text-lg font-medium text-foreground mt-0.5 tracking-tight text-balance">Here is what needs your attention.</h1>
       </div>
-      <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
-        <div data-digest class="leading-relaxed">
-          ${renderMarkdown(digest.content)}
-        </div>
-      </div>`;
-  } else {
-    digestBody = `
-      <div class="flex items-baseline justify-between mb-5 shrink-0">
-        <div>
-          <p class="text-sm text-muted-foreground">${escapeHtml(dateLine)}</p>
-        </div>
+      <div class="flex items-center gap-1 shrink-0 mt-0.5">
+        <button type="button" data-digest-tab="daily" class="rounded-md px-2.5 py-1 text-xs transition-colors bg-primary text-primary-foreground">Daily</button>
+        <button type="button" data-digest-tab="weekly" class="rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary">Weekly</button>
       </div>
-      <div class="flex-1 flex items-center justify-center">
-        <p data-digest class="text-center italic text-muted-foreground">
-          No digest yet &mdash; your first one arrives tomorrow at ${escapeHtml(cronTime)}
-        </p>
-      </div>`;
-  }
-
-  return `<div class="min-h-[420px] max-h-[60vh] rounded-md border border-border bg-card p-6 flex flex-col">
-    ${digestBody}
+    </div>
+    <div data-digest-panel="daily" class="flex-1 min-h-0 flex flex-col">
+      ${renderDigestContent(daily, dailyCronTime, "daily")}
+    </div>
+    <div data-digest-panel="weekly" class="flex-1 min-h-0 flex flex-col hidden">
+      ${renderDigestContent(weekly, weeklyCronTime, "weekly")}
+    </div>
   </div>`;
 }
 
@@ -433,15 +443,38 @@ function renderClientScript(): string {
     es.addEventListener('digest:updated', function(e) {
       try {
         var d = JSON.parse(e.data);
-        var digestEl = document.querySelector('[data-digest]');
-        if (digestEl && d.content) {
-          digestEl.classList.add('bg-secondary');
-          digestEl.innerHTML = d.content.replace(/\\n/g, '<br>');
-          setTimeout(function() { digestEl.classList.remove('bg-secondary'); }, 500);
+        var type = d.digestType || 'daily';
+        var panel = document.querySelector('[data-digest-panel="' + type + '"]');
+        if (panel && d.content) {
+          var digestEl = panel.querySelector('[data-digest]');
+          if (digestEl) {
+            digestEl.classList.add('bg-secondary');
+            digestEl.innerHTML = d.content.replace(/\\n/g, '<br>');
+            setTimeout(function() { digestEl.classList.remove('bg-secondary'); }, 500);
+          }
+          // Switch to the updated tab
+          var tab = document.querySelector('[data-digest-tab="' + type + '"]');
+          if (tab) tab.click();
         }
       } catch(err) {}
     });
   }
+
+  /* ── Digest tab switching ── */
+  document.querySelectorAll('[data-digest-tab]').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var type = tab.getAttribute('data-digest-tab');
+      document.querySelectorAll('[data-digest-tab]').forEach(function(t) {
+        t.className = 'rounded-md px-2.5 py-1 text-xs transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary';
+      });
+      tab.className = 'rounded-md px-2.5 py-1 text-xs transition-colors bg-primary text-primary-foreground';
+      document.querySelectorAll('[data-digest-panel]').forEach(function(p) {
+        p.classList.add('hidden');
+      });
+      var panel = document.querySelector('[data-digest-panel="' + type + '"]');
+      if (panel) panel.classList.remove('hidden');
+    });
+  });
 })();
 </script>`;
 }
@@ -453,11 +486,13 @@ export function createDashboardRoutes(
   const app = new Hono();
 
   app.get("/", async (c) => {
-    const [rawEntries, rawStats, digest, cronValue] = await Promise.all([
+    const [rawEntries, rawStats, dailyDigest, weeklyDigest, dailyCronValue, weeklyCronValue] = await Promise.all([
       getRecentEntries(sql, 9),
       getDashboardStats(sql),
-      getLatestDigest(sql),
-      resolveConfigValue("digest_daily_cron", sql),
+      getLatestDigest(sql, "daily"),
+      getLatestDigest(sql, "weekly"),
+      resolveConfigValue("daily_digest_cron", sql),
+      resolveConfigValue("weekly_digest_cron", sql),
     ]);
 
     const entries = rawEntries ?? [];
@@ -467,10 +502,11 @@ export function createDashboardRoutes(
       openTasks: 0,
       stalledProjects: 0,
     };
-    const cronTime = parseCronHour(cronValue);
+    const dailyCronTime = parseCronHour(dailyCronValue);
+    const weeklyCronTime = parseCronHour(weeklyCronValue);
 
     const content = `
-      ${renderDigest(digest ?? null, cronTime)}
+      ${renderDigest(dailyDigest ?? null, weeklyDigest ?? null, dailyCronTime, weeklyCronTime)}
 
       <div class="shrink-0 flex flex-col gap-3 mt-3">
         ${renderCapture()}

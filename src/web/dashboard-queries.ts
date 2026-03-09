@@ -75,9 +75,10 @@ export async function getDashboardStats(
 
 export async function getLatestDigest(
   sql: Sql,
+  type: "daily" | "weekly" = "daily",
 ): Promise<{ content: string; created_at: Date } | null> {
   const rows = await sql`
-    SELECT content, generated_at FROM digests WHERE type = 'daily'
+    SELECT content, generated_at FROM digests WHERE type = ${type}
   `;
   if (!rows.length) return null;
   return { content: rows[0].content, created_at: rows[0].generated_at };

@@ -211,7 +211,7 @@ describe("Web Dashboard", () => {
 
       expect(res.status).toBe(200);
       const body = await res.text();
-      expect(body.toLowerCase()).toContain("no digest yet");
+      expect(body.toLowerCase()).toContain("no daily digest yet");
       expect(body).toContain("7:00");
     });
   });
