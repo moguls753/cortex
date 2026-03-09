@@ -1,114 +1,107 @@
 # Cortex
 
-A self-hosted, agent-readable second brain. Capture thoughts from Telegram or a web editor, classify and embed them with AI, and expose everything to any AI tool via MCP.
+A self-hosted second brain. Capture thoughts from Telegram or a web editor, classify them with AI, search by meaning, and expose everything to any AI tool via MCP.
 
-Your data lives on your server. No SaaS middlemen. One brain, every AI tool.
+Your data lives on your server. No SaaS middlemen.
+
+<br>
+
+<p align="center">
+  <img src="docs/screenshots/capture-demo.gif" alt="Quick capture with AI classification" width="720">
+</p>
+
+<p align="center">
+  <sub>Type a thought. AI classifies it instantly.</sub>
+</p>
+
+<br>
 
 ## How It Works
 
-1. **Capture** -- Send a Telegram message (text or voice), write a note in the web dashboard, or add a thought from any AI tool via MCP.
-2. **Classify** -- An LLM automatically sorts your thought into one of five categories (People, Projects, Tasks, Ideas, Reference) and extracts structured fields.
-3. **Store** -- Everything goes into PostgreSQL with vector embeddings for semantic search. Your data, your server.
-4. **Access** -- Browse and search from the web dashboard, get daily/weekly digests by email, or let any MCP-compatible AI tool query your brain.
-
 ```
-CAPTURE                    INTELLIGENCE              STORAGE               ACCESS
-───────────────────────────────────────────────────────────────────────────────────
-
-Telegram Bot ──┐           ┌── LLM Provider           PostgreSQL            Web Dashboard
-(text + voice) │           │   (Anthropic, OpenAI,    + pgvector            (browse, search,
-               ├── App ────┤    or any compatible)                          edit, settings)
-Web Editor ────┘           ├── Ollama
-                           │   (local embeddings)     SSE ──────────────── Live updates
-                           └── faster-whisper
-                               (voice transcription)                       MCP Server
-                                                                           (any AI tool)
+You ──→ Capture ──→ Classify ──→ Store ──→ Access
+        Telegram     LLM          PostgreSQL   Web Dashboard
+        Web Editor   (any)        + pgvector   MCP Server
+        MCP                       Embeddings   Email Digests
 ```
+
+1. **Capture** — Send a Telegram message, write in the web editor, or add a thought from any AI tool via MCP.
+2. **Classify** — An LLM sorts your thought into one of five categories (People, Projects, Tasks, Ideas, Reference) and extracts structured fields.
+3. **Store** — PostgreSQL with vector embeddings. Semantic search finds things by meaning, not just keywords.
+4. **Access** — Web dashboard, daily/weekly digests, or let any MCP-compatible AI tool query your brain.
+
+<br>
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/demo.gif" alt="Dashboard, Browse, Entry, Settings" width="720">
+</p>
+
+<details>
+<summary>Individual screenshots</summary>
+<br>
+
+**Dashboard** — Daily digest, quick capture, stats, recent entries with live SSE updates.
+<img src="docs/screenshots/dashboard.png" alt="Dashboard" width="720">
+
+<br>
+
+**Browse** — Filter by category, tags. Semantic search powered by pgvector.
+<img src="docs/screenshots/browse.png" alt="Browse" width="720">
+
+<br>
+
+**Entry** — View and edit with markdown rendering, category fields, tags.
+<img src="docs/screenshots/entry.png" alt="Entry view" width="720">
+
+<br>
+
+**Settings** — LLM provider, digest schedule, Ollama, confidence threshold.
+<img src="docs/screenshots/settings.png" alt="Settings" width="720">
+
+</details>
+
+<br>
 
 ## Features
 
-**Capture**
-- Telegram bot: text messages and voice notes (transcribed locally via faster-whisper)
-- Web dashboard with quick capture and a full markdown editor
-- MCP server for adding thoughts from Claude, ChatGPT, Cursor, or any MCP client
+**Capture** — Telegram bot (text + voice via faster-whisper), web dashboard with quick capture and full editor, MCP server for any AI tool.
 
-**Intelligence**
-- LLM-powered classification into 5 categories with confidence scoring
-- Context-aware: uses recent and semantically similar entries to improve accuracy
-- Low-confidence entries get inline Telegram buttons for quick correction
-- `/fix` command to reclassify the last entry
+**Intelligence** — LLM classification into 5 categories with confidence scoring. Context-aware: uses recent and similar entries. Low-confidence entries get inline Telegram buttons. `/fix` to reclassify.
 
-**Search and browse**
-- Semantic search (cosine similarity via pgvector + snowflake-arctic-embed2)
-- Text search fallback
-- Filter by category, tags, date
-- Multilingual: English and German
+**Search** — Semantic search via pgvector + snowflake-arctic-embed2. Text fallback. Filter by category, tags, date. Multilingual (EN/DE).
 
-**Digests**
-- Daily briefing (top priorities, stuck items, small wins)
-- Weekly review (activity summary, open loops, recurring themes)
-- Delivered by email and always visible on the dashboard
+**Digests** — Daily briefing and weekly review, delivered by email and on the dashboard.
 
-**Your data**
-- Self-hosted: PostgreSQL, local embeddings, local voice transcription
-- LLM-agnostic: Anthropic, OpenAI, or any OpenAI-compatible endpoint (LM Studio, Ollama)
-- Soft delete with trash and restore
-- MCP server exposes 7 tools for full CRUD access
+**Self-hosted** — PostgreSQL, local embeddings, local voice transcription. LLM-agnostic: Anthropic, OpenAI, or any compatible endpoint. Soft delete with trash. MCP with 7 CRUD tools.
+
+<br>
 
 ## Quick Start
 
-Docker Compose runs four services: the app, PostgreSQL with pgvector, Ollama for embeddings, and faster-whisper for voice transcription.
-
 ```bash
 git clone <repo-url> && cd cortex
-cp .env.example .env
-```
-
-Edit `.env` and set these required values:
-
-| Variable | What it is |
-|---|---|
-| `TELEGRAM_BOT_TOKEN` | Create a bot via [@BotFather](https://t.me/BotFather) |
-| `TELEGRAM_CHAT_ID` | Your personal Telegram chat ID |
-| `LLM_API_KEY` | API key for your LLM provider |
-| `WEBAPP_PASSWORD` | Password for the web dashboard |
-| `SESSION_SECRET` | Run `openssl rand -hex 32` to generate |
-| `POSTGRES_PASSWORD` | Database password (change from default) |
-
-Then:
-
-```bash
+cp .env.example .env    # edit with your values
 docker compose up -d
 ```
 
-The app will run database migrations, pull the embedding model, and start all services. Access the dashboard at `http://localhost:3000`.
+| Variable | What it is |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | From [@BotFather](https://t.me/BotFather) |
+| `TELEGRAM_CHAT_ID` | Your Telegram chat ID |
+| `LLM_API_KEY` | API key for your LLM provider |
+| `WEBAPP_PASSWORD` | Web dashboard password |
+| `SESSION_SECRET` | `openssl rand -hex 32` |
+| `POSTGRES_PASSWORD` | Database password |
 
-## Configuration
+Dashboard at `http://localhost:3000`. All settings overridable at runtime via the Settings page.
 
-All settings can be overridden at runtime via the web Settings page. Env vars serve as defaults.
-
-| Variable | Default | Description |
-|---|---|---|
-| `LLM_PROVIDER` | `anthropic` | `anthropic` or `openai-compatible` |
-| `LLM_API_KEY` | -- | API key for classification and digests |
-| `LLM_MODEL` | `claude-sonnet-4-20250514` | Model for classification and digests |
-| `LLM_BASE_URL` | -- | Base URL for OpenAI-compatible endpoints |
-| `OLLAMA_MODEL` | `snowflake-arctic-embed2` | Embedding model |
-| `TELEGRAM_BOT_TOKEN` | -- | Telegram bot token |
-| `TELEGRAM_CHAT_ID` | -- | Authorized Telegram chat ID |
-| `WEBAPP_PASSWORD` | -- | Web dashboard login password |
-| `SESSION_SECRET` | -- | Cookie signing secret |
-| `PORT` | `3000` | Web server port |
-| `TZ` | `Europe/Berlin` | Timezone for digest scheduling |
-| `DAILY_DIGEST_CRON` | `30 7 * * *` | Daily digest schedule |
-| `WEEKLY_DIGEST_CRON` | `0 16 * * 0` | Weekly review schedule (Sunday 16:00) |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | -- | SMTP for email digests |
-| `DIGEST_EMAIL_TO` | -- | Digest recipient email |
-| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `cortex` / `cortex` / -- | Database credentials |
+<br>
 
 ## MCP Integration
 
-Configure your AI tool to connect to Cortex via MCP:
+Add to your Claude Code config (`~/.claude.json`):
 
 ```json
 {
@@ -121,53 +114,51 @@ Configure your AI tool to connect to Cortex via MCP:
 }
 ```
 
-Available tools: `search_brain`, `add_thought`, `list_recent`, `get_entry`, `update_entry`, `delete_entry`, `brain_stats`.
+7 tools: `search_brain` · `add_thought` · `list_recent` · `get_entry` · `update_entry` · `delete_entry` · `brain_stats`
+
+<br>
+
+## Configuration
+
+All settings can be overridden at runtime via the web Settings page. Env vars serve as defaults.
+
+| Variable | Default | Description |
+|---|---|---|
+| `LLM_PROVIDER` | `anthropic` | `anthropic` or `openai-compatible` |
+| `LLM_API_KEY` | — | API key for classification and digests |
+| `LLM_MODEL` | `claude-sonnet-4-20250514` | Model for classification and digests |
+| `LLM_BASE_URL` | — | Base URL for OpenAI-compatible endpoints |
+| `OLLAMA_MODEL` | `snowflake-arctic-embed2` | Embedding model |
+| `PORT` | `3000` | Web server port |
+| `TZ` | `Europe/Berlin` | Timezone for digest scheduling |
+| `DAILY_DIGEST_CRON` | `30 7 * * *` | Daily digest schedule |
+| `WEEKLY_DIGEST_CRON` | `0 16 * * 0` | Weekly review schedule |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | — | SMTP for email digests |
+
+<br>
 
 ## For Developers
 
-### Tech stack
-
-Node.js + TypeScript, Hono (web), PostgreSQL + pgvector + Drizzle ORM, Ollama (embeddings), grammY (Telegram), Vitest (tests), Tailwind CSS (CLI build), Docker Compose.
-
-### Local development
+**Stack** — Node.js, TypeScript, Hono, PostgreSQL + pgvector + Drizzle ORM, Ollama, grammY, Vitest, Tailwind CSS, Docker Compose.
 
 ```bash
-npm install
-npm run dev
+npm install && npm run dev    # local development
+npm test                      # all 318 tests
+npm run test:unit             # fast, no Docker
+npm run test:integration      # needs Docker (testcontainers)
 ```
 
-Requires a running PostgreSQL instance with pgvector and Ollama with the embedding model loaded.
+**Architecture** — See [ARCHITECTURE.md](ARCHITECTURE.md) for database schema, capture flows, prompt contracts, error handling, and Docker Compose config.
 
-### Tests
+**Spec-driven development** — Every feature went through: behavioral spec → test spec → test implementation spec → failing tests → passing code → review. All artifacts in `docs/specs/`.
 
-```bash
-npm test              # all tests
-npm run test:unit     # unit tests (fast, no Docker)
-npm run test:integration  # integration tests (needs Docker for testcontainers)
-```
-
-### Specification-driven development
-
-This project follows a spec-dd workflow:
-
-1. Behavioral specification
-2. Test specification
-3. Test implementation specification
-4. Implement tests (must fail)
-5. Implement feature (make tests pass)
-6. Review alignment
-
-All spec artifacts live in `docs/specs/`. See `docs/specs/progress.md` for current status.
-
-### Architecture
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture document, including database schema, capture flows, prompt contracts, error handling, and Docker Compose configuration.
+<br>
 
 ## Status
 
-All 12 features complete, 318 tests passing (234 unit + 84 integration):
+All 12 features complete. 318 tests passing (234 unit + 84 integration).
 
-Foundation, Embedding, Classification, Telegram Bot, Web Auth, Web Dashboard, Web Browse, Web Entry, Web New Note, Web Settings, MCP Server, Digests.
+<br>
 
 ## License
 
