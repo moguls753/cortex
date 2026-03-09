@@ -56,7 +56,7 @@ function formatWeeklyPrompt(data: WeeklyReviewData): string {
   const template = loadPrompt("weekly-review");
 
   const weekEntries = data.weekEntries.length > 0
-    ? data.weekEntries.map((e) => `- [${e.category}] ${e.name}`).join("\n")
+    ? data.weekEntries.map((e) => `- [${e.category}] ${e.name}${e.content ? ": " + e.content.slice(0, 100) : ""}`).join("\n")
     : "None";
 
   const dailyCounts = data.dailyCounts.length > 0
