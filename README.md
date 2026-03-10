@@ -28,20 +28,26 @@
 
 ```bash
 git clone https://github.com/moguls753/cortex.git && cd cortex
-cp .env.example .env    # fill in your values
+cp .env.example .env
+```
+
+Open `.env` and add your LLM API key:
+
+```
+LLM_API_KEY=your-key-here
+```
+
+Then start everything:
+
+```bash
 docker compose up -d
 ```
 
-| Variable | What it is |
-|---|---|
-| `TELEGRAM_BOT_TOKEN` | From [@BotFather](https://t.me/BotFather) |
-| `TELEGRAM_CHAT_ID` | Your Telegram chat ID |
-| `LLM_API_KEY` | API key for your LLM provider |
-| `WEBAPP_PASSWORD` | Web dashboard password |
-| `SESSION_SECRET` | `openssl rand -hex 32` |
-| `POSTGRES_PASSWORD` | Database password |
+This boots PostgreSQL, Ollama, Whisper, and the app. The embedding model is pulled automatically on first start.
 
-Dashboard at `http://localhost:3000`. All settings can be changed at runtime from the Settings page.
+Open `http://localhost:3000`, log in with password `cortex`, and you're ready to go.
+
+For Telegram capture, also set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env`. All settings are editable at runtime from the Settings page.
 
 ## MCP
 
