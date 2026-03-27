@@ -66,6 +66,19 @@ Add to your Claude Code config (`~/.claude.json`):
 
 Tools: `search_brain` · `add_thought` · `list_recent` · `get_entry` · `update_entry` · `delete_entry` · `brain_stats`
 
+## Resource Requirements
+
+| Service | RAM |
+|---|---|
+| Whisper (medium model) | ~3 GB |
+| Ollama (snowflake-arctic-embed2) | ~1 GB |
+| PostgreSQL | ~256 MB |
+| App | ~128 MB |
+
+**Minimum: ~4-5 GB RAM** with a cloud LLM provider (Anthropic, OpenAI).
+
+If you run classification and digests through a local LLM via Ollama instead of a cloud provider, add the RAM for that model on top. Recommended minimum: **Qwen 2.5 7B** (~5 GB) or **Llama 3.1 8B** (~5 GB) — smaller models tend to struggle with reliable structured output. **10 GB+ RAM recommended** for fully local setups.
+
 ## Configuration
 
 Env vars serve as defaults. Everything is overridable from the Settings page at runtime.
