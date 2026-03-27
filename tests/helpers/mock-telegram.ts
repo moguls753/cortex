@@ -86,7 +86,7 @@ export function createMockContext(
     reply,
     editMessageText,
     answerCallbackQuery,
-    getFile,
+    api: { getFile },
   };
 
   return { ctx, mocks: { reply, editMessageText, answerCallbackQuery, getFile } };

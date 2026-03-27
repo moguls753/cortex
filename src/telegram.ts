@@ -231,9 +231,9 @@ export async function handleVoiceMessage(
     const chatId = message.chat.id;
     if (!(await isAuthorized(chatId, sql))) return;
 
-    // Get file info from Telegram
-    const getFile = ctx.getFile as () => Promise<{ file_path: string }>;
-    const file = await getFile();
+    // Get file info from Telegram via bot API
+    const api = (ctx as any).api;
+    const file = await api.getFile(message.voice.file_id);
     const botToken = config.telegramBotToken;
     const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
 

@@ -1003,7 +1003,7 @@ function createMockCtx(
     reply: vi.fn().mockResolvedValue({ message_id: 100 }),
     editMessageText: vi.fn().mockResolvedValue(true),
     answerCallbackQuery: vi.fn().mockResolvedValue(true),
-    getFile: vi.fn().mockResolvedValue({ file_path: "voice/file_0.oga" }),
+    api: { getFile: vi.fn().mockResolvedValue({ file_path: "voice/file_0.oga" }) },
   };
 }
 
@@ -1022,7 +1022,7 @@ function createMockVoiceCtx(
     reply: vi.fn().mockResolvedValue({ message_id: 100 }),
     editMessageText: vi.fn().mockResolvedValue(true),
     answerCallbackQuery: vi.fn().mockResolvedValue(true),
-    getFile: vi.fn().mockResolvedValue({ file_path: "voice/file_0.oga" }),
+    api: { getFile: vi.fn().mockResolvedValue({ file_path: "voice/file_0.oga" }) },
   };
 }
 
@@ -1046,6 +1046,6 @@ function createMockCallbackCtx(
     reply: vi.fn().mockResolvedValue({ message_id: 100 }),
     editMessageText: vi.fn().mockResolvedValue(true),
     answerCallbackQuery: vi.fn().mockResolvedValue(true),
-    getFile: vi.fn().mockResolvedValue({ file_path: "voice/file_0.oga" }),
+    api: { getFile: vi.fn().mockResolvedValue({ file_path: "voice/file_0.oga" }) },
   };
 }

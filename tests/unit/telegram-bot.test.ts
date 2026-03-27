@@ -742,9 +742,11 @@ describe("Telegram Bot", () => {
       await handleFixCommand(ctx, mockSql);
 
       expect(mockReclassifyEntry).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
+        "Discussed roadmap",
+        "projects",
         "this should be a person not a project",
+        undefined,
+        expect.anything(),
       );
     });
 
