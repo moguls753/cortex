@@ -18,6 +18,7 @@ Last updated: 2026-03-07
 | web-settings | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | mcp-server | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | digests | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| google-calendar | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 

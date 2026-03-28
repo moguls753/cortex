@@ -11,6 +11,7 @@ import {
   getAllTags,
 } from "./entry-queries.js";
 import { embedEntry } from "../embed.js";
+import { handleEntryCalendarCleanup } from "../google-calendar.js";
 import {
   iconTrash2,
   iconMic,
@@ -395,6 +396,13 @@ export function createEntryRoutes(sql: Sql): Hono {
     if (!UUID_RE.test(id)) {
       return c.html(renderLayout("Not Found", render404()), 404);
     }
+    // Clean up linked calendar event before soft-delete
+    try {
+      await handleEntryCalendarCleanup(sql, id);
+    } catch {
+      // Calendar cleanup failure should not block entry deletion
+    }
+
     await softDeleteEntry(sql, id);
 
     const referer = c.req.header("referer");

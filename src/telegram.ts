@@ -17,6 +17,7 @@ import {
 import { generateEmbedding, embedEntry } from "./embed.js";
 import { config, resolveConfigValue } from "./config.js";
 import { createLogger } from "./logger.js";
+import { processCalendarEvent } from "./google-calendar.js";
 
 const log = createLogger("telegram");
 
@@ -181,6 +182,16 @@ export async function handleTextMessage(
       // Embedding will be retried by cron
     }
 
+    // Calendar event creation (non-blocking)
+    let calendarResult: { created: boolean; date?: string } | null = null;
+    if (classResult.create_calendar_event) {
+      try {
+        calendarResult = await processCalendarEvent(sql, entryId, classResult);
+      } catch {
+        // Calendar errors never block entry storage
+      }
+    }
+
     // Reply
     const reply = ctx.reply as (text: string, options?: unknown) => Promise<unknown>;
     const category = capitalize(classResult.category!);
@@ -197,6 +208,11 @@ export async function handleTextMessage(
         `❓ Best guess: ${category} → ${name} (${pct})`,
         { reply_markup: buildInlineKeyboard(entryId) },
       );
+    }
+
+    // Calendar confirmation
+    if (calendarResult?.created && classResult.calendar_date) {
+      await reply(`📅 Calendar event created for ${classResult.calendar_date}`);
     }
   } catch (error) {
     const reply = ctx.reply as (text: string) => Promise<unknown>;
@@ -294,6 +310,16 @@ export async function handleVoiceMessage(
       // Will retry
     }
 
+    // Calendar event creation (non-blocking)
+    let calendarResult: { created: boolean; date?: string } | null = null;
+    if (classResult.create_calendar_event) {
+      try {
+        calendarResult = await processCalendarEvent(sql, entryId, classResult);
+      } catch {
+        // Calendar errors never block entry storage
+      }
+    }
+
     // Reply with transcript + classification
     const category = capitalize(classResult.category!);
     const name = classResult.name;
@@ -309,6 +335,11 @@ export async function handleVoiceMessage(
         `🎤 '${transcript}'\n❓ Best guess: ${category} → ${name} (${pct})`,
         { reply_markup: buildInlineKeyboard(entryId) },
       );
+    }
+
+    // Calendar confirmation
+    if (calendarResult?.created && classResult.calendar_date) {
+      await reply(`📅 Calendar event created for ${classResult.calendar_date}`);
     }
   } catch (error) {
     const reply = ctx.reply as (text: string) => Promise<unknown>;

@@ -19,6 +19,7 @@ import {
 } from "./icons.js";
 import { generateDailyDigest, generateWeeklyReview } from "../digests.js";
 import type { SSEBroadcaster } from "./sse.js";
+import { exchangeAuthCode } from "../google-calendar.js";
 
 type Sql = postgres.Sql;
 
@@ -136,6 +137,18 @@ function validateSettings(form: Record<string, string>): string | null {
     return "Invalid cron expression for weekly digest.";
   }
 
+  // Google Calendar duration
+  const gcalDuration = form.google_calendar_default_duration;
+  if (gcalDuration) {
+    const dur = parseInt(gcalDuration, 10);
+    if (isNaN(dur) || dur < 15) {
+      return "Calendar event duration must be at least 15 minutes.";
+    }
+    if (dur > 480) {
+      return "Calendar event duration must be at most 480 minutes.";
+    }
+  }
+
   return null;
 }
 
@@ -156,6 +169,35 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     const ollamaUrl = resolveEffective(dbSettings, "ollama_url", DEFAULTS.ollama_url);
     const email = resolveEffective(dbSettings, "digest_email_to", DEFAULTS.digest_email_to);
     const chatIds = resolveChatIds(dbSettings);
+
+    // Google Calendar config
+    const gcalId = dbSettings.google_calendar_id || process.env.GOOGLE_CALENDAR_ID || "";
+    const gcalDuration = dbSettings.google_calendar_default_duration || "60";
+    const gcalRefreshToken = dbSettings.google_refresh_token || process.env.GOOGLE_REFRESH_TOKEN || "";
+    const gcalClientId = dbSettings.google_client_id || process.env.GOOGLE_CLIENT_ID || "";
+    const gcalConnected = !!gcalRefreshToken;
+
+    // If tokens exist, try to validate them
+    let gcalValidated = gcalConnected;
+    if (gcalConnected && gcalClientId) {
+      const gcalClientSecret = dbSettings.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "";
+      try {
+        const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: gcalRefreshToken,
+            client_id: gcalClientId,
+            client_secret: gcalClientSecret,
+          }),
+          signal: AbortSignal.timeout(3000),
+        });
+        if (!tokenRes.ok) gcalValidated = false;
+      } catch {
+        gcalValidated = false;
+      }
+    }
 
     // Fetch models for the currently selected provider
     let providerModels: string[] = [];
@@ -460,6 +502,52 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
               ${iconPlay("size-3")} Weekly
             </button>
             <span id="digest-status" class="text-[10px] text-muted-foreground hidden"></span>
+          </div>
+        </div>
+
+        <!-- ═══ Google Calendar ═══ -->
+        <div class="rounded-md border border-border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            ${iconClock("size-3 text-primary")}
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Google Calendar</span>
+            <span class="flex-1 h-px bg-border"></span>
+          </div>
+          <div class="space-y-3">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-muted-foreground">Calendar ID</label>
+              <input type="text" name="google_calendar_id" value="${escapeHtml(gcalId)}" placeholder="your-calendar@group.calendar.google.com"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-muted-foreground">Default event duration (minutes)</label>
+              <input type="number" name="google_calendar_default_duration" value="${escapeHtml(gcalDuration)}" min="15" max="480" placeholder="60"
+                class="h-8 w-32 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+            </div>
+            <div class="flex items-center gap-3 pt-1">
+              ${gcalValidated
+                ? `<span class="text-xs text-primary font-medium">Connected</span>
+                   <form method="POST" action="/settings/google-calendar/disconnect" class="inline">
+                     <button type="submit" class="text-xs text-destructive hover:underline">Disconnect</button>
+                   </form>`
+                : `<span class="text-xs text-muted-foreground">Not connected</span>
+                   ${gcalClientId
+                     ? `<a href="https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(gcalClientId)}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&scope=https://www.googleapis.com/auth/calendar&access_type=offline&prompt=consent"
+                         target="_blank" rel="noopener"
+                         class="text-xs text-primary hover:underline">Connect Google Calendar</a>`
+                     : `<span class="text-xs text-muted-foreground">(Set GOOGLE_CLIENT_ID to enable)</span>`
+                   }`
+              }
+            </div>
+            ${!gcalValidated && gcalClientId
+              ? `<div class="flex items-center gap-2 pt-1">
+                   <input type="text" id="gcal-auth-code" placeholder="Paste authorization code..."
+                     class="h-8 flex-1 rounded-l-md border border-r-0 border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+                   <button type="button" id="gcal-connect-btn"
+                     class="h-8 rounded-r-md border border-border bg-secondary px-2.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+                     onclick="(function(){var code=document.getElementById('gcal-auth-code').value;if(code){var f=document.createElement('form');f.method='POST';f.action='/settings/google-calendar/connect';var i=document.createElement('input');i.type='hidden';i.name='code';i.value=code;f.appendChild(i);document.body.appendChild(f);f.submit();}})()">Connect</button>
+                 </div>`
+              : ""
+            }
           </div>
         </div>
 
@@ -902,6 +990,8 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       timezone: (body.timezone as string) || "",
       confidence_threshold: (body.confidence_threshold as string) || "",
       digest_email_to: (body.digest_email_to as string) || "",
+      google_calendar_id: (body.google_calendar_id as string) || "",
+      google_calendar_default_duration: (body.google_calendar_default_duration as string) || "",
     };
 
     const llmConfig: LLMConfig = {
@@ -941,6 +1031,8 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       timezone: form.timezone,
       confidence_threshold: form.confidence_threshold,
       digest_email_to: form.digest_email_to,
+      google_calendar_id: form.google_calendar_id,
+      google_calendar_default_duration: form.google_calendar_default_duration,
     };
 
     await saveAllSettings(sql, toSave);
@@ -959,6 +1051,33 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     if (warning) params.set("warning", warning);
 
     return c.redirect(`/settings?${params.toString()}`, 302);
+  });
+
+  // Google Calendar connect/disconnect
+  app.post("/settings/google-calendar/connect", async (c) => {
+    const body = await c.req.parseBody();
+    const code = (body.code as string) || "";
+    if (!code.trim()) {
+      return c.redirect("/settings?error=Authorization+code+is+required", 302);
+    }
+    const settings = await getAllSettings(sql);
+    const clientId = settings.google_client_id || process.env.GOOGLE_CLIENT_ID || "";
+    const clientSecret = settings.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "";
+    try {
+      const tokens = await exchangeAuthCode(code, clientId, clientSecret);
+      await saveAllSettings(sql, {
+        google_access_token: tokens.accessToken,
+        google_refresh_token: tokens.refreshToken,
+      });
+      return c.redirect("/settings?success=Google+Calendar+connected", 302);
+    } catch (e) {
+      return c.redirect(`/settings?error=${encodeURIComponent("Failed to connect: " + (e as Error).message)}`, 302);
+    }
+  });
+
+  app.post("/settings/google-calendar/disconnect", async (c) => {
+    await sql`DELETE FROM settings WHERE key IN ('google_refresh_token', 'google_access_token')`;
+    return c.redirect("/settings?success=Google+Calendar+disconnected", 302);
   });
 
   // Digest trigger endpoints

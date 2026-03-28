@@ -12,6 +12,7 @@ import {
   getBrainStats,
 } from "./mcp-queries.js";
 import { createLogger } from "./logger.js";
+import { processCalendarEvent } from "./google-calendar.js";
 
 const log = createLogger("mcp");
 
@@ -194,13 +195,28 @@ export async function handleAddThought(sql: any, params: { text: string }): Prom
 
   try {
     const entry = await insertMcpEntry(sql, entryData);
-    return ok({
+
+    // Calendar event creation
+    let calendarResult: { created: boolean } | null = null;
+    if (classification?.create_calendar_event) {
+      try {
+        calendarResult = await processCalendarEvent(sql, entry.id, classification);
+      } catch {
+        // Calendar never blocks entry storage
+      }
+    }
+
+    const resultData: Record<string, unknown> = {
       id: entry.id,
       category: entry.category,
       name: entry.name,
       confidence: entry.confidence,
       tags: entry.tags,
-    });
+    };
+    if (calendarResult?.created) {
+      resultData.calendar = "📅 Calendar event created";
+    }
+    return ok(resultData);
   } catch (e) {
     log.error("Insert failed", { error: (e as Error).message });
     return err("Database unavailable");
@@ -354,6 +370,14 @@ export async function handleDeleteEntry(sql: any, params: { id: string }): Promi
     const entry = await getEntryById(sql, params.id);
     if (!entry) return err("Entry not found");
     if (entry.deleted_at) return err("Entry is already deleted");
+
+    // Clean up linked calendar event before soft-delete
+    try {
+      const { handleEntryCalendarCleanup } = await import("./google-calendar.js");
+      await handleEntryCalendarCleanup(sql, params.id);
+    } catch {
+      // Calendar cleanup failure should not block deletion
+    }
 
     await softDeleteEntry(sql, params.id);
     return ok("Entry deleted");

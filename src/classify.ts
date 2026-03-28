@@ -55,6 +55,7 @@ export function validateClassificationResponse(raw: string): {
   tags: string[];
   create_calendar_event: boolean;
   calendar_date: string | null;
+  calendar_time: string | null;
 } | null {
   // Extract JSON from response — LLMs often wrap in markdown code fences
   let jsonStr = raw.trim();
@@ -74,7 +75,7 @@ export function validateClassificationResponse(raw: string): {
     return null;
   }
 
-  const { category, name, confidence, fields, tags, create_calendar_event, calendar_date } = parsed;
+  const { category, name, confidence, fields, tags, create_calendar_event, calendar_date, calendar_time } = parsed;
 
   // category
   if (typeof category !== "string" || !(VALID_CATEGORIES as readonly string[]).includes(category)) {
@@ -110,6 +111,9 @@ export function validateClassificationResponse(raw: string): {
   // calendar_date
   const calDate = typeof calendar_date === "string" ? calendar_date : null;
 
+  // calendar_time
+  const calTime = typeof calendar_time === "string" ? calendar_time : null;
+
   return {
     category: category as Category,
     name: name as string,
@@ -118,6 +122,7 @@ export function validateClassificationResponse(raw: string): {
     tags: tags as string[],
     create_calendar_event: calEvent,
     calendar_date: calDate,
+    calendar_time: calTime,
   };
 }
 
@@ -283,6 +288,7 @@ export async function classifyText(
   tags: string[];
   create_calendar_event?: boolean;
   calendar_date?: string | null;
+  calendar_time?: string | null;
   content: string;
 } | null> {
   const provider = createLLMProvider(await resolveLLMConfig(options?.sql));
@@ -341,6 +347,7 @@ export async function classifyText(
     tags: validated.tags,
     create_calendar_event: validated.create_calendar_event,
     calendar_date: validated.calendar_date,
+    calendar_time: validated.calendar_time,
     content: text,
   };
 }

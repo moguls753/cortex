@@ -11,6 +11,7 @@ import {
 import { classifyText, assembleContext } from "../classify.js";
 import { embedEntry } from "../embed.js";
 import { resolveConfigValue } from "../config.js";
+import { processCalendarEvent } from "../google-calendar.js";
 import {
   iconSparkles,
   iconCornerDownLeft,
@@ -402,7 +403,7 @@ function renderClientScript(): string {
 
     function badgeHtml(cat) {
       var c = cat || 'unclassified';
-      var abbr = {people:'PEO',projects:'PRO',tasks:'TSK',ideas:'IDE',reference:'REF'}[c] || 'UNC';
+      var abbr = {people:'People',projects:'Project',tasks:'Task',ideas:'Idea',reference:'Ref'}[c] || '—';
       var cls = {people:'badge-people',projects:'badge-projects',tasks:'badge-tasks',ideas:'badge-ideas',reference:'badge-reference'}[c] || 'badge-unclassified';
       return '<span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 ' + cls + '">' + abbr + '</span>';
     }
@@ -462,7 +463,7 @@ function renderClientScript(): string {
         var badge = row.querySelector('[class*="badge-"]');
         if (badge && d.category) {
           var oldCat = badge.classList.contains('badge-tasks') ? 'tasks' : badge.classList.contains('badge-projects') ? 'projects' : null;
-          var abbr = {people:'PEO',projects:'PRO',tasks:'TSK',ideas:'IDE',reference:'REF'}[d.category] || 'UNC';
+          var abbr = {people:'People',projects:'Project',tasks:'Task',ideas:'Idea',reference:'Ref'}[d.category] || '—';
           var oldBadge = badge.className.match(/badge-\\w+/);
           if (oldBadge) badge.classList.remove(oldBadge[0]);
           var newCls = {people:'badge-people',projects:'badge-projects',tasks:'badge-tasks',ideas:'badge-ideas',reference:'badge-reference'}[d.category] || 'badge-unclassified';
@@ -632,6 +633,56 @@ export function createDashboardRoutes(
     }
 
     return c.json({ id: entryId, category, name, confidence }, 201);
+  });
+
+  // Form-based capture (used by web dashboard form)
+  app.post("/", async (c) => {
+    const body = await c.req.parseBody();
+    const text = ((body.note as string) || "").trim();
+    if (!text) return c.redirect("/", 303);
+
+    let classification: any = null;
+    const outputLanguage = (await resolveConfigValue("output_language", sql)) || undefined;
+    try {
+      const contextEntries = await assembleContext(sql, text);
+      classification = await classifyText(text, { contextEntries, outputLanguage, sql });
+    } catch { /* Classification failed */ }
+
+    const entryId = await insertEntry(sql, {
+      name: classification?.name ?? "Untitled",
+      content: text,
+      category: classification?.category ?? null,
+      confidence: classification?.confidence ?? null,
+      fields: classification?.fields ?? {},
+      tags: classification?.tags ?? [],
+      source: "webapp",
+      source_type: "text",
+    });
+
+    try {
+      await embedEntry(sql, entryId);
+    } catch { /* Ollama down */ }
+
+    // Calendar event creation
+    let calendarResult: { created: boolean } | null = null;
+    if (classification?.create_calendar_event) {
+      try {
+        calendarResult = await processCalendarEvent(sql, entryId, classification);
+      } catch { /* Calendar never blocks entry storage */ }
+    }
+
+    const calendarHtml = calendarResult?.created
+      ? `<div class="text-xs text-primary mt-1">📅 Calendar event created</div>`
+      : "";
+
+    return c.html(renderLayout("Dashboard", `
+      <main class="flex-1 overflow-y-auto scrollbar-thin">
+        <div class="p-4">
+          <div class="text-sm text-foreground">Entry saved: ${classification?.name ?? "Untitled"}</div>
+          ${calendarHtml}
+        </div>
+      </main>
+    `));
   });
 
   app.get("/api/events", (c) => {

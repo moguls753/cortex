@@ -27,6 +27,8 @@ services:
       - DAILY_DIGEST_CRON=${DAILY_DIGEST_CRON:-30 7 * * *}
       - WEEKLY_DIGEST_CRON=${WEEKLY_DIGEST_CRON:-0 16 * * 0}
       - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.6}
+      - GOOGLE_CLIENT_ID
+      - GOOGLE_CLIENT_SECRET
       - TZ=${TZ:-Europe/Berlin}
     extra_hosts:
       - "host.docker.internal:host-gateway"

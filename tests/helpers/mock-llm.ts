@@ -11,6 +11,7 @@ export interface ClassificationResult {
   tags: string[];
   create_calendar_event: boolean;
   calendar_date: string | null;
+  calendar_time: string | null;
 }
 
 const DEFAULT_CLASSIFICATION: ClassificationResult = {
@@ -21,6 +22,7 @@ const DEFAULT_CLASSIFICATION: ClassificationResult = {
   tags: ["social", "startup"],
   create_calendar_event: false,
   calendar_date: null,
+  calendar_time: null,
 };
 
 /**
