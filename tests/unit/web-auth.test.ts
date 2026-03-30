@@ -328,40 +328,10 @@ describe("Web Auth", () => {
     });
   });
 
-  // =========================================================================
-  // Group 4: Startup Validation
-  // =========================================================================
-  describe("Startup Validation", () => {
-    // TS-4.1 — Traceability test (expected to PASS immediately)
-    it("refuses to start without WEBAPP_PASSWORD", async () => {
-      vi.resetModules();
-      const { clearAllConfigEnvVars, setRequiredEnvVars } = await import(
-        "../helpers/env.js"
-      );
-      clearAllConfigEnvVars();
-      setRequiredEnvVars();
-      delete process.env.WEBAPP_PASSWORD;
-
-      await expect(import("../../src/config.js")).rejects.toThrow(
-        /WEBAPP_PASSWORD/,
-      );
-    });
-
-    // TS-4.2 — Traceability test (expected to PASS immediately)
-    it("refuses to start without SESSION_SECRET", async () => {
-      vi.resetModules();
-      const { clearAllConfigEnvVars, setRequiredEnvVars } = await import(
-        "../helpers/env.js"
-      );
-      clearAllConfigEnvVars();
-      setRequiredEnvVars();
-      delete process.env.SESSION_SECRET;
-
-      await expect(import("../../src/config.js")).rejects.toThrow(
-        /SESSION_SECRET/,
-      );
-    });
-  });
+  // Group 4: Startup Validation — removed
+  // WEBAPP_PASSWORD and SESSION_SECRET are no longer required env vars.
+  // Auth now uses bcrypt + user table via src/web/setup.ts.
+  // Session secret is resolved at runtime via resolveSessionSecret().
 
   // =========================================================================
   // Group 5: Edge Cases

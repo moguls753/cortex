@@ -6,6 +6,7 @@ import type { SSEBroadcaster } from "./web/sse.js";
 import { createLLMProvider } from "./llm/index.js";
 import { config, resolveConfigValue } from "./config.js";
 import { getLLMConfig } from "./llm/config.js";
+import { createLogger } from "./logger.js";
 import {
   getDailyDigestData,
   getWeeklyReviewData,
@@ -19,14 +20,22 @@ import { embedEntry } from "./embed.js";
 import { classifyEntry } from "./classify.js";
 import cron from "node-cron";
 
+const log = createLogger("digests");
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROMPTS_DIR = path.join(__dirname, "..", "prompts");
+
+async function resolveOutputLanguage(sql: Sql): Promise<string> {
+  const val = await resolveConfigValue("output_language", sql);
+  if (val) return val;
+  return "English";
+}
 
 function loadPrompt(name: string): string {
   return fs.readFileSync(path.join(PROMPTS_DIR, `${name}.md`), "utf-8");
 }
 
-function formatDailyPrompt(data: DailyDigestData): string {
+function formatDailyPrompt(data: DailyDigestData, outputLanguage: string): string {
   const template = loadPrompt("daily-digest");
 
   const activeProjects = data.activeProjects.length > 0
@@ -46,13 +55,14 @@ function formatDailyPrompt(data: DailyDigestData): string {
     : "None";
 
   return template
+    .replace("{output_language}", outputLanguage)
     .replace("{active_projects}", activeProjects)
     .replace("{pending_follow_ups}", pendingFollowUps)
     .replace("{upcoming_tasks}", upcomingTasks)
     .replace("{yesterday_entries}", yesterdayEntries);
 }
 
-function formatWeeklyPrompt(data: WeeklyReviewData): string {
+function formatWeeklyPrompt(data: WeeklyReviewData, outputLanguage: string): string {
   const template = loadPrompt("weekly-review");
 
   const weekEntries = data.weekEntries.length > 0
@@ -72,6 +82,7 @@ function formatWeeklyPrompt(data: WeeklyReviewData): string {
     : "None";
 
   return template
+    .replace("{output_language}", outputLanguage)
     .replace("{entry_count}", String(data.weekEntries.length))
     .replace("{week_entries}", weekEntries)
     .replace("{daily_counts}", dailyCounts)
@@ -144,10 +155,19 @@ async function sendEmail(
 
 export async function generateDailyDigest(sql: Sql, broadcaster?: SSEBroadcaster): Promise<void> {
   try {
-    const data = await getDailyDigestData(sql);
-    const prompt = formatDailyPrompt(data);
-
+    // Check if LLM is configured before generating digest
     const llmConfig = await getLLMConfig(sql);
+    const apiKey = llmConfig.apiKeys[llmConfig.provider] ?? "";
+    const needsKey = llmConfig.provider !== "ollama" && llmConfig.provider !== "local";
+    if (!llmConfig.provider || (needsKey && !apiKey)) {
+      log.info("LLM not configured — skipping digest");
+      return;
+    }
+
+    const data = await getDailyDigestData(sql);
+    const outputLanguage = await resolveOutputLanguage(sql);
+    const prompt = formatDailyPrompt(data, outputLanguage);
+
     const provider = createLLMProvider({
       provider: llmConfig.provider,
       apiKey: llmConfig.apiKeys[llmConfig.provider] ?? "",
@@ -192,10 +212,19 @@ export async function generateDailyDigest(sql: Sql, broadcaster?: SSEBroadcaster
 
 export async function generateWeeklyReview(sql: Sql, broadcaster?: SSEBroadcaster): Promise<void> {
   try {
-    const data = await getWeeklyReviewData(sql);
-    const prompt = formatWeeklyPrompt(data);
-
+    // Check if LLM is configured before generating digest
     const llmConfig = await getLLMConfig(sql);
+    const apiKey = llmConfig.apiKeys[llmConfig.provider] ?? "";
+    const needsKey = llmConfig.provider !== "ollama" && llmConfig.provider !== "local";
+    if (!llmConfig.provider || (needsKey && !apiKey)) {
+      log.info("LLM not configured — skipping digest");
+      return;
+    }
+
+    const data = await getWeeklyReviewData(sql);
+    const outputLanguage = await resolveOutputLanguage(sql);
+    const prompt = formatWeeklyPrompt(data, outputLanguage);
+
     const provider = createLLMProvider({
       provider: llmConfig.provider,
       apiKey: llmConfig.apiKeys[llmConfig.provider] ?? "",
@@ -288,8 +317,8 @@ export async function startScheduler(
     }
     jobs = [];
 
-    const dailyCron = (await resolveConfigValue("daily_digest_cron", sql)) || config.dailyDigestCron;
-    const weeklyCron = (await resolveConfigValue("weekly_digest_cron", sql)) || config.weeklyDigestCron;
+    const dailyCron = (await resolveConfigValue("daily_digest_cron", sql)) || "0 7 * * *";
+    const weeklyCron = (await resolveConfigValue("weekly_digest_cron", sql)) || "0 8 * * 1";
     const timezone = (await resolveConfigValue("timezone", sql)) || config.timezone;
 
     const dailyJob = cron.schedule(dailyCron, () => {

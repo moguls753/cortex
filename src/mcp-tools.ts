@@ -12,7 +12,7 @@ import {
   getBrainStats,
 } from "./mcp-queries.js";
 import { createLogger } from "./logger.js";
-import { processCalendarEvent } from "./google-calendar.js";
+import { processCalendarEvent, handleEntryCalendarCleanup, getCalendarNames } from "./google-calendar.js";
 
 const log = createLogger("mcp");
 
@@ -166,8 +166,10 @@ export async function handleAddThought(sql: any, params: { text: string }): Prom
   let classification: any = null;
   try {
     const contextEntries = await assembleContext(sql, params.text);
+    const calendarNames = await getCalendarNames(sql);
     classification = await classifyText(params.text, {
       contextEntries: Array.isArray(contextEntries) ? contextEntries : [],
+      calendarNames,
       sql,
     });
   } catch {
@@ -373,7 +375,6 @@ export async function handleDeleteEntry(sql: any, params: { id: string }): Promi
 
     // Clean up linked calendar event before soft-delete
     try {
-      const { handleEntryCalendarCleanup } = await import("./google-calendar.js");
       await handleEntryCalendarCleanup(sql, params.id);
     } catch {
       // Calendar cleanup failure should not block deletion

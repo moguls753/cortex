@@ -41,6 +41,7 @@ Do NOT produce generic advice like "consider streamlining processes." Point at s
 {stalled_projects}
 
 ## Rules
+- Respond entirely in {output_language}
 - Maximum 250 words total
 - Use names, project names, specific tasks — never generic placeholders
 - Use relative dates (Monday, last Tuesday) not ISO dates

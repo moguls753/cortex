@@ -212,7 +212,9 @@ describe("Embedding integration", () => {
 
     // TS-3.3
     it("generates and stores embedding on retry", async () => {
-      fetchSpy.mockResolvedValue(createEmbedResponse());
+      fetchSpy.mockImplementation(
+        createOllamaRouter({ tagsModels: ["snowflake-arctic-embed2"], embedResult: undefined }),
+      );
 
       const entry = await insertEntry(db.sql, {
         name: "retry-me",

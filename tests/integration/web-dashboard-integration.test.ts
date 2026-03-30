@@ -36,6 +36,7 @@ vi.mock("../../src/classify.js", () => ({
     tags: [],
     content: "Mock content",
   }),
+  assembleContext: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../../src/embed.js", () => ({
@@ -44,6 +45,12 @@ vi.mock("../../src/embed.js", () => ({
 
 vi.mock("../../src/config.js", () => ({
   resolveConfigValue: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../src/google-calendar.js", () => ({
+  getCalendarNames: vi.fn().mockResolvedValue(undefined),
+  processCalendarEvent: vi.fn().mockResolvedValue({ created: false }),
+  handleEntryCalendarCleanup: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ─── Factories & Helpers ────────────────────────────────────────────
@@ -145,15 +152,23 @@ async function readSSEEvent(
 ): Promise<string> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
+  let accumulated = "";
 
   try {
-    const result = await Promise.race([
-      reader.read(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("SSE read timeout")), timeoutMs),
-      ),
-    ]);
-    return decoder.decode(result.value);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const result = await Promise.race([
+        reader.read(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("SSE read timeout")), deadline - Date.now()),
+        ),
+      ]);
+      if (result.done) break;
+      accumulated += decoder.decode(result.value, { stream: true });
+      // Check if we have a real event (not just the initial keepalive)
+      if (accumulated.includes("event:")) break;
+    }
+    return accumulated;
   } finally {
     reader.cancel();
   }

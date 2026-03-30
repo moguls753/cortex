@@ -13,19 +13,16 @@ const log = createLogger("classify");
 
 async function resolveLLMConfig(sql?: postgres.Sql): Promise<{ provider: string; apiKey: string; model: string; baseUrl?: string }> {
   if (!sql) {
-    return {
-      provider: process.env.LLM_PROVIDER || "anthropic",
-      apiKey: process.env.LLM_API_KEY || "",
-      model: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
-      baseUrl: process.env.LLM_BASE_URL || undefined,
-    };
+    // No DB connection — return empty config (graceful degradation will handle it)
+    return { provider: "", apiKey: "", model: "" };
   }
   const config = await getLLMConfig(sql);
+  const baseUrl = config.baseUrl?.trim() || undefined;
   return {
     provider: config.provider,
     apiKey: config.apiKeys[config.provider] ?? "",
     model: config.model,
-    baseUrl: config.baseUrl || undefined,
+    baseUrl,
   };
 }
 
@@ -56,6 +53,7 @@ export function validateClassificationResponse(raw: string): {
   create_calendar_event: boolean;
   calendar_date: string | null;
   calendar_time: string | null;
+  calendar_name: string | null;
 } | null {
   // Extract JSON from response — LLMs often wrap in markdown code fences
   let jsonStr = raw.trim();
@@ -75,7 +73,7 @@ export function validateClassificationResponse(raw: string): {
     return null;
   }
 
-  const { category, name, confidence, fields, tags, create_calendar_event, calendar_date, calendar_time } = parsed;
+  const { category, name, confidence, fields, tags, create_calendar_event, calendar_date, calendar_time, calendar_name } = parsed;
 
   // category
   if (typeof category !== "string" || !(VALID_CATEGORIES as readonly string[]).includes(category)) {
@@ -114,6 +112,9 @@ export function validateClassificationResponse(raw: string): {
   // calendar_time
   const calTime = typeof calendar_time === "string" ? calendar_time : null;
 
+  // calendar_name (multi-calendar)
+  const calName = typeof calendar_name === "string" ? calendar_name : null;
+
   return {
     category: category as Category,
     name: name as string,
@@ -123,6 +124,7 @@ export function validateClassificationResponse(raw: string): {
     create_calendar_event: calEvent,
     calendar_date: calDate,
     calendar_time: calTime,
+    calendar_name: calName,
   };
 }
 
@@ -149,18 +151,26 @@ export function assemblePrompt(
   contextEntries: string,
   inputText: string,
   outputLanguage: string = "English",
+  calendarNames?: string[],
 ): string {
   const now = new Date();
   const today = now.toISOString().split("T")[0];
   const tmrw = new Date(now);
   tmrw.setDate(tmrw.getDate() + 1);
   const tomorrow = tmrw.toISOString().split("T")[0];
+
+  let calendarSection = "";
+  if (calendarNames && calendarNames.length >= 2) {
+    calendarSection = `\n## Calendar routing\n\nMultiple calendars are configured: ${calendarNames.map(n => `"${n}"`).join(", ")}.\nWhen create_calendar_event is true, also return a **calendar_name** field with the most appropriate calendar name from the list above. Add calendar_name to the JSON output alongside the other calendar fields.\n`;
+  }
+
   return template
     .replace(/\{today\}/g, today)
     .replace(/\{tomorrow\}/g, tomorrow)
     .replace(/\{output_language\}/g, outputLanguage)
     .replace("{context_entries}", contextEntries)
-    .replace("{input_text}", inputText);
+    .replace("{input_text}", inputText)
+    .replace("{calendar_section}", calendarSection);
 }
 
 async function resolveOutputLanguage(sql?: postgres.Sql): Promise<string> {
@@ -168,7 +178,7 @@ async function resolveOutputLanguage(sql?: postgres.Sql): Promise<string> {
     const val = await resolveConfigValue("output_language", sql);
     if (val) return val;
   }
-  return process.env.OUTPUT_LANGUAGE || "English";
+  return "English";
 }
 
 export function resolveConfidenceThreshold(settingsValue?: string | null): number {
@@ -278,6 +288,7 @@ export async function classifyText(
     entryId?: string;
     contextEntries?: Array<{ name: string; category: string | null; content: string | null }>;
     outputLanguage?: string;
+    calendarNames?: string[];
     sql?: postgres.Sql;
   },
 ): Promise<{
@@ -289,9 +300,30 @@ export async function classifyText(
   create_calendar_event?: boolean;
   calendar_date?: string | null;
   calendar_time?: string | null;
+  calendar_name?: string | null;
   content: string;
+  error?: string;
 } | null> {
-  const provider = createLLMProvider(await resolveLLMConfig(options?.sql));
+  // Check if LLM is configured before attempting classification
+  const llmConfig = await resolveLLMConfig(options?.sql);
+  const needsKey = llmConfig.provider !== "ollama" && llmConfig.provider !== "local";
+  if (!llmConfig.provider || (needsKey && !llmConfig.apiKey)) {
+    log.info("LLM not configured — returning default classification");
+    return {
+      category: "uncategorized",
+      name: text.slice(0, 50),
+      confidence: 0,
+      fields: {},
+      tags: [],
+      create_calendar_event: false,
+      calendar_date: null,
+      calendar_time: null,
+      calendar_name: null,
+      content: text,
+    };
+  }
+
+  const provider = createLLMProvider(llmConfig);
 
   let template: string;
   try {
@@ -318,7 +350,7 @@ export async function classifyText(
       )
     : "";
 
-  const prompt = assemblePrompt(template, contextStr, inputText, options?.outputLanguage);
+  const prompt = assemblePrompt(template, contextStr, inputText, options?.outputLanguage, options?.calendarNames);
 
   let response: string;
   try {
@@ -331,7 +363,15 @@ export async function classifyText(
       entryId: options?.entryId ?? null,
       inputLength: text.length,
     });
-    return null;
+    return {
+      category: null,
+      name: text.slice(0, 50),
+      confidence: null,
+      fields: {},
+      tags: [],
+      content: text,
+      error: err.message,
+    };
   }
 
   const validated = validateClassificationResponse(response);
@@ -348,6 +388,7 @@ export async function classifyText(
     create_calendar_event: validated.create_calendar_event,
     calendar_date: validated.calendar_date,
     calendar_time: validated.calendar_time,
+    calendar_name: validated.calendar_name,
     content: text,
   };
 }

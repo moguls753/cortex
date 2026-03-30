@@ -112,7 +112,7 @@ describe("Web Settings Integration", () => {
 
       const res = await app.request("/settings", {
         method: "POST",
-        body: buildFormData({ llm_model: "claude-haiku-4-5-20251001" }),
+        body: buildFormData({ confidence_threshold: "0.75" }),
         headers: {
           Cookie: cookie,
           "Content-Type": "application/x-www-form-urlencoded",
@@ -122,9 +122,9 @@ describe("Web Settings Integration", () => {
       expect(res.status).toBe(302);
 
       const rows =
-        await db.sql`SELECT * FROM settings WHERE key = 'llm_model'`;
+        await db.sql`SELECT * FROM settings WHERE key = 'confidence_threshold'`;
       expect(rows.length).toBe(1);
-      expect(rows[0].value).toBe("claude-haiku-4-5-20251001");
+      expect(rows[0].value).toBe("0.75");
       expect(rows[0].updated_at).toBeInstanceOf(Date);
       // Check updated_at is recent (within last 10 seconds)
       const diff = Date.now() - new Date(rows[0].updated_at).getTime();
@@ -133,10 +133,10 @@ describe("Web Settings Integration", () => {
 
     // TS-5.2
     it("settings page shows DB value over env var", async () => {
-      // Insert a DB setting
-      await db.sql`INSERT INTO settings (key, value) VALUES ('llm_model', 'db-model')`;
+      // Insert a DB setting for timezone
+      await db.sql`INSERT INTO settings (key, value) VALUES ('timezone', 'Asia/Tokyo')`;
 
-      const restore = withEnv({ LLM_MODEL: "env-model" });
+      const restore = withEnv({ TZ: "US/Pacific" });
 
       try {
         const { app } = await createIntegrationSettings(db.sql);
@@ -147,8 +147,8 @@ describe("Web Settings Integration", () => {
         });
 
         const body = await res.text();
-        expect(body).toContain("db-model");
-        expect(body).not.toContain("env-model");
+        expect(body).toContain("Asia/Tokyo");
+        expect(body).not.toContain("US/Pacific");
       } finally {
         restore();
       }
@@ -156,8 +156,8 @@ describe("Web Settings Integration", () => {
 
     // TS-5.3
     it("settings page shows env var when no DB setting exists", async () => {
-      // Ensure no llm_model row in settings table (already truncated in beforeEach)
-      const restore = withEnv({ LLM_MODEL: "env-model" });
+      // Ensure no timezone row in settings table (already truncated in beforeEach)
+      const restore = withEnv({ TZ: "US/Pacific" });
 
       try {
         const { app } = await createIntegrationSettings(db.sql);
@@ -168,7 +168,7 @@ describe("Web Settings Integration", () => {
         });
 
         const body = await res.text();
-        expect(body).toContain("env-model");
+        expect(body).toContain("US/Pacific");
       } finally {
         restore();
       }

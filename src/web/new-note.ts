@@ -4,6 +4,7 @@ import { renderLayout } from "./layout.js";
 import { insertEntry } from "./dashboard-queries.js";
 import { getAllTags } from "./entry-queries.js";
 import { classifyText, assembleContext } from "../classify.js";
+import { getCalendarNames } from "../google-calendar.js";
 import { embedEntry } from "../embed.js";
 import {
   CATEGORIES,
@@ -209,7 +210,8 @@ export function createNewNoteRoutes(sql: Sql): Hono {
 
     try {
       const contextEntries = await assembleContext(sql, text);
-      const result = await classifyText(text, { contextEntries, sql });
+      const calendarNames = await getCalendarNames(sql);
+      const result = await classifyText(text, { contextEntries, calendarNames, sql });
 
       if (!result) {
         return c.json({

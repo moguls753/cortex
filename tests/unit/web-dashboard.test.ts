@@ -44,6 +44,12 @@ vi.mock("../../src/config.js", () => ({
   resolveConfigValue: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("../../src/google-calendar.js", () => ({
+  getCalendarNames: vi.fn().mockResolvedValue(undefined),
+  processCalendarEvent: vi.fn().mockResolvedValue({ created: false }),
+  handleEntryCalendarCleanup: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ─── Types & Factories ─────────────────────────────────────────────
 
 interface Entry {

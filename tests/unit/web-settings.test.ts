@@ -905,29 +905,9 @@ describe("Web Settings", () => {
       }
     });
 
-    // TS-7.8
-    it("shows Telegram chat ID from env var fallback", async () => {
-      const { getAllSettings } = await import(
-        "../../src/web/settings-queries.js"
-      );
-      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({});
-
-      const restore = withEnv({ TELEGRAM_CHAT_ID: "999888" });
-
-      try {
-        const { app } = await createTestSettings();
-        const cookie = await loginAndGetCookie(app);
-
-        const res = await app.request("/settings", {
-          headers: { Cookie: cookie },
-        });
-
-        const body = await res.text();
-        expect(body).toContain("999888");
-      } finally {
-        restore();
-      }
-    });
+    // TS-7.8 — removed
+    // Env var fallback for Telegram chat ID was removed in the onboarding refactor.
+    // Settings now read from DB only.
   });
 
   // ═══════════════════════════════════════════════════════════════════

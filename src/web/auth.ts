@@ -90,6 +90,12 @@ export function createAuthMiddleware(secret: string): MiddlewareHandler {
       return;
     }
 
+    // Allow /setup* routes through (handled by setup middleware)
+    if (path.startsWith("/setup")) {
+      await next();
+      return;
+    }
+
     // Check session cookie
     const cookieHeader = c.req.header("cookie") ?? null;
     const session = getSessionPayload(cookieHeader, secret);

@@ -19,16 +19,18 @@ interface CalendarConfig {
   clientId: string;
   clientSecret: string;
   defaultDuration: number;
+  calendars?: Record<string, string>;
+  defaultCalendar?: string;
 }
 
 export async function resolveCalendarConfig(sql?: postgres.Sql): Promise<CalendarConfig> {
   const settings: Record<string, string> = sql ? await getAllSettings(sql) : {};
 
-  const calendarId = settings.google_calendar_id || process.env.GOOGLE_CALENDAR_ID || "";
+  const calendarId = settings.google_calendar_id || "";
   const accessToken = settings.google_access_token || "";
-  const refreshToken = settings.google_refresh_token || process.env.GOOGLE_REFRESH_TOKEN || "";
-  const clientId = settings.google_client_id || process.env.GOOGLE_CLIENT_ID || "";
-  const clientSecret = settings.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "";
+  const refreshToken = settings.google_refresh_token || "";
+  const clientId = settings.google_client_id || "";
+  const clientSecret = settings.google_client_secret || "";
 
   let defaultDuration = 60;
   const durationStr = settings.google_calendar_default_duration;
@@ -39,12 +41,74 @@ export async function resolveCalendarConfig(sql?: postgres.Sql): Promise<Calenda
     }
   }
 
+  // Multi-calendar support
+  let calendars: Record<string, string> | undefined;
+  let defaultCalendar: string | undefined;
+  const calendarsJson = settings.google_calendars;
+  if (calendarsJson) {
+    try {
+      const parsed = JSON.parse(calendarsJson) as Record<string, string>;
+      const entries = Object.entries(parsed).filter(([k, v]) => k && v);
+      if (entries.length >= 2) {
+        calendars = Object.fromEntries(entries);
+        // Resolve default calendar
+        const defaultName = settings.google_calendar_default;
+        if (defaultName && calendars[defaultName]) {
+          defaultCalendar = defaultName;
+        } else {
+          // Fall back to first calendar
+          defaultCalendar = entries[0][0];
+        }
+      } else if (entries.length === 1) {
+        // Single entry in google_calendars = single-calendar mode
+        return { calendarId: entries[0][1], accessToken, refreshToken, clientId, clientSecret, defaultDuration };
+      }
+    } catch {
+      // Invalid JSON — fall through to single-calendar
+    }
+  }
+
+  if (calendars) {
+    return { calendarId: calendars[defaultCalendar!], accessToken, refreshToken, clientId, clientSecret, defaultDuration, calendars, defaultCalendar };
+  }
+
   return { calendarId, accessToken, refreshToken, clientId, clientSecret, defaultDuration };
 }
 
 export async function isCalendarConfigured(sql?: postgres.Sql): Promise<boolean> {
   const config = await resolveCalendarConfig(sql);
   return !!(config.refreshToken || config.accessToken) && !!config.calendarId;
+}
+
+// ---------------------------------------------------------------------------
+// Calendar names (for classification prompt)
+// ---------------------------------------------------------------------------
+
+export async function getCalendarNames(sql?: postgres.Sql): Promise<string[] | undefined> {
+  const config = await resolveCalendarConfig(sql);
+  if (config.calendars && Object.keys(config.calendars).length >= 2) {
+    return Object.keys(config.calendars);
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Calendar ID resolution
+// ---------------------------------------------------------------------------
+
+function resolveTargetCalendarId(config: CalendarConfig, calendarName?: string | null): string {
+  if (!config.calendars) {
+    // Single-calendar mode
+    return config.calendarId;
+  }
+  if (calendarName && config.calendars[calendarName]) {
+    return config.calendars[calendarName];
+  }
+  // Fallback to default
+  if (calendarName) {
+    log.warn("Unrecognized calendar_name, using default", { calendarName, default: config.defaultCalendar });
+  }
+  return config.calendars[config.defaultCalendar!] || config.calendarId;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +314,7 @@ export async function processCalendarEvent(
     create_calendar_event?: boolean;
     calendar_date?: string | null;
     calendar_time?: string | null;
+    calendar_name?: string | null;
   },
 ): Promise<CalendarResult> {
   try {
@@ -257,20 +322,24 @@ export async function processCalendarEvent(
     if (!classificationResult.create_calendar_event) {
       // Check if entry has an existing event to delete (reclassification case)
       const rows = await sql`
-        SELECT google_calendar_event_id FROM entries WHERE id = ${entryId}
+        SELECT google_calendar_event_id, google_calendar_target FROM entries WHERE id = ${entryId}
       `;
       const existingEventId = rows[0]?.google_calendar_event_id as string | null;
+      const existingTarget = rows[0]?.google_calendar_target as string | null;
 
       if (existingEventId) {
         // Delete the event from Google Calendar
         try {
           const config = await resolveCalendarConfig(sql);
-          await deleteCalendarEvent(config, existingEventId);
+          const deleteConfig = existingTarget
+            ? { ...config, calendarId: existingTarget }
+            : config;
+          await deleteCalendarEvent(deleteConfig, existingEventId);
         } catch (e) {
           log.error("Failed to delete calendar event", { entryId, error: (e as Error).message });
         }
         await sql`
-          UPDATE entries SET google_calendar_event_id = NULL WHERE id = ${entryId}
+          UPDATE entries SET google_calendar_event_id = NULL, google_calendar_target = NULL WHERE id = ${entryId}
         `;
       }
 
@@ -283,17 +352,20 @@ export async function processCalendarEvent(
     }
 
     // --- Check if configured ---
-    if (!(await isCalendarConfigured(sql))) {
+    const config = await resolveCalendarConfig(sql);
+    if ((!config.refreshToken && !config.accessToken) || !config.calendarId) {
       return { created: false };
     }
 
-    const config = await resolveCalendarConfig(sql);
-
     // Get entry data
     const entryRows = await sql`
-      SELECT id, name, content, google_calendar_event_id FROM entries WHERE id = ${entryId}
+      SELECT id, name, content, google_calendar_event_id, google_calendar_target FROM entries WHERE id = ${entryId}
     `;
-    const entry = entryRows[0] as { id: string; name: string; content: string; google_calendar_event_id: string | null } | undefined;
+    const entry = entryRows[0] as {
+      id: string; name: string; content: string;
+      google_calendar_event_id: string | null;
+      google_calendar_target: string | null;
+    } | undefined;
     if (!entry) {
       return { created: false, error: "Entry not found" };
     }
@@ -306,26 +378,92 @@ export async function processCalendarEvent(
     };
 
     const existingEventId = entry.google_calendar_event_id;
+    const existingTarget = entry.google_calendar_target;
 
-    // --- Create or update ---
+    // Resolve which calendar to target
+    const isMultiCalendar = !!config.calendars;
+    const targetCalendarId = resolveTargetCalendarId(config, classificationResult.calendar_name);
+
+    // Check if calendar changed (multi-calendar reclassification)
+    const calendarChanged = isMultiCalendar && existingEventId && existingTarget && existingTarget !== targetCalendarId;
+
+    // --- Calendar change: delete old + create new ---
+    if (calendarChanged) {
+      const doCalendarChange = async (cfg: CalendarConfig) => {
+        // Delete from old calendar
+        const oldConfig = { ...cfg, calendarId: existingTarget! };
+        await deleteCalendarEvent(oldConfig, existingEventId!);
+        // Create on new calendar
+        const newConfig = { ...cfg, calendarId: targetCalendarId };
+        const result = await createCalendarEvent(newConfig, eventParams);
+        return result.id;
+      };
+
+      try {
+        const newEventId = await doCalendarChange(config);
+        await sql`
+          UPDATE entries SET google_calendar_event_id = ${newEventId}, google_calendar_target = ${targetCalendarId} WHERE id = ${entryId}
+        `;
+        return { created: true, eventId: newEventId, date: classificationResult.calendar_date };
+      } catch (firstError) {
+        const err = firstError as Error;
+        if (err.message.includes("401")) {
+          try {
+            const tokens = await refreshAccessToken(config.refreshToken, config.clientId, config.clientSecret);
+            const tokensToSave: Record<string, string> = { google_access_token: tokens.accessToken };
+            if (tokens.refreshToken) tokensToSave.google_refresh_token = tokens.refreshToken;
+            await saveAllSettings(sql, tokensToSave);
+            const updatedConfig = { ...config, accessToken: tokens.accessToken };
+            const newEventId = await doCalendarChange(updatedConfig);
+            await sql`
+              UPDATE entries SET google_calendar_event_id = ${newEventId}, google_calendar_target = ${targetCalendarId} WHERE id = ${entryId}
+            `;
+            return { created: true, eventId: newEventId, date: classificationResult.calendar_date };
+          } catch (retryError) {
+            log.error("Calendar change retry failed", { entryId, error: (retryError as Error).message });
+            return { created: false, error: (retryError as Error).message };
+          }
+        }
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const newEventId = await doCalendarChange(config);
+          await sql`
+            UPDATE entries SET google_calendar_event_id = ${newEventId}, google_calendar_target = ${targetCalendarId} WHERE id = ${entryId}
+          `;
+          return { created: true, eventId: newEventId, date: classificationResult.calendar_date };
+        } catch (retryError) {
+          log.error("Calendar change retry failed", { entryId, error: (retryError as Error).message });
+          return { created: false, error: (retryError as Error).message };
+        }
+      }
+    }
+
+    // --- Standard create or update ---
+    const opCalendarId = existingTarget || targetCalendarId;
+    const opConfig = { ...config, calendarId: opCalendarId };
+
     const doCalendarOp = async (cfg: CalendarConfig) => {
       if (existingEventId) {
-        // Update existing
         const result = await updateCalendarEvent(cfg, existingEventId, eventParams);
         return result.id;
       } else {
-        // Create new
         const result = await createCalendarEvent(cfg, eventParams);
         return result.id;
       }
     };
 
     try {
-      const eventId = await doCalendarOp(config);
+      const eventId = await doCalendarOp(opConfig);
       if (!existingEventId) {
-        await sql`
-          UPDATE entries SET google_calendar_event_id = ${eventId} WHERE id = ${entryId}
-        `;
+        if (isMultiCalendar) {
+          await sql`
+            UPDATE entries SET google_calendar_event_id = ${eventId}, google_calendar_target = ${targetCalendarId} WHERE id = ${entryId}
+          `;
+        } else {
+          await sql`
+            UPDATE entries SET google_calendar_event_id = ${eventId} WHERE id = ${entryId}
+          `;
+        }
       }
       return { created: true, eventId, date: classificationResult.calendar_date };
     } catch (firstError) {
@@ -346,12 +484,18 @@ export async function processCalendarEvent(
           await saveAllSettings(sql, tokensToSave);
 
           // Retry with new token
-          const updatedConfig = { ...config, accessToken: tokens.accessToken };
+          const updatedConfig = { ...opConfig, accessToken: tokens.accessToken };
           const eventId = await doCalendarOp(updatedConfig);
           if (!existingEventId) {
-            await sql`
-              UPDATE entries SET google_calendar_event_id = ${eventId} WHERE id = ${entryId}
-            `;
+            if (isMultiCalendar) {
+              await sql`
+                UPDATE entries SET google_calendar_event_id = ${eventId}, google_calendar_target = ${targetCalendarId} WHERE id = ${entryId}
+              `;
+            } else {
+              await sql`
+                UPDATE entries SET google_calendar_event_id = ${eventId} WHERE id = ${entryId}
+              `;
+            }
           }
           return { created: true, eventId, date: classificationResult.calendar_date };
         } catch (retryError) {
@@ -366,11 +510,17 @@ export async function processCalendarEvent(
       // Non-401 error: retry once after delay
       try {
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        const eventId = await doCalendarOp(config);
+        const eventId = await doCalendarOp(opConfig);
         if (!existingEventId) {
-          await sql`
-            UPDATE entries SET google_calendar_event_id = ${eventId} WHERE id = ${entryId}
-          `;
+          if (isMultiCalendar) {
+            await sql`
+              UPDATE entries SET google_calendar_event_id = ${eventId}, google_calendar_target = ${targetCalendarId} WHERE id = ${entryId}
+            `;
+          } else {
+            await sql`
+              UPDATE entries SET google_calendar_event_id = ${eventId} WHERE id = ${entryId}
+            `;
+          }
         }
         return { created: true, eventId, date: classificationResult.calendar_date };
       } catch (retryError) {
@@ -396,17 +546,23 @@ export async function handleEntryCalendarCleanup(
 ): Promise<void> {
   try {
     const rows = await sql`
-      SELECT google_calendar_event_id FROM entries WHERE id = ${entryId}
+      SELECT google_calendar_event_id, google_calendar_target FROM entries WHERE id = ${entryId}
     `;
     const eventId = rows[0]?.google_calendar_event_id as string | null;
+    const calendarTarget = rows[0]?.google_calendar_target as string | null;
     if (!eventId) return;
 
     const config = await resolveCalendarConfig(sql);
     if (!config.calendarId || (!config.refreshToken && !config.accessToken)) return;
 
-    await deleteCalendarEvent(config, eventId);
+    // Use stored calendar target if available, otherwise fall back to config
+    const deleteConfig = calendarTarget
+      ? { ...config, calendarId: calendarTarget }
+      : config;
+
+    await deleteCalendarEvent(deleteConfig, eventId);
     await sql`
-      UPDATE entries SET google_calendar_event_id = NULL WHERE id = ${entryId}
+      UPDATE entries SET google_calendar_event_id = NULL, google_calendar_target = NULL WHERE id = ${entryId}
     `;
   } catch (e) {
     log.error("Calendar cleanup failed", { entryId, error: (e as Error).message });

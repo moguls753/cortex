@@ -11,7 +11,7 @@ import {
 import { classifyText, assembleContext } from "../classify.js";
 import { embedEntry } from "../embed.js";
 import { resolveConfigValue } from "../config.js";
-import { processCalendarEvent } from "../google-calendar.js";
+import { processCalendarEvent, getCalendarNames } from "../google-calendar.js";
 import {
   iconSparkles,
   iconCornerDownLeft,
@@ -99,6 +99,7 @@ const SECTION_STYLES: Record<string, { border: string; label: string }> = {
   "OPEN LOOPS":       { border: "border-accent",             label: "text-accent" },
   "NEXT WEEK":        { border: "border-primary",            label: "text-primary" },
   "RECURRING THEME":  { border: "border-primary/50",         label: "text-primary/80" },
+  "PATTERN":          { border: "border-primary/50",         label: "text-primary/80" },
 };
 
 function renderDigestMarkdown(text: string): string {
@@ -267,7 +268,7 @@ function renderCapture(): string {
           ${iconCornerDownLeft("size-3.5")}
         </button>
       </div>
-      <div id="capture-feedback" class="text-[11px] pl-3 min-h-4"></div>
+      <div id="capture-feedback" class="text-[11px] pl-3 min-h-4 mt-1"></div>
     </form>`;
 }
 
@@ -375,8 +376,13 @@ function renderClientScript(): string {
       if (res.ok) {
         var cat = res.data.category || 'unclassified';
         var conf = res.data.confidence ? Math.round(res.data.confidence * 100) + '%' : '';
-        feedback.innerHTML = '<span class="text-primary">Captured as <strong>' + cat + '</strong>: ' + (res.data.name || '') + (conf ? ' (' + conf + ')' : '') + '</span>';
-        setTimeout(function() { feedback.innerHTML = ''; }, 3000);
+        if (res.data.classificationError) {
+          feedback.innerHTML = '<span class="text-destructive">Saved but classification failed: ' + res.data.classificationError + '</span>';
+          setTimeout(function() { feedback.innerHTML = ''; }, 8000);
+        } else {
+          feedback.innerHTML = '<span class="text-primary">Captured as <strong>' + cat + '</strong>: ' + (res.data.name || '') + (conf ? ' (' + conf + ')' : '') + '</span>';
+          setTimeout(function() { feedback.innerHTML = ''; }, 3000);
+        }
       }
     })
     .catch(function() {
@@ -572,6 +578,7 @@ export function createDashboardRoutes(
           </div>
           <div class="col-span-8 rounded-md border border-border bg-card px-4 py-3 max-h-[276px] overflow-y-auto scrollbar-thin">
             ${renderEntries(entries)}
+            ${entries.length > 0 ? '<div class="text-right mt-2"><a href="/browse" class="text-xs text-muted-foreground hover:text-primary transition-colors">View all &rarr;</a></div>' : ""}
           </div>
         </div>
       </div>
@@ -592,9 +599,11 @@ export function createDashboardRoutes(
     let fields: Record<string, unknown> = {};
     let tags: string[] = [];
     let content: string | null = text;
+    let classification: any = null;
 
     let contextEntries: Array<{ name: string; category: string | null; content: string | null }> = [];
     const outputLanguage = (await resolveConfigValue("output_language", sql)) || undefined;
+    const calendarNames = await getCalendarNames(sql);
     try {
       contextEntries = await assembleContext(sql, text);
     } catch {
@@ -602,14 +611,14 @@ export function createDashboardRoutes(
     }
 
     try {
-      const result = await classifyText(text, { contextEntries, outputLanguage, sql });
-      if (result) {
-        category = result.category ?? null;
-        name = result.name ?? null;
-        confidence = result.confidence ?? null;
-        fields = result.fields ?? {};
-        tags = result.tags ?? [];
-        content = result.content ?? text;
+      classification = await classifyText(text, { contextEntries, outputLanguage, calendarNames, sql });
+      if (classification) {
+        category = classification.category ?? null;
+        name = classification.name ?? null;
+        confidence = classification.confidence ?? null;
+        fields = classification.fields ?? {};
+        tags = classification.tags ?? [];
+        content = classification.content ?? text;
       }
     } catch {
       // Classification failed
@@ -632,7 +641,17 @@ export function createDashboardRoutes(
       // Ollama down
     }
 
-    return c.json({ id: entryId, category, name, confidence }, 201);
+    // Calendar event creation
+    let calendarCreated = false;
+    if (classification?.create_calendar_event) {
+      try {
+        const calResult = await processCalendarEvent(sql, entryId, classification);
+        calendarCreated = calResult.created;
+      } catch { /* Calendar never blocks entry storage */ }
+    }
+
+    const classificationError = classification?.error || null;
+    return c.json({ id: entryId, category, name, confidence, calendar: calendarCreated || undefined, classificationError }, 201);
   });
 
   // Form-based capture (used by web dashboard form)
@@ -643,9 +662,10 @@ export function createDashboardRoutes(
 
     let classification: any = null;
     const outputLanguage = (await resolveConfigValue("output_language", sql)) || undefined;
+    const calendarNames = await getCalendarNames(sql);
     try {
       const contextEntries = await assembleContext(sql, text);
-      classification = await classifyText(text, { contextEntries, outputLanguage, sql });
+      classification = await classifyText(text, { contextEntries, outputLanguage, calendarNames, sql });
     } catch { /* Classification failed */ }
 
     const entryId = await insertEntry(sql, {

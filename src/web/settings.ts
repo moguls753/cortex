@@ -3,10 +3,13 @@ import type postgres from "postgres";
 import { CronExpressionParser } from "cron-parser";
 import { renderLayout } from "./layout.js";
 import { getAllSettings, saveAllSettings } from "./settings-queries.js";
-import { SETTINGS_TO_ENV } from "../config.js";
 import { escapeHtml } from "./shared.js";
 import { getLLMConfig, saveLLMConfig } from "../llm/config.js";
 import type { LLMConfig } from "../llm/config.js";
+import { restartBot } from "../telegram.js";
+import { createLogger } from "../logger.js";
+
+const log = createLogger("settings");
 import {
   iconBrain,
   iconClock,
@@ -16,6 +19,7 @@ import {
   iconAlertTriangle,
   iconPlay,
   iconDownload,
+  iconSearch,
 } from "./icons.js";
 import { generateDailyDigest, generateWeeklyReview } from "../digests.js";
 import type { SSEBroadcaster } from "./sse.js";
@@ -30,7 +34,13 @@ const DEFAULTS: Record<string, string> = {
   confidence_threshold: "0.6",
   ollama_url: "http://ollama:11434",
   digest_email_to: "",
+  output_language: "English",
 };
+
+const LANGUAGE_OPTIONS = [
+  "English", "German", "French", "Spanish", "Italian",
+  "Portuguese", "Dutch", "Polish", "Turkish", "Japanese", "Chinese", "Korean",
+];
 
 
 const PROVIDER_PRESETS: Record<string, { label: string; baseUrl: string; needsKey: boolean }> = {
@@ -38,8 +48,8 @@ const PROVIDER_PRESETS: Record<string, { label: string; baseUrl: string; needsKe
   openai:    { label: "OpenAI (ChatGPT)", baseUrl: "https://api.openai.com/v1", needsKey: true },
   groq:      { label: "Groq", baseUrl: "https://api.groq.com/openai/v1", needsKey: true },
   gemini:    { label: "Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/", needsKey: true },
-  local:     { label: "Local LLM", baseUrl: "http://localhost:1234/v1", needsKey: false },
-  ollama:    { label: "Ollama", baseUrl: "http://ollama:11434/v1", needsKey: false },
+  local:     { label: "LM Studio", baseUrl: "http://localhost:1234/v1", needsKey: false },
+  ollama:    { label: "Ollama (Local)", baseUrl: "http://ollama:11434/v1", needsKey: false },
 };
 
 async function fetchProviderModels(provider: string, apiKey: string, baseUrl: string): Promise<string[]> {
@@ -74,8 +84,6 @@ function resolveEffective(
   defaultValue: string,
 ): string {
   if (dbSettings[key] !== undefined) return dbSettings[key];
-  const envVar = SETTINGS_TO_ENV[key];
-  if (envVar && process.env[envVar] !== undefined) return process.env[envVar]!;
   return defaultValue;
 }
 
@@ -94,8 +102,6 @@ function resolveChatIds(dbSettings: Record<string, string>): string[] {
       .map((id) => id.trim())
       .filter((id) => id.length > 0);
   }
-  const envVal = process.env.TELEGRAM_CHAT_ID;
-  if (envVal) return [envVal.trim()];
   return [];
 }
 
@@ -169,18 +175,33 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     const ollamaUrl = resolveEffective(dbSettings, "ollama_url", DEFAULTS.ollama_url);
     const email = resolveEffective(dbSettings, "digest_email_to", DEFAULTS.digest_email_to);
     const chatIds = resolveChatIds(dbSettings);
+    const outputLanguage = resolveEffective(dbSettings, "output_language", DEFAULTS.output_language);
+
+    // Telegram bot token
+    const telegramBotToken = dbSettings.telegram_bot_token || "";
 
     // Google Calendar config
-    const gcalId = dbSettings.google_calendar_id || process.env.GOOGLE_CALENDAR_ID || "";
+    const gcalId = dbSettings.google_calendar_id || "";
     const gcalDuration = dbSettings.google_calendar_default_duration || "60";
-    const gcalRefreshToken = dbSettings.google_refresh_token || process.env.GOOGLE_REFRESH_TOKEN || "";
-    const gcalClientId = dbSettings.google_client_id || process.env.GOOGLE_CLIENT_ID || "";
+
+    // Multi-calendar
+    let gcalCalendars: Record<string, string> = {};
+    let gcalDefault = dbSettings.google_calendar_default || "";
+    const gcalCalendarsJson = dbSettings.google_calendars;
+    if (gcalCalendarsJson) {
+      try {
+        gcalCalendars = JSON.parse(gcalCalendarsJson);
+      } catch { /* ignore invalid JSON */ }
+    }
+    const isMultiCalendar = Object.keys(gcalCalendars).length >= 2;
+    const gcalRefreshToken = dbSettings.google_refresh_token || "";
+    const gcalClientId = dbSettings.google_client_id || "";
+    const gcalClientSecret = dbSettings.google_client_secret || "";
     const gcalConnected = !!gcalRefreshToken;
 
     // If tokens exist, try to validate them
     let gcalValidated = gcalConnected;
     if (gcalConnected && gcalClientId) {
-      const gcalClientSecret = dbSettings.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "";
       try {
         const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
           method: "POST",
@@ -260,7 +281,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     const thresholdPercent = Math.round(parseFloat(threshold) * 100);
 
     const content = `
-    <main class="flex-1 overflow-y-auto scrollbar-thin">
+    <main class="flex-1 overflow-y-auto scrollbar-thin pr-2">
       <form method="POST" action="/settings" class="space-y-3 pb-4">
 
         <div class="flex items-center justify-between">
@@ -277,6 +298,14 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
             <span class="flex-1 h-px bg-border"></span>
           </div>
           <div class="space-y-3">
+            <div class="flex flex-col gap-1.5">
+              <label for="telegram_bot_token" class="text-xs text-muted-foreground">Bot Token</label>
+              <input type="password" id="telegram_bot_token" name="telegram_bot_token" value="${escapeHtml(telegramBotToken)}"
+                autocomplete="new-password"
+                placeholder="${telegramBotToken ? "••••••••  (leave blank to keep)" : "Bot token from @BotFather"}"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              <span class="text-[10px] text-muted-foreground">Requires app restart to take effect.</span>
+            </div>
             <div class="flex flex-col gap-1.5">
               <label class="text-xs text-muted-foreground">Authorized Chat IDs</label>
               <div id="chat-id-list" class="flex flex-wrap gap-1.5 min-h-[28px]">
@@ -379,7 +408,9 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
               class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
           </div>
 
-          <!-- Row 3: Ollama model picker + RAM table -->
+          <input type="hidden" name="ollama_url" value="${escapeHtml(ollamaUrl)}" />
+
+          <!-- Ollama model picker + RAM table -->
           <div id="ollama-section" class="mt-3 space-y-3${llmProvider !== "ollama" ? " hidden" : ""}">
             <div>
               <div class="flex items-center justify-between mb-1.5">
@@ -452,6 +483,21 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
           </div>
         </div>
 
+        <!-- ═══ Embeddings ═══ -->
+        <div class="rounded-md border border-border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            ${iconSearch("size-3 text-primary")}
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Embeddings</span>
+            <span class="flex-1 h-px bg-border"></span>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-muted-foreground">Model</label>
+            <input type="text" value="snowflake-arctic-embed2" readonly
+              class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none cursor-default" />
+            <span class="text-[10px] text-muted-foreground">Generates vector embeddings for all entries via the Ollama container.</span>
+          </div>
+        </div>
+
         <!-- ═══ Digests ═══ -->
         <div class="rounded-md border border-border bg-card p-4">
           <div class="flex items-center gap-2 mb-3">
@@ -491,6 +537,21 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
                 class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
             </div>
           </div>
+          <div class="grid grid-cols-2 gap-4 mt-3">
+            <div class="flex flex-col gap-1.5">
+              <label for="output_language" class="text-xs text-muted-foreground">Output Language</label>
+              <select id="output_language" name="output_language"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                ${LANGUAGE_OPTIONS.map(lang =>
+                  `<option value="${lang}"${outputLanguage === lang ? " selected" : ""}>${lang}</option>`
+                ).join("")}
+                ${!LANGUAGE_OPTIONS.includes(outputLanguage)
+                  ? `<option value="${escapeHtml(outputLanguage)}" selected>${escapeHtml(outputLanguage)}</option>`
+                  : ""}
+              </select>
+              <span class="text-[10px] text-muted-foreground">Digests, classification names, and tags</span>
+            </div>
+          </div>
           <div class="mt-3 flex items-center gap-2">
             <span class="text-xs text-muted-foreground">Generate now</span>
             <button type="button" id="trigger-daily"
@@ -513,33 +574,43 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
             <span class="flex-1 h-px bg-border"></span>
           </div>
           <div class="space-y-3">
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs text-muted-foreground">Calendar ID</label>
-              <input type="text" name="google_calendar_id" value="${escapeHtml(gcalId)}" placeholder="your-calendar@group.calendar.google.com"
-                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+            <!-- OAuth Credentials -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Client ID</label>
+                <input type="text" name="google_client_id" value="${escapeHtml(gcalClientId)}"
+                  placeholder="From Google Cloud Console"
+                  class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Client Secret</label>
+                <input type="password" name="google_client_secret" value=""
+                  autocomplete="new-password"
+                  placeholder="${gcalClientSecret ? "••••••••  (leave blank to keep)" : "From Google Cloud Console"}"
+                  class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              </div>
             </div>
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs text-muted-foreground">Default event duration (minutes)</label>
-              <input type="number" name="google_calendar_default_duration" value="${escapeHtml(gcalDuration)}" min="15" max="480" placeholder="60"
-                class="h-8 w-32 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
-            </div>
-            <div class="flex items-center gap-3 pt-1">
+
+            <!-- Connection status + actions -->
+            <div class="flex items-center gap-3">
               ${gcalValidated
-                ? `<span class="text-xs text-primary font-medium">Connected</span>
-                   <form method="POST" action="/settings/google-calendar/disconnect" class="inline">
-                     <button type="submit" class="text-xs text-destructive hover:underline">Disconnect</button>
-                   </form>`
+                ? `<span class="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary">${iconCheck("size-3")} Connected</span>
+                   <button type="button"
+                     class="flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-xs text-destructive hover:bg-destructive/20 hover:border-destructive/50 transition-colors"
+                     onclick="if(confirm('Disconnect Google Calendar?')){var f=document.createElement('form');f.method='POST';f.action='/settings/google-calendar/disconnect';document.body.appendChild(f);f.submit();}">
+                     ${iconX("size-3")} Disconnect
+                   </button>`
                 : `<span class="text-xs text-muted-foreground">Not connected</span>
                    ${gcalClientId
                      ? `<a href="https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(gcalClientId)}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&scope=https://www.googleapis.com/auth/calendar&access_type=offline&prompt=consent"
                          target="_blank" rel="noopener"
-                         class="text-xs text-primary hover:underline">Connect Google Calendar</a>`
-                     : `<span class="text-xs text-muted-foreground">(Set GOOGLE_CLIENT_ID to enable)</span>`
+                         class="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors">Connect</a>`
+                     : `<span class="text-xs text-muted-foreground">Save credentials to enable connection</span>`
                    }`
               }
             </div>
             ${!gcalValidated && gcalClientId
-              ? `<div class="flex items-center gap-2 pt-1">
+              ? `<div class="flex items-center gap-2">
                    <input type="text" id="gcal-auth-code" placeholder="Paste authorization code..."
                      class="h-8 flex-1 rounded-l-md border border-r-0 border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
                    <button type="button" id="gcal-connect-btn"
@@ -548,6 +619,64 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
                  </div>`
               : ""
             }
+
+            <!-- Calendar config (only when connected) -->
+            ${gcalValidated ? `
+            <div class="flex flex-col gap-1.5">
+              <div class="flex items-center justify-between">
+                <label class="text-xs text-muted-foreground">Calendars</label>
+                <button type="button" id="gcal-add-btn"
+                  class="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+              </div>
+              <div class="space-y-2" id="gcal-calendar-list">
+                ${(() => {
+                  // Merge legacy single calendar + multi-calendar entries into one list
+                  const entries: [string, string][] = Object.entries(gcalCalendars);
+                  if (entries.length === 0 && gcalId) {
+                    entries.push(["Default", gcalId]);
+                  }
+                  if (entries.length === 0) {
+                    return `<span id="gcal-empty-hint" class="text-[10px] text-muted-foreground">No calendars added yet.</span>`;
+                  }
+                  return entries.map(([name, id], i) => `
+                  <div class="flex gap-2 items-center" data-gcal-row>
+                    <input type="text" name="calendar_name_${i}" value="${escapeHtml(name)}" placeholder="Name"
+                      class="h-8 w-32 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+                    <input type="text" name="calendar_id_${i}" value="${escapeHtml(id)}" placeholder="calendar-id@group.calendar.google.com"
+                      class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+                    <button type="button" class="gcal-remove-btn text-muted-foreground hover:text-destructive transition-colors" aria-label="Remove calendar">
+                      ${iconX("size-3")}
+                    </button>
+                  </div>`).join("");
+                })()}
+              </div>
+              ${(() => {
+                const entries = Object.entries(gcalCalendars);
+                const hasMultiple = entries.length >= 2;
+                return hasMultiple ? `
+              <div class="flex flex-col gap-1.5 mt-1" id="gcal-default-row">
+                <label class="text-xs text-muted-foreground">Default calendar</label>
+                <select name="google_calendar_default" id="gcal-default-select"
+                  class="h-8 w-48 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                  ${entries.map(([name]) => `<option value="${escapeHtml(name)}" ${name === gcalDefault ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+                </select>
+              </div>` : `<div class="hidden" id="gcal-default-row">
+                <label class="text-xs text-muted-foreground">Default calendar</label>
+                <select name="google_calendar_default" id="gcal-default-select"
+                  class="h-8 w-48 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"></select>
+              </div>`;
+              })()}
+            </div>
+            <input type="hidden" name="google_calendar_id" value="${escapeHtml(gcalId)}" id="gcal-legacy-id" />
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-muted-foreground">Default event duration (minutes)</label>
+              <input type="number" name="google_calendar_default_duration" value="${escapeHtml(gcalDuration)}" min="15" max="480" placeholder="60"
+                class="h-8 w-32 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+            </div>
+            ` : `
+            <input type="hidden" name="google_calendar_id" value="${escapeHtml(gcalId)}" />
+            <input type="hidden" name="google_calendar_default_duration" value="${escapeHtml(gcalDuration)}" />
+            `}
           </div>
         </div>
 
@@ -974,6 +1103,110 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
           pullBtn.classList.remove('opacity-50');
         }
       }
+
+      /* ── Google Calendar list management ── */
+      var gcalList = document.getElementById('gcal-calendar-list');
+      var gcalAddBtn = document.getElementById('gcal-add-btn');
+      var gcalDefaultRow = document.getElementById('gcal-default-row');
+      var gcalDefaultSelect = document.getElementById('gcal-default-select');
+      var gcalLegacyId = document.getElementById('gcal-legacy-id');
+      var iconXTpl = document.getElementById('icon-x-tpl');
+
+      function reindexCalendarRows() {
+        if (!gcalList) return;
+        var rows = gcalList.querySelectorAll('[data-gcal-row]');
+        rows.forEach(function(row, i) {
+          var inputs = row.querySelectorAll('input');
+          if (inputs[0]) inputs[0].name = 'calendar_name_' + i;
+          if (inputs[1]) inputs[1].name = 'calendar_id_' + i;
+        });
+        // Update default dropdown
+        updateDefaultDropdown();
+        // Clear legacy single calendar ID when using multi-calendar
+        if (gcalLegacyId && rows.length > 0) gcalLegacyId.value = '';
+      }
+
+      function updateDefaultDropdown() {
+        if (!gcalDefaultRow || !gcalDefaultSelect || !gcalList) return;
+        var rows = gcalList.querySelectorAll('[data-gcal-row]');
+        var currentDefault = gcalDefaultSelect.value;
+        if (rows.length >= 2) {
+          gcalDefaultRow.classList.remove('hidden');
+          gcalDefaultRow.classList.add('flex', 'flex-col', 'gap-1.5', 'mt-1');
+          gcalDefaultSelect.innerHTML = '';
+          rows.forEach(function(row) {
+            var nameInput = row.querySelector('input');
+            var name = nameInput ? nameInput.value : '';
+            if (name) {
+              var opt = document.createElement('option');
+              opt.value = name;
+              opt.textContent = name;
+              if (name === currentDefault) opt.selected = true;
+              gcalDefaultSelect.appendChild(opt);
+            }
+          });
+        } else {
+          gcalDefaultRow.classList.add('hidden');
+        }
+      }
+
+      function createCalendarRow(name, id) {
+        var hint = document.getElementById('gcal-empty-hint');
+        if (hint) hint.remove();
+        var div = document.createElement('div');
+        div.className = 'flex gap-2 items-center';
+        div.setAttribute('data-gcal-row', '');
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.value = name || '';
+        nameInput.placeholder = 'Name';
+        nameInput.className = 'h-8 w-32 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground';
+        nameInput.addEventListener('input', updateDefaultDropdown);
+        var idInput = document.createElement('input');
+        idInput.type = 'text';
+        idInput.value = id || '';
+        idInput.placeholder = 'calendar-id@group.calendar.google.com';
+        idInput.className = 'h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground';
+        var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'gcal-remove-btn text-muted-foreground hover:text-destructive transition-colors';
+        removeBtn.setAttribute('aria-label', 'Remove calendar');
+        if (iconXTpl) removeBtn.appendChild(iconXTpl.content.cloneNode(true));
+        div.appendChild(nameInput);
+        div.appendChild(idInput);
+        div.appendChild(removeBtn);
+        return div;
+      }
+
+      if (gcalAddBtn && gcalList) {
+        gcalAddBtn.addEventListener('click', function() {
+          gcalList.appendChild(createCalendarRow('', ''));
+          reindexCalendarRows();
+        });
+      }
+
+      if (gcalList) {
+        gcalList.addEventListener('click', function(e) {
+          var btn = e.target.closest('.gcal-remove-btn');
+          if (!btn) return;
+          var row = btn.closest('[data-gcal-row]');
+          if (row) row.remove();
+          reindexCalendarRows();
+          if (gcalList.querySelectorAll('[data-gcal-row]').length === 0) {
+            var hint = document.createElement('span');
+            hint.id = 'gcal-empty-hint';
+            hint.className = 'text-[10px] text-muted-foreground';
+            hint.textContent = 'No calendars added yet.';
+            gcalList.appendChild(hint);
+          }
+        });
+        // Update default dropdown when names change
+        gcalList.addEventListener('input', function(e) {
+          if (e.target.matches('input[name^="calendar_name_"]')) {
+            updateDefaultDropdown();
+          }
+        });
+      }
     })();
     </script>`;
 
@@ -983,15 +1216,32 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
   app.post("/settings", async (c) => {
     const body = await c.req.parseBody();
 
+    // Parse multi-calendar form data
+    const calendars: Record<string, string> = {};
+    for (let i = 0; i < 20; i++) {
+      const name = ((body[`calendar_name_${i}`] as string) || "").trim();
+      const id = ((body[`calendar_id_${i}`] as string) || "").trim();
+      if (name && id) {
+        calendars[name] = id;
+      }
+    }
+
     const form: Record<string, string> = {
+      telegram_bot_token: (body.telegram_bot_token as string) || "",
       chat_ids: (body.chat_ids as string) || "",
       daily_digest_cron: (body.daily_digest_cron as string) || "",
       weekly_digest_cron: (body.weekly_digest_cron as string) || "",
       timezone: (body.timezone as string) || "",
       confidence_threshold: (body.confidence_threshold as string) || "",
       digest_email_to: (body.digest_email_to as string) || "",
+      ollama_url: (body.ollama_url as string) || "",
+      google_client_id: (body.google_client_id as string) || "",
+      google_client_secret: (body.google_client_secret as string) || "",
       google_calendar_id: (body.google_calendar_id as string) || "",
       google_calendar_default_duration: (body.google_calendar_default_duration as string) || "",
+      output_language: (body.output_language as string) || DEFAULTS.output_language,
+      google_calendars: Object.keys(calendars).length > 0 ? JSON.stringify(calendars) : "",
+      google_calendar_default: (body.google_calendar_default as string) || "",
     };
 
     const llmConfig: LLMConfig = {
@@ -1025,18 +1275,34 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       .filter((id) => id.length > 0);
 
     const toSave: Record<string, string> = {
+      ...(form.telegram_bot_token ? { telegram_bot_token: form.telegram_bot_token } : {}),
       telegram_chat_ids: chatIds.join(","),
       daily_digest_cron: form.daily_digest_cron,
       weekly_digest_cron: form.weekly_digest_cron,
       timezone: form.timezone,
       confidence_threshold: form.confidence_threshold,
       digest_email_to: form.digest_email_to,
+      ollama_url: form.ollama_url,
+      ...(form.google_client_id ? { google_client_id: form.google_client_id } : {}),
+      ...(form.google_client_secret ? { google_client_secret: form.google_client_secret } : {}),
       google_calendar_id: form.google_calendar_id,
       google_calendar_default_duration: form.google_calendar_default_duration,
+      output_language: form.output_language,
+      google_calendars: form.google_calendars,
+      google_calendar_default: form.google_calendar_default,
     };
 
     await saveAllSettings(sql, toSave);
     await saveLLMConfig(sql, llmConfig);
+
+    // Restart Telegram bot if token was saved (stops old instance if running, starts new)
+    if (form.telegram_bot_token) {
+      restartBot(sql).catch((err) => {
+        log.warn("Failed to start Telegram bot after settings save", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }
 
     // Ollama connectivity check
     let warning = "";
@@ -1061,8 +1327,8 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       return c.redirect("/settings?error=Authorization+code+is+required", 302);
     }
     const settings = await getAllSettings(sql);
-    const clientId = settings.google_client_id || process.env.GOOGLE_CLIENT_ID || "";
-    const clientSecret = settings.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || "";
+    const clientId = settings.google_client_id || "";
+    const clientSecret = settings.google_client_secret || "";
     try {
       const tokens = await exchangeAuthCode(code, clientId, clientSecret);
       await saveAllSettings(sql, {

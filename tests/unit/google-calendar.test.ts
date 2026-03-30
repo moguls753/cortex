@@ -109,6 +109,13 @@ vi.mock("../../src/web/settings-queries.js", () => ({
   saveAllSettings: mockSaveAllSettings,
 }));
 
+// Mock config module — resolveConfigValue controls telegram_chat_ids for authorization
+const mockResolveConfigValue = vi.fn();
+vi.mock("../../src/config.js", () => ({
+  config: {},
+  resolveConfigValue: (...args: unknown[]) => mockResolveConfigValue(...args),
+}));
+
 // Mock LLM config
 vi.mock("../../src/llm/config.js", () => ({
   getLLMConfig: vi.fn().mockResolvedValue({
@@ -207,6 +214,9 @@ describe("Google Calendar", () => {
     mockProcessCalendarEvent.mockResolvedValue({ created: false });
     mockHandleEntryCalendarCleanup.mockReset();
     mockHandleEntryCalendarCleanup.mockResolvedValue(undefined);
+    // Default resolveConfigValue — no settings
+    mockResolveConfigValue.mockReset();
+    mockResolveConfigValue.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -260,46 +270,49 @@ describe("Google Calendar", () => {
     });
 
     it("TS-1.3: Telegram text handler triggers calendar creation", async () => {
-      const restore = withEnv({ TELEGRAM_CHAT_ID: "123456" });
-      try {
-        const { handleTextMessage } = await import("../../src/telegram.js");
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "telegram_chat_ids") return '["123456"]';
+        return undefined;
+      });
 
-        const classResult = {
-          category: "tasks",
-          name: "Meeting",
-          confidence: 0.9,
-          fields: {},
-          tags: ["meeting"],
+      const { handleTextMessage } = await import("../../src/telegram.js");
+
+      const classResult = {
+        category: "tasks",
+        name: "Meeting",
+        confidence: 0.9,
+        fields: {},
+        tags: ["meeting"],
+        create_calendar_event: true,
+        calendar_date: "2026-04-15",
+        calendar_time: "14:00",
+        content: "Meeting tomorrow at 2pm",
+      };
+      mockClassifyText.mockResolvedValueOnce(classResult);
+
+      const { ctx } = createMockContext({
+        chatId: 123456,
+        text: "Meeting tomorrow at 2pm",
+      });
+
+      await handleTextMessage(ctx, mockSql);
+
+      expect(mockProcessCalendarEvent).toHaveBeenCalledWith(
+        mockSql,
+        expect.any(String),
+        expect.objectContaining({
           create_calendar_event: true,
           calendar_date: "2026-04-15",
-          calendar_time: "14:00",
-          content: "Meeting tomorrow at 2pm",
-        };
-        mockClassifyText.mockResolvedValueOnce(classResult);
-
-        const { ctx } = createMockContext({
-          chatId: 123456,
-          text: "Meeting tomorrow at 2pm",
-        });
-
-        await handleTextMessage(ctx, mockSql);
-
-        expect(mockProcessCalendarEvent).toHaveBeenCalledWith(
-          mockSql,
-          expect.any(String),
-          expect.objectContaining({
-            create_calendar_event: true,
-            calendar_date: "2026-04-15",
-          }),
-        );
-      } finally {
-        restore();
-      }
+        }),
+      );
     });
 
     it("TS-1.4: Telegram voice handler triggers calendar creation", async () => {
-      const restore = withEnv({ TELEGRAM_CHAT_ID: "123456" });
-      try {
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "telegram_chat_ids") return '["123456"]';
+        return undefined;
+      });
+
       const { handleVoiceMessage } = await import("../../src/telegram.js");
 
       const classResult = {
@@ -337,9 +350,6 @@ describe("Google Calendar", () => {
       await handleVoiceMessage(ctx, mockSql);
 
       expect(mockProcessCalendarEvent).toHaveBeenCalled();
-      } finally {
-        restore();
-      }
     });
 
     it("TS-1.5: web dashboard capture triggers calendar creation", async () => {
@@ -442,33 +452,29 @@ describe("Google Calendar", () => {
     });
 
     it("TS-2.2: connect button generates OAuth consent URL", async () => {
-      const restore = withEnv({
-        GOOGLE_CLIENT_ID: "test-client-id-123",
+      mockGetAllSettings.mockResolvedValue({
+        google_client_id: "test-client-id-123",
       });
 
-      try {
-        const { createAuthMiddleware, createAuthRoutes } = await import(
-          "../../src/web/auth.js"
-        );
-        const { createSettingsRoutes } = await import("../../src/web/settings.js");
+      const { createAuthMiddleware, createAuthRoutes } = await import(
+        "../../src/web/auth.js"
+      );
+      const { createSettingsRoutes } = await import("../../src/web/settings.js");
 
-        const app = new Hono();
-        app.use("*", createAuthMiddleware(TEST_SECRET));
-        app.route("/", createAuthRoutes(TEST_PASSWORD, TEST_SECRET));
-        app.route("/", createSettingsRoutes(mockSql));
+      const app = new Hono();
+      app.use("*", createAuthMiddleware(TEST_SECRET));
+      app.route("/", createAuthRoutes(TEST_PASSWORD, TEST_SECRET));
+      app.route("/", createSettingsRoutes(mockSql));
 
-        const cookie = await loginAndGetCookie(app);
-        const res = await app.request("/settings", {
-          headers: { Cookie: cookie },
-        });
-        const html = await res.text();
+      const cookie = await loginAndGetCookie(app);
+      const res = await app.request("/settings", {
+        headers: { Cookie: cookie },
+      });
+      const html = await res.text();
 
-        expect(html).toContain("accounts.google.com");
-        expect(html).toContain("test-client-id-123");
-        expect(html).toContain("calendar");
-      } finally {
-        restore();
-      }
+      expect(html).toContain("accounts.google.com");
+      expect(html).toContain("test-client-id-123");
+      expect(html).toContain("calendar");
     });
 
     it("TS-2.5: not connected status when no tokens", async () => {
@@ -502,40 +508,24 @@ describe("Google Calendar", () => {
       }
     });
 
-    it("TS-2.7: env var provides fallback calendar ID", async () => {
-      const restore = withEnv({
-        GOOGLE_CALENDAR_ID: "env@group.calendar.google.com",
-      });
+    it("TS-2.7: returns empty calendar ID when no DB setting exists", async () => {
+      const resolveCalendarConfig = realResolveCalendarConfig;
+      mockGetAllSettings.mockResolvedValue({});
 
-      try {
-        const resolveCalendarConfig = realResolveCalendarConfig;
-        mockGetAllSettings.mockResolvedValue({});
+      const config = await resolveCalendarConfig(mockSql);
 
-        const config = await resolveCalendarConfig(mockSql);
-
-        expect(config.calendarId).toBe("env@group.calendar.google.com");
-      } finally {
-        restore();
-      }
+      expect(config.calendarId).toBe("");
     });
 
-    it("TS-2.8: settings table value overrides env var", async () => {
-      const restore = withEnv({
-        GOOGLE_CALENDAR_ID: "env@group.calendar.google.com",
+    it("TS-2.8: reads calendar ID from settings table", async () => {
+      const resolveCalendarConfig = realResolveCalendarConfig;
+      mockGetAllSettings.mockResolvedValue({
+        google_calendar_id: "settings@group.calendar.google.com",
       });
 
-      try {
-        const resolveCalendarConfig = realResolveCalendarConfig;
-        mockGetAllSettings.mockResolvedValue({
-          google_calendar_id: "settings@group.calendar.google.com",
-        });
+      const config = await resolveCalendarConfig(mockSql);
 
-        const config = await resolveCalendarConfig(mockSql);
-
-        expect(config.calendarId).toBe("settings@group.calendar.google.com");
-      } finally {
-        restore();
-      }
+      expect(config.calendarId).toBe("settings@group.calendar.google.com");
     });
   });
 
@@ -543,8 +533,11 @@ describe("Google Calendar", () => {
 
   describe("Confirmation Messages", () => {
     it("TS-3.1: Telegram reply includes calendar confirmation", async () => {
-      const restore = withEnv({ TELEGRAM_CHAT_ID: "123456" });
-      try {
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "telegram_chat_ids") return '["123456"]';
+        return undefined;
+      });
+
       const { handleTextMessage } = await import("../../src/telegram.js");
 
       mockClassifyText.mockResolvedValueOnce({
@@ -577,9 +570,6 @@ describe("Google Calendar", () => {
       );
       expect(replyCall).toBeDefined();
       expect(replyCall![0]).toContain("2026-04-15");
-      } finally {
-        restore();
-      }
     });
 
     it("TS-3.2: web capture response includes calendar confirmation", async () => {

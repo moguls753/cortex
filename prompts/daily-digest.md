@@ -33,6 +33,7 @@ One concrete, completable task that takes under 15 minutes and creates visible p
 {yesterday_entries}
 
 ## Rules
+- Respond entirely in {output_language}
 - Maximum 150 words total
 - Be specific: names, dates, concrete actions. Never "address outstanding items" — say what the item IS.
 - Use relative dates (today, tomorrow, Friday) not ISO dates

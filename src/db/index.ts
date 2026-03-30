@@ -119,6 +119,14 @@ export async function runMigrations(url: string): Promise<void> {
       );
 
       ALTER TABLE entries ADD COLUMN IF NOT EXISTS google_calendar_event_id TEXT;
+      ALTER TABLE entries ADD COLUMN IF NOT EXISTS google_calendar_target TEXT;
+
+      CREATE TABLE IF NOT EXISTS "user" (
+        id             INTEGER PRIMARY KEY CHECK (id = 1),
+        password_hash  TEXT NOT NULL,
+        display_name   TEXT,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
   } finally {
     await sql.end();

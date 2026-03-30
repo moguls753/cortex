@@ -8,27 +8,12 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-cortex}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:-cortex}
       - OLLAMA_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-snowflake-arctic-embed2}
       - WHISPER_URL=http://whisper:8000
-      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
-      - LLM_API_KEY
-      - LLM_MODEL=${LLM_MODEL:-claude-sonnet-4-20250514}
-      - LLM_BASE_URL
-      - TELEGRAM_BOT_TOKEN
-      - TELEGRAM_CHAT_ID
-      - WEBAPP_PASSWORD
-      - SESSION_SECRET
       - SMTP_HOST
       - SMTP_PORT
       - SMTP_USER
       - SMTP_PASS
-      - DIGEST_EMAIL_TO
       - DIGEST_EMAIL_FROM=${DIGEST_EMAIL_FROM:-${SMTP_USER}}
-      - DAILY_DIGEST_CRON=${DAILY_DIGEST_CRON:-30 7 * * *}
-      - WEEKLY_DIGEST_CRON=${WEEKLY_DIGEST_CRON:-0 16 * * 0}
-      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.6}
-      - GOOGLE_CLIENT_ID
-      - GOOGLE_CLIENT_SECRET
       - TZ=${TZ:-Europe/Berlin}
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -75,6 +75,7 @@ Input: "Website redesign — finished wireframes, need to build the component li
 Input: "git stash apply vs git stash pop: apply keeps the stash, pop removes it"
 {"category":"reference","name":"git stash apply vs pop","confidence":0.95,"fields":{"notes":"apply keeps stash entry, pop removes it after applying"},"tags":["git","cli"],"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
 
+{calendar_section}
 ## Context
 
 These are recent and related entries from the knowledge base. Use them to maintain consistency in naming, tagging, and categorization:

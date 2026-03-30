@@ -5,10 +5,6 @@
 
 const REQUIRED_ENV_VARS = {
   DATABASE_URL: "postgresql://test:test@localhost:5432/cortex_test",
-  LLM_API_KEY: "test-api-key",
-  TELEGRAM_BOT_TOKEN: "123456:ABC-DEF",
-  WEBAPP_PASSWORD: "test-password",
-  SESSION_SECRET: "test-session-secret-at-least-32-chars-long",
 } as const;
 
 /**
@@ -61,13 +57,9 @@ export function clearAllConfigEnvVars(): void {
   const allKeys = [
     ...Object.keys(REQUIRED_ENV_VARS),
     "PORT",
-    "OLLAMA_MODEL",
     "TZ",
-    "LLM_PROVIDER",
-    "LLM_MODEL",
-    "LLM_BASE_URL",
-    "DAILY_DIGEST_CRON",
-    "WEEKLY_DIGEST_CRON",
+    "OLLAMA_URL",
+    "WHISPER_URL",
   ];
   for (const key of allKeys) {
     delete process.env[key];

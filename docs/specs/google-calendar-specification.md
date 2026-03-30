@@ -126,7 +126,7 @@ Automatically create Google Calendar events from entries that the classification
 
 **NG-2:** No support for recurring events. Each entry creates a single event.
 
-**NG-3:** No support for multiple calendars. One calendar ID, one set of credentials.
+**NG-3:** No support for multiple calendars. One calendar ID, one set of credentials. (Multi-calendar support is specified separately in `multi-calendar-specification.md`.)
 
 **NG-4:** No support for calendar invitees/attendees. Events are created for the user only.
 

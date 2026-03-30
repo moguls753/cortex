@@ -15,9 +15,10 @@ import {
   validateClassificationResponse,
 } from "./classify.js";
 import { generateEmbedding, embedEntry } from "./embed.js";
-import { config, resolveConfigValue } from "./config.js";
+import { resolveConfigValue } from "./config.js";
 import { createLogger } from "./logger.js";
-import { processCalendarEvent } from "./google-calendar.js";
+import { processCalendarEvent, getCalendarNames } from "./google-calendar.js";
+import { getAllSettings } from "./web/settings-queries.js";
 
 const log = createLogger("telegram");
 
@@ -43,11 +44,6 @@ async function getAuthorizedChatIds(
     } catch {
       // fall through to env var
     }
-  }
-
-  const envVar = process.env.TELEGRAM_CHAT_ID;
-  if (envVar) {
-    return envVar.split(",").map((id) => id.trim());
   }
 
   return [];
@@ -142,13 +138,14 @@ export async function handleTextMessage(
     if (!(await isAuthorized(chatId, sql))) return;
 
     // Gather context for classification
-    const [contextEntries, outputLanguage] = await Promise.all([
+    const [contextEntries, outputLanguage, calendarNames] = await Promise.all([
       assembleContext(sql, text),
       resolveConfigValue("output_language", sql).then((v) => v || undefined),
+      getCalendarNames(sql),
     ]);
 
     // Classify
-    const classResult = await classifyText(text, { contextEntries, outputLanguage, sql });
+    const classResult = await classifyText(text, { contextEntries, outputLanguage, calendarNames, sql });
 
     if (!classResult || classResult.category === null) {
       // Store unclassified
@@ -250,7 +247,8 @@ export async function handleVoiceMessage(
     // Get file info from Telegram via bot API
     const api = (ctx as any).api;
     const file = await api.getFile(message.voice.file_id);
-    const botToken = config.telegramBotToken;
+    const settings = await getAllSettings(sql);
+    const botToken = settings.telegram_bot_token || "";
     const fileUrl = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
 
     // Transcribe
@@ -270,13 +268,14 @@ export async function handleVoiceMessage(
     }
 
     // Gather context for classification
-    const [contextEntries, outputLanguage] = await Promise.all([
+    const [contextEntries, outputLanguage, calendarNames] = await Promise.all([
       assembleContext(sql, transcript),
       resolveConfigValue("output_language", sql).then((v) => v || undefined),
+      getCalendarNames(sql),
     ]);
 
     // Classify
-    const classResult = await classifyText(transcript, { contextEntries, outputLanguage, sql });
+    const classResult = await classifyText(transcript, { contextEntries, outputLanguage, calendarNames, sql });
     const reply = ctx.reply as (text: string, options?: unknown) => Promise<unknown>;
 
     if (!classResult || classResult.category === null) {
@@ -598,18 +597,60 @@ export function createBotWithHandlers(
 // startBot
 // ---------------------------------------------------------------------------
 
+let botRunning = false;
+let currentBot: InstanceType<typeof Bot> | null = null;
+
+/** @internal Test-only — resets module state for test isolation */
+export function resetBotState(): void {
+  botRunning = false;
+  currentBot = null;
+}
+
+export function isBotRunning(): boolean {
+  return botRunning;
+}
+
+export async function stopBot(): Promise<void> {
+  if (currentBot) {
+    try {
+      await currentBot.stop();
+    } catch {
+      // Ignore stop errors
+    }
+    currentBot = null;
+  }
+  botRunning = false;
+}
+
+export async function restartBot(sql: postgres.Sql): Promise<void> {
+  await stopBot();
+  await startBot(sql);
+}
+
 export async function startBot(sql: postgres.Sql): Promise<void> {
-  const token = config.telegramBotToken;
+  if (botRunning) {
+    log.info("Telegram bot already running — skipping");
+    return;
+  }
+  // Claim the slot immediately before any async work to prevent races
+  botRunning = true;
+
+  const settings = await getAllSettings(sql);
+  const token = settings.telegram_bot_token;
 
   if (!token) {
-    log.warn("TELEGRAM_BOT_TOKEN not set — skipping bot startup");
+    botRunning = false;
+    log.info("Telegram bot token not configured — skipping");
     return;
   }
 
-  const bot = createBotWithHandlers(token, sql);
-
-  // Start in long-polling mode (no webhook)
-  bot.start();
-
-  log.info("Telegram bot started in long-polling mode");
+  try {
+    const bot = createBotWithHandlers(token, sql);
+    bot.start();
+    currentBot = bot;
+    log.info("Telegram bot started in long-polling mode");
+  } catch (err) {
+    botRunning = false;
+    throw err;
+  }
 }

@@ -55,11 +55,15 @@ vi.mock("../../src/embed.js", () => ({
 
 const mockResolveConfigValue = vi.fn();
 
+const mockGetAllSettings = vi.fn();
+
 vi.mock("../../src/config.js", () => ({
-  config: {
-    telegramBotToken: "123456:ABC-DEF",
-  },
+  config: {},
   resolveConfigValue: mockResolveConfigValue,
+}));
+
+vi.mock("../../src/web/settings-queries.js", () => ({
+  getAllSettings: (...args: unknown[]) => mockGetAllSettings(...args),
 }));
 
 // Mock grammy (for startup tests)
@@ -129,7 +133,7 @@ describe("Telegram Bot", () => {
     startBot = mod.startBot;
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Reset all mocks
     mockClassifyText.mockReset();
     mockAssembleContext.mockReset();
@@ -139,12 +143,22 @@ describe("Telegram Bot", () => {
     mockGenerateEmbedding.mockReset();
     mockEmbedEntry.mockReset();
     mockResolveConfigValue.mockReset();
+    mockGetAllSettings.mockReset();
     MockBot.mockClear();
     mockBotStart.mockReset();
     mockBotApiSetWebhook.mockReset();
     mockBotOn.mockReset();
     mockBotCommand.mockReset();
     mockBotCatch.mockReset();
+
+    // Reset bot running state between tests
+    const { resetBotState } = await import("../../src/telegram.js");
+    resetBotState();
+
+    // Default: getAllSettings returns a token for startup tests
+    mockGetAllSettings.mockResolvedValue({
+      telegram_bot_token: "123456:ABC-DEF",
+    });
 
     // Default mock sql — returns [{ id: "uuid-42" }] for INSERT
     mockSql = vi.fn().mockResolvedValue([{ id: "uuid-42" }]);
@@ -186,34 +200,31 @@ describe("Telegram Bot", () => {
       expect(mockClassifyText).toHaveBeenCalled();
     });
 
-    it("accepts messages from chat IDs in the env var when no setting exists", async () => {
-      // TS-1.2
+    it("rejects messages when no chat IDs are configured in settings", async () => {
+      // TS-1.2 (updated: env var fallback removed)
       mockResolveConfigValue.mockImplementation(async (key: string) => {
         if (key === "telegram_chat_ids") return undefined;
         return undefined;
       });
-      const restoreEnv = withEnv({ TELEGRAM_CHAT_ID: "123456" });
       const { ctx, mocks } = createMockContext({ chatId: 123456 });
 
       await handleTextMessage(ctx, mockSql);
 
-      expect(mocks.reply).toHaveBeenCalled();
-      restoreEnv();
+      expect(mocks.reply).not.toHaveBeenCalled();
+      expect(mockClassifyText).not.toHaveBeenCalled();
     });
 
-    it("accepts messages from any chat ID in a comma-separated env var list", async () => {
-      // TS-1.3
+    it("accepts messages from any chat ID in a settings JSON array with multiple entries", async () => {
+      // TS-1.3 (updated: uses settings instead of env var)
       mockResolveConfigValue.mockImplementation(async (key: string) => {
-        if (key === "telegram_chat_ids") return undefined;
+        if (key === "telegram_chat_ids") return '["111", "222", "333"]';
         return undefined;
       });
-      const restoreEnv = withEnv({ TELEGRAM_CHAT_ID: "111,222,333" });
-      const { ctx, mocks } = createMockContext({ chatId: 222 });
+      const { ctx, mocks } = createMockContext({ chatId: 333 });
 
       await handleTextMessage(ctx, mockSql);
 
       expect(mocks.reply).toHaveBeenCalled();
-      restoreEnv();
     });
 
     it("accepts messages from any chat ID in the settings table JSON array", async () => {
@@ -808,22 +819,20 @@ describe("Telegram Bot", () => {
   describe("startup", () => {
     it("starts the bot in long-polling mode", async () => {
       // TS-6.1
-      const restoreEnv = withEnv({
-        TELEGRAM_BOT_TOKEN: "123456:ABC-DEF",
+      mockGetAllSettings.mockResolvedValue({
+        telegram_bot_token: "123456:ABC-DEF",
       });
 
       await startBot(mockSql);
 
       expect(mockBotStart).toHaveBeenCalled();
       expect(mockBotApiSetWebhook).not.toHaveBeenCalled();
-      restoreEnv();
     });
 
     it("relies on grammY built-in reconnection with no custom logic", async () => {
       // TS-6.2
-      // Verify that bot.start() is called with default options (no custom retry)
-      const restoreEnv = withEnv({
-        TELEGRAM_BOT_TOKEN: "123456:ABC-DEF",
+      mockGetAllSettings.mockResolvedValue({
+        telegram_bot_token: "123456:ABC-DEF",
       });
 
       await startBot(mockSql);
@@ -832,29 +841,21 @@ describe("Telegram Bot", () => {
       expect(mockBotStart).toHaveBeenCalled();
       // No setInterval/setTimeout calls for custom reconnection
       // (structural assertion: the module relies on grammY's built-in retry)
-      restoreEnv();
     });
 
-    it("skips bot startup and logs a warning when TELEGRAM_BOT_TOKEN is missing", async () => {
+    it("skips bot startup and logs info when bot token is not configured", async () => {
       // TS-6.4
       const stdoutSpy = vi
         .spyOn(process.stdout, "write")
         .mockImplementation(() => true);
 
-      vi.resetModules();
-      vi.doMock("../../src/config.js", () => ({
-        config: { telegramBotToken: "" },
-        resolveConfigValue: mockResolveConfigValue,
-      }));
+      mockGetAllSettings.mockResolvedValue({});
 
-      const { startBot: startBotFresh } = await import(
-        "../../src/telegram.js"
-      );
-      await startBotFresh(mockSql);
+      await startBot(mockSql);
 
       expect(MockBot).not.toHaveBeenCalled();
       const logOutput = stdoutSpy.mock.calls.map((c) => c[0]).join("");
-      expect(logOutput).toContain("warn");
+      expect(logOutput).toMatch(/not configured|info/i);
 
       stdoutSpy.mockRestore();
     });

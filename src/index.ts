@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { config } from "./config.js";
+import { config, resolveSessionSecret } from "./config.js";
 import { createLogger } from "./logger.js";
 import { createDbConnection, runMigrations } from "./db/index.js";
 import { createHealthRoute, type ServiceCheckers } from "./web/health.js";
-import { createAuthMiddleware, createAuthRoutes } from "./web/auth.js";
+import { createSetupMiddleware, createSetupRoutes } from "./web/setup.js";
 import { createDashboardRoutes } from "./web/dashboard.js";
 import { createBrowseRoutes } from "./web/browse.js";
 import { createEntryRoutes } from "./web/entry.js";
@@ -14,7 +14,7 @@ import { createSettingsRoutes } from "./web/settings.js";
 import { createMcpHttpHandler } from "./mcp-tools.js";
 import { createSSEBroadcaster } from "./web/sse.js";
 import { initializeEmbedding } from "./embed.js";
-import { startBot } from "./telegram.js";
+import { startBot, isBotRunning } from "./telegram.js";
 import { listenForEntryChanges } from "./db/notify.js";
 import { startScheduler } from "./digests.js";
 
@@ -31,6 +31,9 @@ async function main(): Promise<void> {
   // Create database connection
   const sql = createDbConnection(config.databaseUrl);
 
+  // Resolve session secret (env var -> DB -> auto-generate)
+  const sessionSecret = await resolveSessionSecret(sql);
+
   // Initialize embedding model (best-effort)
   initializeEmbedding().catch(() => {
     log.warn("Embedding model initialization failed — will retry on first use");
@@ -46,9 +49,6 @@ async function main(): Promise<void> {
     });
   });
 
-  // Telegram bot state (must be declared before checkers reference it)
-  let telegramStarted = false;
-
   // Service checkers for health endpoint
   const checkers: ServiceCheckers = {
     checkPostgres: async () => {
@@ -61,8 +61,7 @@ async function main(): Promise<void> {
     },
     checkOllama: async () => {
       try {
-        const ollamaUrl = process.env.OLLAMA_URL || "http://ollama:11434";
-        const res = await fetch(ollamaUrl, { signal: AbortSignal.timeout(3000) });
+        const res = await fetch(config.ollamaUrl, { signal: AbortSignal.timeout(3000) });
         return res.ok ? "connected" : "disconnected";
       } catch {
         return "disconnected";
@@ -70,15 +69,14 @@ async function main(): Promise<void> {
     },
     checkWhisper: async () => {
       try {
-        const whisperUrl = process.env.WHISPER_URL || "http://whisper:8000";
-        const res = await fetch(whisperUrl, { signal: AbortSignal.timeout(3000) });
+        const res = await fetch(config.whisperUrl, { signal: AbortSignal.timeout(3000) });
         return res.ok ? "connected" : "disconnected";
       } catch {
         return "disconnected";
       }
     },
     checkTelegram: async () => {
-      return telegramStarted ? "polling" : "stopped";
+      return isBotRunning() ? "polling" : "stopped";
     },
     getUptime: () => Math.floor((Date.now() - startTime) / 1000),
   };
@@ -89,11 +87,11 @@ async function main(): Promise<void> {
   // Static files (CSS, etc.) — before auth so they load on the login page
   app.use("/public/*", serveStatic({ root: "./" }));
 
-  // Auth middleware (protects all routes except /health and /login)
-  app.use("*", createAuthMiddleware(config.sessionSecret));
+  // Setup middleware handles both setup-mode detection and authentication
+  app.use("*", createSetupMiddleware(sql, sessionSecret));
 
-  // Mount routes
-  app.route("/", createAuthRoutes(config.webappPassword, config.sessionSecret));
+  // Mount routes (setup routes include login/logout + wizard)
+  app.route("/", createSetupRoutes(sql, sessionSecret));
   app.route("/", createHealthRoute(checkers));
   app.route("/", createDashboardRoutes(sql, broadcaster));
   app.route("/", createBrowseRoutes(sql));
@@ -128,7 +126,6 @@ async function main(): Promise<void> {
   // Start Telegram bot
   startBot(sql)
     .then(() => {
-      telegramStarted = true;
       log.info("Telegram bot started");
     })
     .catch((err) => {

@@ -51,6 +51,12 @@ vi.mock("../../src/embed.js", () => ({
   generateEmbedding: vi.fn().mockResolvedValue(new Array(1024).fill(0)),
 }));
 
+vi.mock("../../src/google-calendar.js", () => ({
+  getCalendarNames: vi.fn().mockResolvedValue(undefined),
+  processCalendarEvent: vi.fn().mockResolvedValue({ created: false }),
+  handleEntryCalendarCleanup: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 async function createTestNewNote(): Promise<{ app: Hono }> {

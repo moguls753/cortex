@@ -4,8 +4,14 @@ import type { SSEBroadcaster } from "../../src/web/sse.js";
 
 // --- Module Mocks (hoisted) ---
 
-const { mockChat } = vi.hoisted(() => ({
+const { mockChat, mockGetLLMConfig } = vi.hoisted(() => ({
   mockChat: vi.fn().mockResolvedValue("  Mock digest response  "),
+  mockGetLLMConfig: vi.fn().mockResolvedValue({
+    provider: "anthropic",
+    model: "claude-sonnet-4-20250514",
+    baseUrl: "",
+    apiKeys: { anthropic: "test-key" },
+  }),
 }));
 
 vi.mock("../../src/digests-queries.js", () => ({
@@ -30,6 +36,10 @@ vi.mock("../../src/llm/index.js", () => ({
   createLLMProvider: vi.fn().mockReturnValue({ chat: mockChat }),
 }));
 
+vi.mock("../../src/llm/config.js", () => ({
+  getLLMConfig: mockGetLLMConfig,
+}));
+
 vi.mock("../../src/email.js", () => ({
   sendDigestEmail: vi.fn().mockResolvedValue(undefined),
   isSmtpConfigured: vi.fn().mockReturnValue(false),
@@ -37,13 +47,7 @@ vi.mock("../../src/email.js", () => ({
 
 vi.mock("../../src/config.js", () => ({
   config: {
-    llmModel: "claude-sonnet-4-20250514",
-    llmProvider: "anthropic",
-    llmApiKey: "test-key",
-    llmBaseUrl: "",
     timezone: "Europe/Berlin",
-    dailyDigestCron: "30 7 * * *",
-    weeklyDigestCron: "0 16 * * 0",
   },
   resolveConfigValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -71,6 +75,7 @@ import {
   getEntriesNeedingRetry,
 } from "../../src/digests-queries.js";
 import { createLLMProvider } from "../../src/llm/index.js";
+import { getLLMConfig } from "../../src/llm/config.js";
 import { sendDigestEmail, isSmtpConfigured } from "../../src/email.js";
 import { resolveConfigValue } from "../../src/config.js";
 import { embedEntry } from "../../src/embed.js";
@@ -121,6 +126,12 @@ describe("Digests", () => {
     (embedEntry as any).mockResolvedValue(undefined);
     (classifyEntry as any).mockResolvedValue(undefined);
     (createLLMProvider as any).mockReturnValue({ chat: mockChat });
+    mockGetLLMConfig.mockResolvedValue({
+      provider: "anthropic",
+      model: "claude-sonnet-4-20250514",
+      baseUrl: "",
+      apiKeys: { anthropic: "test-key" },
+    });
   });
 
   afterEach(() => {
@@ -140,9 +151,11 @@ describe("Digests", () => {
         yesterdayEntries: [{ id: "e1", name: "Note", category: "ideas", content: "Something", created_at: new Date() }],
       };
       (getDailyDigestData as any).mockResolvedValue(sampleData);
-      (resolveConfigValue as any).mockImplementation(async (key: string) => {
-        if (key === "llm_model") return "claude-haiku-4-5-20251001";
-        return undefined;
+      mockGetLLMConfig.mockResolvedValue({
+        provider: "anthropic",
+        model: "claude-haiku-4-5-20251001",
+        baseUrl: "",
+        apiKeys: { anthropic: "test-key" },
       });
 
       const mockBroadcaster = createMockBroadcaster();
@@ -282,7 +295,7 @@ describe("Digests", () => {
       expect(prompt).toContain("WHAT HAPPENED");
       expect(prompt).toContain("OPEN LOOPS");
       expect(prompt).toContain("NEXT WEEK");
-      expect(prompt).toContain("RECURRING THEME");
+      expect(prompt).toContain("PATTERN");
       expect(prompt).toContain("250");
     });
 
@@ -686,7 +699,7 @@ describe("Digests", () => {
       // TS-5.1a
       (resolveConfigValue as any).mockImplementation(async (key: string) => {
         if (key === "daily_digest_cron") return "0 8 * * *";
-        if (key === "weekly_digest_cron") return "0 16 * * 0";
+        if (key === "weekly_digest_cron") return "0 8 * * 1";
         if (key === "timezone") return "Europe/Berlin";
         return undefined;
       });
@@ -734,13 +747,13 @@ describe("Digests", () => {
 
       // Daily default
       expect(cron.schedule).toHaveBeenCalledWith(
-        "30 7 * * *",
+        "0 7 * * *",
         expect.any(Function),
         expect.any(Object),
       );
       // Weekly default
       expect(cron.schedule).toHaveBeenCalledWith(
-        "0 16 * * 0",
+        "0 8 * * 1",
         expect.any(Function),
         expect.any(Object),
       );
@@ -764,8 +777,8 @@ describe("Digests", () => {
 
       // Verify timezone option passed to daily and weekly cron.schedule calls
       const calls = (cron.schedule as any).mock.calls;
-      const dailyCall = calls.find((c: any[]) => c[0] === "30 7 * * *");
-      const weeklyCall = calls.find((c: any[]) => c[0] === "0 16 * * 0");
+      const dailyCall = calls.find((c: any[]) => c[0] === "0 7 * * *");
+      const weeklyCall = calls.find((c: any[]) => c[0] === "0 8 * * 1");
 
       expect(dailyCall).toBeDefined();
       expect(dailyCall[2]).toEqual(expect.objectContaining({ timezone: "America/New_York" }));
@@ -776,8 +789,8 @@ describe("Digests", () => {
     it("reschedules cron without restart when settings change", async () => {
       // TS-5.4
       (resolveConfigValue as any).mockImplementation(async (key: string) => {
-        if (key === "daily_digest_cron") return "30 7 * * *";
-        if (key === "weekly_digest_cron") return "0 16 * * 0";
+        if (key === "daily_digest_cron") return "0 7 * * *";
+        if (key === "weekly_digest_cron") return "0 8 * * 1";
         return undefined;
       });
 
@@ -787,7 +800,7 @@ describe("Digests", () => {
       // Update settings
       (resolveConfigValue as any).mockImplementation(async (key: string) => {
         if (key === "daily_digest_cron") return "0 8 * * *";
-        if (key === "weekly_digest_cron") return "0 16 * * 0";
+        if (key === "weekly_digest_cron") return "0 8 * * 1";
         return undefined;
       });
 
@@ -856,8 +869,8 @@ describe("Digests", () => {
       await startScheduler(mockSql, mockBroadcaster);
 
       // Find callbacks by cron expression (not by registration order)
-      const dailyJob = capturedJobs.find((j) => j.expr === "30 7 * * *");
-      const weeklyJob = capturedJobs.find((j) => j.expr === "0 16 * * 0");
+      const dailyJob = capturedJobs.find((j) => j.expr === "0 7 * * *");
+      const weeklyJob = capturedJobs.find((j) => j.expr === "0 8 * * 1");
       expect(dailyJob).toBeDefined();
       expect(weeklyJob).toBeDefined();
 

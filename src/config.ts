@@ -1,53 +1,47 @@
+import { randomBytes } from "node:crypto";
 import type postgres from "postgres";
 
-const REQUIRED_VARS = [
-  "DATABASE_URL",
-  "TELEGRAM_BOT_TOKEN",
-  "WEBAPP_PASSWORD",
-  "SESSION_SECRET",
-] as const;
+const REQUIRED_VARS = ["DATABASE_URL"] as const;
 
 const missing = REQUIRED_VARS.filter((v) => !process.env[v]);
 if (missing.length > 0) {
   throw new Error(
-    `Missing required environment variables: ${missing.join(", ")}`,
+    `Missing required environment variable: ${missing.join(", ")}`,
   );
 }
 
 const databaseUrl = process.env.DATABASE_URL!;
-if (
-  !databaseUrl.startsWith("postgresql://") &&
-  !databaseUrl.startsWith("postgres://")
-) {
-  throw new Error(
-    `DATABASE_URL is malformed or has an invalid format: "${databaseUrl}"`,
-  );
-}
 
 export const config = {
   databaseUrl,
-  llmProvider: process.env.LLM_PROVIDER || "anthropic",
-  llmApiKey: process.env.LLM_API_KEY ?? "",
-  llmModel: process.env.LLM_MODEL || "claude-sonnet-4-20250514",
-  llmBaseUrl: process.env.LLM_BASE_URL || "",
-  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN!,
-  webappPassword: process.env.WEBAPP_PASSWORD!,
-  sessionSecret: process.env.SESSION_SECRET!,
   port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
-  ollamaModel: process.env.OLLAMA_MODEL || "snowflake-arctic-embed2",
+  ollamaUrl: process.env.OLLAMA_URL || "http://ollama:11434",
+  whisperUrl: process.env.WHISPER_URL || "http://whisper:8000",
   timezone: process.env.TZ || "Europe/Berlin",
-  dailyDigestCron: process.env.DAILY_DIGEST_CRON || "30 7 * * *",
-  weeklyDigestCron: process.env.WEEKLY_DIGEST_CRON || "0 16 * * 0",
 };
 
-export const SETTINGS_TO_ENV: Record<string, string> = {
-  timezone: "TZ",
-  daily_digest_cron: "DAILY_DIGEST_CRON",
-  weekly_digest_cron: "WEEKLY_DIGEST_CRON",
-  ollama_url: "OLLAMA_URL",
-  confidence_threshold: "CONFIDENCE_THRESHOLD",
-  digest_email_to: "DIGEST_EMAIL_TO",
-};
+export async function resolveSessionSecret(
+  sql: postgres.Sql,
+): Promise<string> {
+  // 1. Check env var first
+  if (process.env.SESSION_SECRET) {
+    return process.env.SESSION_SECRET;
+  }
+
+  // 2. Check settings table
+  const rows = await sql`SELECT value FROM settings WHERE key = 'session_secret'`;
+  if (rows.length > 0) {
+    return rows[0].value;
+  }
+
+  // 3. Generate and save a new secret
+  const secret = randomBytes(32).toString("hex");
+  await sql`
+    INSERT INTO settings (key, value) VALUES ('session_secret', ${secret})
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+  `;
+  return secret;
+}
 
 export async function resolveConfigValue(
   key: string,
@@ -56,11 +50,6 @@ export async function resolveConfigValue(
   const rows = await sql`SELECT value FROM settings WHERE key = ${key}`;
   if (rows.length > 0) {
     return rows[0].value;
-  }
-
-  const envVar = SETTINGS_TO_ENV[key];
-  if (envVar) {
-    return process.env[envVar];
   }
 
   return undefined;

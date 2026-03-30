@@ -22,7 +22,6 @@ import {
   createClassificationJSON,
   createMockChat,
 } from "../helpers/mock-llm.js";
-import { withEnv } from "../helpers/env.js";
 
 // ---------------------------------------------------------------------------
 // Module mocks — these must be hoisted
@@ -45,6 +44,19 @@ const mockReadFile = vi.fn();
 
 vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
+}));
+
+const mockGetLLMConfig = vi.fn();
+
+vi.mock("../../src/llm/config.js", () => ({
+  getLLMConfig: (...args: unknown[]) => mockGetLLMConfig(...args),
+}));
+
+const mockResolveConfigValue = vi.fn();
+
+vi.mock("../../src/config.js", () => ({
+  config: {},
+  resolveConfigValue: (...args: unknown[]) => mockResolveConfigValue(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -99,6 +111,9 @@ describe("Classification", () => {
   let resolveConfidenceThreshold: ResolveConfidenceThreshold;
   let isConfident: IsConfident;
 
+  // Mock sql instance — passed to classifyText so resolveLLMConfig hits the DB path
+  const mockSql = vi.fn() as unknown as any;
+
   beforeAll(async () => {
     const mod = await import("../../src/classify.js");
     classifyText = mod.classifyText;
@@ -118,6 +133,19 @@ describe("Classification", () => {
     mockReadFile.mockResolvedValue(
       "Classify this: {context_entries}\n\nInput: {input_text}",
     );
+
+    // Default LLM config — Anthropic provider with API key
+    mockGetLLMConfig.mockReset();
+    mockGetLLMConfig.mockResolvedValue({
+      provider: "anthropic",
+      model: "claude-sonnet-4-20250514",
+      baseUrl: "",
+      apiKeys: { anthropic: "test-key" },
+    });
+
+    // Default resolveConfigValue — no settings
+    mockResolveConfigValue.mockReset();
+    mockResolveConfigValue.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -130,77 +158,66 @@ describe("Classification", () => {
   describe("provider selection", () => {
     // TS-1.1
     it("sends classification request through the Anthropic provider", async () => {
-      const restoreEnv = withEnv({
-        LLM_PROVIDER: "anthropic",
-        LLM_API_KEY: "test-key",
-        LLM_MODEL: "claude-sonnet-4-20250514",
+      mockGetLLMConfig.mockResolvedValueOnce({
+        provider: "anthropic",
+        model: "claude-sonnet-4-20250514",
+        baseUrl: "",
+        apiKeys: { anthropic: "test-key" },
       });
+      mockChat.mockResolvedValueOnce(createClassificationJSON());
 
-      try {
-        mockChat.mockResolvedValueOnce(createClassificationJSON());
+      const result = await classifyText(
+        "Had coffee with Maria, discussed her new startup",
+        { sql: mockSql },
+      );
 
-        const result = await classifyText(
-          "Had coffee with Maria, discussed her new startup",
-        );
-
-        expect(mockCreateLLMProvider).toHaveBeenCalledWith(
-          expect.objectContaining({ provider: "anthropic" }),
-        );
-        expect(mockChat).toHaveBeenCalled();
-        expect(result).not.toBeNull();
-        expect(result!.category).toBe("people");
-      } finally {
-        restoreEnv();
-      }
+      expect(mockCreateLLMProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: "anthropic" }),
+      );
+      expect(mockChat).toHaveBeenCalled();
+      expect(result).not.toBeNull();
+      expect(result!.category).toBe("people");
     });
 
     // TS-1.2
     it("sends classification request through the OpenAI-compatible provider", async () => {
-      const restoreEnv = withEnv({
-        LLM_PROVIDER: "openai-compatible",
-        LLM_API_KEY: "test-key",
-        LLM_MODEL: "gpt-4",
-        LLM_BASE_URL: "http://localhost:1234/v1",
+      mockGetLLMConfig.mockResolvedValueOnce({
+        provider: "openai-compatible",
+        model: "gpt-4",
+        baseUrl: "http://localhost:1234/v1",
+        apiKeys: { "openai-compatible": "test-key" },
       });
+      mockChat.mockResolvedValueOnce(createClassificationJSON());
 
-      try {
-        mockChat.mockResolvedValueOnce(createClassificationJSON());
+      const result = await classifyText(
+        "Had coffee with Maria, discussed her new startup",
+        { sql: mockSql },
+      );
 
-        const result = await classifyText(
-          "Had coffee with Maria, discussed her new startup",
-        );
-
-        expect(mockCreateLLMProvider).toHaveBeenCalledWith(
-          expect.objectContaining({
-            provider: "openai-compatible",
-            baseUrl: "http://localhost:1234/v1",
-          }),
-        );
-        expect(result).not.toBeNull();
-      } finally {
-        restoreEnv();
-      }
+      expect(mockCreateLLMProvider).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: "openai-compatible",
+          baseUrl: "http://localhost:1234/v1",
+        }),
+      );
+      expect(result).not.toBeNull();
     });
 
     // TS-1.3
     it("uses the configured model for classification requests", async () => {
-      const restoreEnv = withEnv({
-        LLM_PROVIDER: "anthropic",
-        LLM_API_KEY: "test-key",
-        LLM_MODEL: "claude-sonnet-4-20250514",
+      mockGetLLMConfig.mockResolvedValueOnce({
+        provider: "anthropic",
+        model: "claude-sonnet-4-20250514",
+        baseUrl: "",
+        apiKeys: { anthropic: "test-key" },
       });
+      mockChat.mockResolvedValueOnce(createClassificationJSON());
 
-      try {
-        mockChat.mockResolvedValueOnce(createClassificationJSON());
+      await classifyText("test input", { sql: mockSql });
 
-        await classifyText("test input");
-
-        expect(mockCreateLLMProvider).toHaveBeenCalledWith(
-          expect.objectContaining({ model: "claude-sonnet-4-20250514" }),
-        );
-      } finally {
-        restoreEnv();
-      }
+      expect(mockCreateLLMProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "claude-sonnet-4-20250514" }),
+      );
     });
   });
 
@@ -215,7 +232,7 @@ describe("Classification", () => {
       );
       mockChat.mockResolvedValueOnce(createClassificationJSON());
 
-      await classifyText("test input");
+      await classifyText("test input", { sql: mockSql });
 
       expect(mockReadFile).toHaveBeenCalledWith(
         expect.stringContaining("prompts/classify.md"),
@@ -235,8 +252,8 @@ describe("Classification", () => {
         .mockResolvedValueOnce(createClassificationJSON())
         .mockResolvedValueOnce(createClassificationJSON());
 
-      await classifyText("first call");
-      await classifyText("second call");
+      await classifyText("first call", { sql: mockSql });
+      await classifyText("second call", { sql: mockSql });
 
       expect(mockReadFile).toHaveBeenCalledTimes(2);
       const firstPrompt = mockChat.mock.calls[0][0];
@@ -264,7 +281,7 @@ describe("Classification", () => {
         }),
       );
 
-      const result = await classifyText("Had coffee with Maria");
+      const result = await classifyText("Had coffee with Maria", { sql: mockSql });
 
       expect(result).not.toBeNull();
       expect(result!.category).toBe("people");
@@ -324,7 +341,7 @@ describe("Classification", () => {
     it("handles a non-JSON LLM response gracefully", async () => {
       mockChat.mockResolvedValueOnce("I think this is about people");
 
-      const result = await classifyText("test input");
+      const result = await classifyText("test input", { sql: mockSql });
 
       expect(result).toBeNull();
     });
@@ -335,7 +352,7 @@ describe("Classification", () => {
         '{"category": "people", "name": "Mar',
       );
 
-      const result = await classifyText("test input");
+      const result = await classifyText("test input", { sql: mockSql });
 
       expect(result).toBeNull();
     });
@@ -499,9 +516,11 @@ describe("Classification", () => {
     it("stores entry with null category when LLM request times out", async () => {
       mockChat.mockRejectedValueOnce(new Error("Request timed out"));
 
-      const result = await classifyText("test input");
+      const result = await classifyText("test input", { sql: mockSql });
 
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result!.category).toBeNull();
+      expect(result!.error).toBe("Request timed out");
     });
 
     // TS-4.2
@@ -510,9 +529,11 @@ describe("Classification", () => {
       err.status = 429;
       mockChat.mockRejectedValueOnce(err);
 
-      const result = await classifyText("test input");
+      const result = await classifyText("test input", { sql: mockSql });
 
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result!.category).toBeNull();
+      expect(result!.error).toBe("Rate limited");
     });
 
     // TS-4.3
@@ -523,25 +544,29 @@ describe("Classification", () => {
       err.status = 500;
       mockChat.mockRejectedValueOnce(err);
 
-      const result = await classifyText("test input");
+      const result = await classifyText("test input", { sql: mockSql });
 
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result!.category).toBeNull();
+      expect(result!.error).toBe("Internal server error");
     });
 
     // TS-4.4
     it("stores entry with null category on network error", async () => {
       mockChat.mockRejectedValueOnce(new TypeError("fetch failed"));
 
-      const result = await classifyText("test input");
+      const result = await classifyText("test input", { sql: mockSql });
 
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result!.category).toBeNull();
+      expect(result!.error).toBe("fetch failed");
     });
 
     // TS-4.5
     it("preserves raw input text in content field on classification failure", async () => {
       mockChat.mockRejectedValueOnce(new Error("API unavailable"));
 
-      const result = await classifyText("Buy groceries for the weekend");
+      const result = await classifyText("Buy groceries for the weekend", { sql: mockSql });
 
       // classifyText should return a result with null classification but preserved content,
       // OR return null (in which case content preservation is the caller's responsibility).
@@ -568,7 +593,7 @@ describe("Classification", () => {
       mockChat.mockRejectedValueOnce(err);
 
       const inputText = "A".repeat(250);
-      await classifyText(inputText, { entryId: "test-uuid-42" });
+      await classifyText(inputText, { entryId: "test-uuid-42", sql: mockSql });
 
       const logOutput = stdoutSpy.mock.calls
         .map(([chunk]) => chunk.toString())
@@ -590,7 +615,7 @@ describe("Classification", () => {
         createClassificationJSON({ confidence: 0.3 }),
       );
 
-      const result = await classifyText("Hi");
+      const result = await classifyText("Hi", { sql: mockSql });
 
       expect(mockChat).toHaveBeenCalled();
       expect(result).not.toBeNull();
@@ -601,7 +626,7 @@ describe("Classification", () => {
       const longText = "word ".repeat(50_000);
       mockChat.mockResolvedValueOnce(createClassificationJSON());
 
-      await classifyText(longText);
+      await classifyText(longText, { sql: mockSql });
 
       expect(mockChat).toHaveBeenCalled();
       const promptArg = mockChat.mock.calls[0][0];
@@ -622,6 +647,7 @@ describe("Classification", () => {
 
       const result = await classifyText(
         "Treffen mit Anna über das neue Projekt besprochen",
+        { sql: mockSql },
       );
 
       expect(result).not.toBeNull();
@@ -639,7 +665,7 @@ describe("Classification", () => {
         createClassificationJSON({ category: "reference", confidence: 0.3 }),
       );
 
-      const result = await classifyText("stuff");
+      const result = await classifyText("stuff", { sql: mockSql });
 
       expect(result).not.toBeNull();
       expect(result!.confidence).toBe(0.3);
