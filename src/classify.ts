@@ -310,16 +310,13 @@ export async function classifyText(
   if (!llmConfig.provider || (needsKey && !llmConfig.apiKey)) {
     log.info("LLM not configured — returning default classification");
     return {
-      category: "uncategorized",
+      category: null,
       name: text.slice(0, 50),
-      confidence: 0,
+      confidence: null,
       fields: {},
       tags: [],
-      create_calendar_event: false,
-      calendar_date: null,
-      calendar_time: null,
-      calendar_name: null,
       content: text,
+      error: "LLM not configured",
     };
   }
 

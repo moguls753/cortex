@@ -36,14 +36,18 @@ async function getAuthorizedChatIds(
 ): Promise<string[]> {
   const settingValue = await resolveConfigValue("telegram_chat_ids", sql);
   if (settingValue) {
-    try {
-      const parsed = JSON.parse(settingValue);
-      if (Array.isArray(parsed)) {
-        return parsed.map(String);
-      }
-    } catch {
-      // fall through to env var
+    let raw = settingValue;
+    // Handle JSON array format (e.g. '["123","456"]')
+    if (raw.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) raw = parsed.join(",");
+      } catch { /* fall through to comma split */ }
     }
+    return raw
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
   }
 
   return [];
@@ -646,9 +650,24 @@ export async function startBot(sql: postgres.Sql): Promise<void> {
 
   try {
     const bot = createBotWithHandlers(token, sql);
-    bot.start();
+    bot.start({
+      onStart: () => log.info("Telegram bot started in long-polling mode"),
+    }).catch((err) => {
+      const msg = (err as Error)?.message || String(err);
+      log.error("Telegram bot polling stopped", { error: msg });
+      botRunning = false;
+      currentBot = null;
+      // Auto-restart after transient errors (e.g. 409 conflict)
+      setTimeout(() => {
+        log.info("Attempting to restart Telegram bot...");
+        startBot(sql).catch((restartErr) => {
+          log.error("Telegram bot restart failed", {
+            error: (restartErr as Error)?.message || String(restartErr),
+          });
+        });
+      }, 5000);
+    });
     currentBot = bot;
-    log.info("Telegram bot started in long-polling mode");
   } catch (err) {
     botRunning = false;
     throw err;

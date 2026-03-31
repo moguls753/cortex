@@ -47,7 +47,11 @@ function formatDailyPrompt(data: DailyDigestData, outputLanguage: string): strin
     : "None";
 
   const upcomingTasks = data.upcomingTasks.length > 0
-    ? data.upcomingTasks.map((t) => `- ${t.name} (due: ${(t.fields as any).due_date})`).join("\n")
+    ? data.upcomingTasks.map((t) => {
+        const notes = (t.fields as any).notes;
+        const detail = notes || (t.content ? t.content.slice(0, 100) : "");
+        return `- ${t.name} (due: ${(t.fields as any).due_date})${detail ? ": " + detail : ""}`;
+      }).join("\n")
     : "None";
 
   const yesterdayEntries = data.yesterdayEntries.length > 0

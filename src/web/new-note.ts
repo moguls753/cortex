@@ -30,7 +30,7 @@ function renderNewNotePage(allTags: string[], error?: string): string {
 
   html += `<div class="flex items-center justify-between">`;
   html += `<h1 class="text-lg font-medium text-foreground tracking-tight">New Note</h1>`;
-  html += `<a href="/" class="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
+  html += `<a href="/" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
   html += `</div>`;
 
   if (error) {

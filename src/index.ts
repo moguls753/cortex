@@ -12,6 +12,7 @@ import { createEntryRoutes } from "./web/entry.js";
 import { createNewNoteRoutes } from "./web/new-note.js";
 import { createSettingsRoutes } from "./web/settings.js";
 import { createMcpHttpHandler } from "./mcp-tools.js";
+import { createDisplayRoutes } from "./display/index.js";
 import { createSSEBroadcaster } from "./web/sse.js";
 import { initializeEmbedding } from "./embed.js";
 import { startBot, isBotRunning } from "./telegram.js";
@@ -86,6 +87,9 @@ async function main(): Promise<void> {
 
   // Static files (CSS, etc.) — before auth so they load on the login page
   app.use("/public/*", serveStatic({ root: "./" }));
+
+  // Display routes — before auth middleware (they handle their own token-based auth)
+  app.route("/", createDisplayRoutes(sql));
 
   // Setup middleware handles both setup-mode detection and authentication
   app.use("*", createSetupMiddleware(sql, sessionSecret));

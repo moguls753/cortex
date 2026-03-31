@@ -125,3 +125,11 @@ export function iconPlay(className?: string): string {
 export function iconDownload(className?: string): string {
   return `<svg ${attrs(className)}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
 }
+
+export function iconMonitor(className?: string): string {
+  return `<svg ${attrs(className)}><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>`;
+}
+
+export function iconCalendar(className?: string): string {
+  return `<svg ${attrs(className)}><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>`;
+}

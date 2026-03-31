@@ -11,6 +11,7 @@ COPY prompts/ prompts/
 COPY public/ public/
 
 RUN npm run build
+RUN cp -r src/display/fonts dist/display/fonts
 
 FROM node:22-slim
 

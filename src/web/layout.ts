@@ -1,6 +1,5 @@
 import {
   iconBrain,
-  iconSearch,
   iconFolderOpen,
   iconTrash2,
   iconSettings,

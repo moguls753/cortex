@@ -70,6 +70,7 @@ function renderCategoryTabs(
   currentTag: string | undefined,
   currentQuery: string | undefined,
   currentMode: string | undefined,
+  unclassifiedCount: number,
 ): string {
   const allActive = !activeCategory;
   const allUrl = buildUrl({ tag: currentTag, q: currentQuery, mode: currentMode });
@@ -81,6 +82,23 @@ function renderCategoryTabs(
     const isActive = activeCategory === cat;
     const url = buildUrl({ category: cat, tag: currentTag, q: currentQuery, mode: currentMode });
     html += `<a href="${escapeHtml(url)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${isActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">${escapeHtml(label)}</a>`;
+  }
+
+  // Unclassified tab — only shown when unclassified entries exist
+  if (unclassifiedCount > 0) {
+    const isActive = activeCategory === "unclassified";
+    const url = buildUrl({ category: "unclassified", tag: currentTag, q: currentQuery, mode: currentMode });
+    html += `<a href="${escapeHtml(url)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${isActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">Unclassified</a>`;
+
+    // Reclassify button — only when Unclassified tab is active
+    if (isActive) {
+      html += `<span class="text-muted-foreground text-xs select-none">·</span>`;
+      html += `<button type="button" id="reclassify-all-btn"
+        class="rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wider border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30">
+        Reclassify all
+      </button>`;
+      html += `<span id="reclassify-all-feedback" class="text-[11px]"></span>`;
+    }
   }
 
   html += `</div>`;
@@ -232,6 +250,11 @@ export function createBrowseRoutes(sql: Sql): Hono {
 
     const tags = (await getFilterTags(sql, { category })) ?? [];
 
+    // Count unclassified entries (for tab visibility)
+    const [{ count: unclassifiedCount }] = await sql`
+      SELECT COUNT(*)::int AS count FROM entries WHERE deleted_at IS NULL AND category IS NULL
+    ` as unknown as [{ count: number }];
+
     const hasResults = entries.length > 0;
     const hasQuery = !!q;
     const hasCategory = !!category;
@@ -240,16 +263,119 @@ export function createBrowseRoutes(sql: Sql): Hono {
       <div class="flex-1 min-h-0 flex flex-col gap-3">
         <div class="shrink-0 flex flex-col gap-2">
           ${renderSearchBar(q, category, tag)}
-          ${renderCategoryTabs(category, tag, q, mode)}
+          ${renderCategoryTabs(category, tag, q, mode, unclassifiedCount)}
           ${renderTagPills(tags, tag, category, q, mode)}
         </div>
         ${notice ? renderNotice(notice) : ""}
         <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin rounded-md border border-border bg-card px-4 py-3">
           ${hasResults ? renderEntryList(entries) : renderEmptyState(hasQuery, hasCategory)}
         </div>
-      </div>`;
+      </div>
+      ${category === "unclassified" && unclassifiedCount > 0 ? `
+      <script>
+      (function() {
+        var btn = document.getElementById('reclassify-all-btn');
+        var feedback = document.getElementById('reclassify-all-feedback');
+        if (!btn || !feedback) return;
+
+        btn.addEventListener('click', function() {
+          btn.disabled = true;
+          feedback.innerHTML = '<span class="text-primary animate-pulse">reclassifying...</span>';
+
+          fetch('/api/reclassify-unclassified', { method: 'POST' })
+            .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+            .then(function(res) {
+              btn.disabled = false;
+              if (!res.ok) {
+                feedback.innerHTML = '<span class="text-destructive">' + (res.data.error || 'Failed') + '</span>';
+                setTimeout(function() { feedback.innerHTML = ''; }, 5000);
+                return;
+              }
+              var d = res.data;
+              if (d.classified > 0) {
+                var msg = d.classified + ' entries reclassified';
+                if (d.remaining > 0) msg += ' — ' + d.remaining + ' remaining';
+                feedback.innerHTML = '<span class="text-primary">' + msg + '</span>';
+                setTimeout(function() { window.location.reload(); }, 1500);
+              } else if (d.total === 0) {
+                feedback.innerHTML = '<span class="text-muted-foreground">No unclassified entries</span>';
+              } else {
+                feedback.innerHTML = '<span class="text-destructive">Classification failed — check LLM settings</span>';
+                setTimeout(function() { feedback.innerHTML = ''; }, 8000);
+              }
+            })
+            .catch(function() {
+              btn.disabled = false;
+              feedback.innerHTML = '<span class="text-destructive">Request failed</span>';
+              setTimeout(function() { feedback.innerHTML = ''; }, 8000);
+            });
+        });
+      })();
+      </script>` : ""}`;
 
     return c.html(renderLayout("Browse", content, "/browse"));
+  });
+
+  // Reclassify all unclassified entries (max 25 per request)
+  let reclassifyRunning = false;
+
+  app.post("/api/reclassify-unclassified", async (c) => {
+    if (reclassifyRunning) {
+      return c.json({ error: "Reclassification already in progress" }, 409);
+    }
+    reclassifyRunning = true;
+
+    try {
+      const rows = await sql`
+        SELECT id, name, content FROM entries
+        WHERE deleted_at IS NULL AND category IS NULL
+        ORDER BY created_at ASC
+        LIMIT 25
+      `;
+
+      if (rows.length === 0) {
+        return c.json({ total: 0, classified: 0 });
+      }
+
+      const { classifyText, assembleContext } = await import("../classify.js");
+      const { resolveConfigValue } = await import("../config.js");
+      const { embedEntry } = await import("../embed.js");
+      const outputLanguage = (await resolveConfigValue("output_language", sql)) || undefined;
+
+      let classified = 0;
+      for (const row of rows) {
+        const text = (row.content as string) || (row.name as string);
+        let contextEntries: Array<{ name: string; category: string | null; content: string | null }> = [];
+        try { contextEntries = await assembleContext(sql, text); } catch { /* */ }
+
+        const result = await classifyText(text, { entryId: row.id as string, contextEntries, outputLanguage, sql });
+
+        if (result && result.category && !result.error) {
+          const tags = result.tags || [];
+          await sql`
+            UPDATE entries SET
+              name = ${result.name || row.name},
+              category = ${result.category},
+              confidence = ${result.confidence},
+              fields = ${sql.json((result.fields || {}) as unknown as Parameters<typeof sql.json>[0])},
+              tags = ${sql.array(tags)},
+              updated_at = NOW()
+            WHERE id = ${row.id}
+          `;
+          try { await embedEntry(sql, row.id as string); } catch { /* */ }
+          classified++;
+        }
+      }
+
+      // Check if more remain
+      const [{ count: remaining }] = await sql`
+        SELECT COUNT(*)::int AS count FROM entries WHERE deleted_at IS NULL AND category IS NULL
+      ` as unknown as [{ count: number }];
+
+      return c.json({ total: rows.length, classified, remaining });
+    } finally {
+      reclassifyRunning = false;
+    }
   });
 
   return app;

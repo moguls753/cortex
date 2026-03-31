@@ -20,6 +20,8 @@ import {
   iconPlay,
   iconDownload,
   iconSearch,
+  iconMonitor,
+  iconCalendar,
 } from "./icons.js";
 import { generateDailyDigest, generateWeeklyReview } from "../digests.js";
 import type { SSEBroadcaster } from "./sse.js";
@@ -197,6 +199,15 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     const gcalRefreshToken = dbSettings.google_refresh_token || "";
     const gcalClientId = dbSettings.google_client_id || "";
     const gcalClientSecret = dbSettings.google_client_secret || "";
+
+    // Kitchen Display config
+    const displayEnabled = dbSettings.display_enabled || "";
+    const displayToken = dbSettings.display_token || "";
+    const displayWeatherLat = dbSettings.display_weather_lat || "";
+    const displayWeatherLng = dbSettings.display_weather_lng || "";
+    const displayMaxTasks = dbSettings.display_max_tasks || "7";
+    const displayWidth = dbSettings.display_width || "";
+    const displayHeight = dbSettings.display_height || "";
     const gcalConnected = !!gcalRefreshToken;
 
     // If tokens exist, try to validate them
@@ -569,7 +580,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
         <!-- ═══ Google Calendar ═══ -->
         <div class="rounded-md border border-border bg-card p-4">
           <div class="flex items-center gap-2 mb-3">
-            ${iconClock("size-3 text-primary")}
+            ${iconCalendar("size-3 text-primary")}
             <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Google Calendar</span>
             <span class="flex-1 h-px bg-border"></span>
           </div>
@@ -677,6 +688,67 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
             <input type="hidden" name="google_calendar_id" value="${escapeHtml(gcalId)}" />
             <input type="hidden" name="google_calendar_default_duration" value="${escapeHtml(gcalDuration)}" />
             `}
+          </div>
+        </div>
+
+        <!-- ═══ Display ═══ -->
+        <div class="rounded-md border border-border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            ${iconMonitor("size-3 text-primary")}
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Display</span>
+            <span class="flex-1 h-px bg-border"></span>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="display_enabled" name="display_enabled" value="true"${displayEnabled === "true" ? " checked" : ""}
+                class="rounded border-border" />
+              <label for="display_enabled" class="text-xs text-muted-foreground">Enable display</label>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label for="display_token" class="text-xs text-muted-foreground">Security Token</label>
+              <input type="text" id="display_token" name="display_token" value="${escapeHtml(displayToken)}"
+                placeholder="Optional — leave blank to disable token auth"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label for="display_weather_lat" class="text-xs text-muted-foreground">Latitude</label>
+                <input type="text" id="display_weather_lat" name="display_weather_lat" value="${escapeHtml(displayWeatherLat)}"
+                  placeholder="e.g. 52.52"
+                  class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label for="display_weather_lng" class="text-xs text-muted-foreground">Longitude</label>
+                <input type="text" id="display_weather_lng" name="display_weather_lng" value="${escapeHtml(displayWeatherLng)}"
+                  placeholder="e.g. 13.405"
+                  class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              </div>
+            </div>
+            <span class="text-[10px] text-muted-foreground">Find coordinates at open-meteo.com</span>
+            <div class="flex flex-col gap-1.5 max-w-xs">
+              <label for="display_max_tasks" class="text-xs text-muted-foreground">Max Tasks</label>
+              <input type="number" id="display_max_tasks" name="display_max_tasks" value="${escapeHtml(displayMaxTasks)}" min="1" max="20"
+                class="h-8 w-24 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label for="display_width" class="text-xs text-muted-foreground">Width (px)</label>
+                <input type="number" id="display_width" name="display_width" value="${escapeHtml(displayWidth)}"
+                  placeholder="e.g. 800"
+                  class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label for="display_height" class="text-xs text-muted-foreground">Height (px)</label>
+                <input type="number" id="display_height" name="display_height" value="${escapeHtml(displayHeight)}"
+                  placeholder="e.g. 480"
+                  class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              </div>
+            </div>
+            ${displayEnabled === "true" ? `
+            <div class="flex items-center gap-2">
+              <a href="/api/kitchen.png" target="_blank" rel="noopener"
+                class="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors">Preview display →</a>
+            </div>` : ""}
           </div>
         </div>
 
@@ -1242,6 +1314,13 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       output_language: (body.output_language as string) || DEFAULTS.output_language,
       google_calendars: Object.keys(calendars).length > 0 ? JSON.stringify(calendars) : "",
       google_calendar_default: (body.google_calendar_default as string) || "",
+      display_enabled: (body.display_enabled as string) || "",
+      display_token: (body.display_token as string) || "",
+      display_weather_lat: (body.display_weather_lat as string) || "",
+      display_weather_lng: (body.display_weather_lng as string) || "",
+      display_max_tasks: (body.display_max_tasks as string) || "",
+      display_width: (body.display_width as string) || "",
+      display_height: (body.display_height as string) || "",
     };
 
     const llmConfig: LLMConfig = {
@@ -1290,6 +1369,13 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       output_language: form.output_language,
       google_calendars: form.google_calendars,
       google_calendar_default: form.google_calendar_default,
+      display_enabled: form.display_enabled,
+      display_token: form.display_token,
+      display_weather_lat: form.display_weather_lat,
+      display_weather_lng: form.display_weather_lng,
+      display_max_tasks: form.display_max_tasks,
+      display_width: form.display_width,
+      display_height: form.display_height,
     };
 
     await saveAllSettings(sql, toSave);

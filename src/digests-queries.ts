@@ -3,7 +3,7 @@ import type { Sql } from "postgres";
 export interface DailyDigestData {
   activeProjects: Array<{ id: string; name: string; fields: Record<string, unknown> }>;
   pendingFollowUps: Array<{ id: string; name: string; fields: Record<string, unknown> }>;
-  upcomingTasks: Array<{ id: string; name: string; fields: Record<string, unknown> }>;
+  upcomingTasks: Array<{ id: string; name: string; content: string | null; fields: Record<string, unknown>; tags: string[] }>;
   yesterdayEntries: Array<{ id: string; name: string; category: string; content: string | null; created_at: Date }>;
 }
 
@@ -46,7 +46,7 @@ export async function getDailyDigestData(sql: Sql): Promise<DailyDigestData> {
   `;
 
   const upcomingTasks = await sql`
-    SELECT id, name, fields FROM entries
+    SELECT id, name, content, fields, tags FROM entries
     WHERE category = 'tasks'
       AND deleted_at IS NULL
       AND fields->>'status' = 'pending'

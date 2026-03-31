@@ -14,10 +14,6 @@ import { embedEntry } from "../embed.js";
 import { handleEntryCalendarCleanup } from "../google-calendar.js";
 import {
   iconTrash2,
-  iconMic,
-  iconMessageSquare,
-  iconGlobe,
-  iconCpu,
 } from "./icons.js";
 import {
   CATEGORIES,
@@ -41,13 +37,6 @@ function categoryBadgeClass(category: string | null): string {
     reference: "badge-reference",
   };
   return map[category] ?? "badge-unclassified";
-}
-
-function sourceIcon(source?: string, sourceType?: string): string {
-  if (sourceType === "voice") return iconMic("size-3 text-muted-foreground");
-  if (source === "telegram") return iconMessageSquare("size-3 text-muted-foreground");
-  if (source === "mcp") return iconCpu("size-3 text-muted-foreground");
-  return iconGlobe("size-3 text-muted-foreground");
 }
 
 function formatDate(date: Date): string {
@@ -111,16 +100,6 @@ function renderViewPage(entry: {
     html += `<span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium bg-destructive text-destructive-foreground">Deleted</span>`;
   }
 
-  if (entry.source_type === "voice") {
-    html += `<span class="flex items-center gap-1 text-[10px] text-muted-foreground">${sourceIcon(entry.source, entry.source_type)} voice</span>`;
-  } else {
-    html += `<span class="flex items-center gap-1 text-[10px] text-muted-foreground">${sourceIcon(entry.source, entry.source_type)} ${escapeHtml(entry.source)}</span>`;
-  }
-
-  if (entry.confidence !== null) {
-    html += `<span class="text-[10px] text-muted-foreground">${entry.confidence}</span>`;
-  }
-
   html += `</div>`; // badges row
   html += `</div>`; // left side
 
@@ -173,6 +152,7 @@ function renderViewPage(entry: {
   html += `</div>`;
 
   html += `</div>`;
+
   return html;
 }
 
@@ -192,7 +172,7 @@ function renderEditPage(
 
   html += `<div class="flex items-center justify-between">`;
   html += `<h1 class="text-lg font-medium text-foreground tracking-tight">Edit Entry</h1>`;
-  html += `<a href="/entry/${escapeHtml(entry.id)}" class="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
+  html += `<a href="/entry/${escapeHtml(entry.id)}" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
   html += `</div>`;
 
   if (error) {
@@ -285,7 +265,7 @@ function renderEditPage(
   // Submit
   html += `<div class="flex items-center gap-2">`;
   html += `<button type="submit" class="rounded-md px-4 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save</button>`;
-  html += `<a href="/entry/${escapeHtml(entry.id)}" class="rounded-md px-4 py-1.5 text-xs text-muted-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
+  html += `<a href="/entry/${escapeHtml(entry.id)}" class="rounded-md px-4 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
   html += `</div>`;
 
   html += `</form>`;

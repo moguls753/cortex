@@ -20,7 +20,7 @@ export async function browseEntries(
            source, source_type, deleted_at, created_at, updated_at
     FROM entries
     WHERE deleted_at IS NULL
-      ${category ? sql`AND category = ${category}` : sql``}
+      ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
       ${tag ? sql`AND ${tag} = ANY(tags)` : sql``}
     ORDER BY updated_at DESC
   `;
@@ -44,7 +44,7 @@ export async function semanticSearch(
     WHERE deleted_at IS NULL
       AND embedding IS NOT NULL
       AND 1 - (embedding <=> ${embeddingLiteral}::vector(1024)) >= 0.5
-      ${category ? sql`AND category = ${category}` : sql``}
+      ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
       ${tag ? sql`AND ${tag} = ANY(tags)` : sql``}
     ORDER BY similarity DESC
   `;
@@ -66,7 +66,7 @@ export async function textSearch(
     FROM entries
     WHERE deleted_at IS NULL
       AND (name ILIKE ${pattern} OR content ILIKE ${pattern})
-      ${category ? sql`AND category = ${category}` : sql``}
+      ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
       ${tag ? sql`AND ${tag} = ANY(tags)` : sql``}
     ORDER BY updated_at DESC
   `;
@@ -83,7 +83,7 @@ export async function getFilterTags(
     SELECT DISTINCT unnest(tags) AS tag
     FROM entries
     WHERE deleted_at IS NULL
-      ${category ? sql`AND category = ${category}` : sql``}
+      ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
     ORDER BY tag
   `;
   return rows.map((r) => r.tag as string);

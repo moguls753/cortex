@@ -374,13 +374,15 @@ function renderClientScript(): string {
       input.disabled = false;
       updateSubmit();
       if (res.ok) {
+        var e = document.createElement('div');
+        function esc(s) { e.textContent = s; return e.innerHTML; }
         var cat = res.data.category || 'unclassified';
         var conf = res.data.confidence ? Math.round(res.data.confidence * 100) + '%' : '';
         if (res.data.classificationError) {
-          feedback.innerHTML = '<span class="text-destructive">Saved but classification failed: ' + res.data.classificationError + '</span>';
+          feedback.innerHTML = '<span class="text-destructive">Saved but classification failed: ' + esc(res.data.classificationError) + '</span>';
           setTimeout(function() { feedback.innerHTML = ''; }, 8000);
         } else {
-          feedback.innerHTML = '<span class="text-primary">Captured as <strong>' + cat + '</strong>: ' + (res.data.name || '') + (conf ? ' (' + conf + ')' : '') + '</span>';
+          feedback.innerHTML = '<span class="text-primary">Captured as <strong>' + esc(cat) + '</strong>: ' + esc(res.data.name || '') + (conf ? ' (' + conf + ')' : '') + '</span>';
           setTimeout(function() { feedback.innerHTML = ''; }, 3000);
         }
       }

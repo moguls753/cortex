@@ -205,8 +205,13 @@ export function createSetupMiddleware(sql: Sql, secret?: string): MiddlewareHand
   return async (c, next) => {
     const path = c.req.path;
 
-    // Always allow health, public assets
-    if (path === "/health" || path.startsWith("/public/")) {
+    // Always allow health, public assets, display endpoints
+    if (
+      path === "/health" ||
+      path.startsWith("/public/") ||
+      path === "/api/kitchen.png" ||
+      path === "/api/display"
+    ) {
       await next();
       return;
     }

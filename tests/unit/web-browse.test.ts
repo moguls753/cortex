@@ -72,7 +72,11 @@ async function createTestBrowse(): Promise<{ app: Hono }> {
   );
   const { createBrowseRoutes } = await import("../../src/web/browse.js");
 
-  const mockSql = {} as any;
+  // Mock sql as a tagged template function that handles the unclassified count query
+  const mockSql = Object.assign(
+    vi.fn().mockResolvedValue([{ count: 0 }]),
+    { array: vi.fn((a: string[]) => a), json: vi.fn((v: unknown) => v) },
+  ) as any;
 
   const app = new Hono();
   app.use("*", createAuthMiddleware(TEST_SECRET));

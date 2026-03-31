@@ -151,8 +151,6 @@ describe("Web Entry", () => {
       expect(body).toContain("<strong");
       expect(body).toContain("status");
       expect(body).toContain("next_action");
-      expect(body).toContain("telegram");
-      expect(body).toContain("0.85");
       // Edit button
       expect(body).toContain(`/entry/${TEST_UUID}/edit`);
       // Delete button
@@ -532,25 +530,7 @@ describe("Web Entry", () => {
     });
 
     // TS-5.5
-    it("shows voice indicator for voice source entry", async () => {
-      const { getEntry } = await import("../../src/web/entry-queries.js");
-      vi.mocked(getEntry).mockResolvedValue(
-        createMockEntry({
-          source: "telegram",
-          source_type: "voice",
-        }),
-      );
-
-      const { app } = await createTestEntry();
-      const cookie = await loginAndGetCookie(app);
-
-      const res = await app.request(`/entry/${TEST_UUID}`, {
-        headers: { Cookie: cookie },
-      });
-
-      const body = await res.text();
-      expect(body).toMatch(/voice/i);
-    });
+    // Voice indicator removed — source info not shown on entry detail page
 
     // TS-5.6
     it("renders very long content without layout breaks", async () => {
