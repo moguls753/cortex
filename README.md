@@ -21,6 +21,7 @@
 - **Capture** - Telegram bot with text and voice (faster-whisper), web dashboard with quick capture and full editor, MCP server
 - **Intelligence** - LLM classification into 5 categories with confidence scoring, context-aware (uses recent + similar entries), inline Telegram buttons for low-confidence entries, `/fix` to reclassify
 - **Search** - semantic search via pgvector + snowflake-arctic-embed2 with text fallback, filter by category/tags/date, multilingual (EN/DE)
+- **Google Calendar** - automatic event creation from classified entries, multi-calendar support with LLM-based routing
 - **Digests** - daily briefing and weekly review, delivered by email and shown on the dashboard
 - **Self-hosted** - local embeddings, local voice transcription, LLM-agnostic (Anthropic, OpenAI, or any compatible endpoint), soft delete, 7 MCP tools
 
@@ -28,26 +29,30 @@
 
 ```bash
 git clone https://github.com/moguls753/cortex.git && cd cortex
-cp .env.example .env
 ```
 
-Open `.env` and add your LLM API key:
+Create a `.env` file with a database password:
 
-```
-LLM_API_KEY=your-key-here
+```bash
+echo "POSTGRES_PASSWORD=changeme" > .env
 ```
 
-Then start everything:
+Start everything:
 
 ```bash
 docker compose up -d
 ```
 
-This boots PostgreSQL, Ollama, Whisper, and the app. The embedding model is pulled automatically on first start.
+This boots PostgreSQL, Ollama (embeddings), Whisper (voice transcription), and the app. The embedding model is pulled automatically on first start.
 
-Open `http://localhost:3000`, log in with password `cortex`, and you're ready to go.
+Open `http://localhost:3000` and the **setup wizard** will walk you through:
 
-For Telegram capture, also set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env`. All settings are editable at runtime from the Settings page.
+1. **Account** - create your login credentials
+2. **LLM** - pick a provider (Anthropic, OpenAI, Groq, Gemini, LM Studio, Ollama) and enter your API key
+3. **Telegram** - optionally connect a Telegram bot for capture
+4. **Done** - start using Cortex
+
+Everything is reconfigurable later from the Settings page.
 
 ## MCP
 
@@ -81,20 +86,17 @@ If you run classification and digests through a local LLM via Ollama instead of 
 
 ## Configuration
 
-Env vars serve as defaults. Everything is overridable from the Settings page at runtime.
+All configuration is done through the setup wizard and the Settings page. No `.env` editing required beyond `POSTGRES_PASSWORD`.
+
+If you prefer env vars, they serve as defaults and are overridden by settings saved in the database:
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_PROVIDER` | `anthropic` | `anthropic` or `openai-compatible` |
-| `LLM_API_KEY` | | API key for classification and digests |
-| `LLM_MODEL` | `claude-sonnet-4-20250514` | Model for classification and digests |
-| `LLM_BASE_URL` | | Base URL for OpenAI-compatible endpoints |
-| `OLLAMA_MODEL` | `snowflake-arctic-embed2` | Embedding model |
+| `POSTGRES_PASSWORD` | *(required)* | Database password |
 | `PORT` | `3000` | Web server port |
 | `TZ` | `Europe/Berlin` | Timezone for digest scheduling |
-| `DAILY_DIGEST_CRON` | `30 7 * * *` | Daily digest schedule |
-| `WEEKLY_DIGEST_CRON` | `0 16 * * 0` | Weekly review schedule |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | | SMTP for email digests |
+| `DIGEST_EMAIL_FROM` / `DIGEST_EMAIL_TO` | | Email addresses for digests |
 
 ## Development
 
