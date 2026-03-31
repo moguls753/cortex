@@ -790,7 +790,7 @@ function renderStep2(llmConfig: LLMConfig): string {
           if (existingKey && existingKey.value) {
             fetchModels(p, existingKey.value);
           } else {
-            showModelText('Enter API key to load models');
+            showModelText('Add key to load');
           }
         } else {
           showModelText('e.g. local-model-name');
@@ -869,25 +869,30 @@ function renderStep3(): string {
         <span class="flex-1 h-px bg-border"></span>
       </div>
       <form method="POST" action="/setup/step/3" class="space-y-3">
+        <div class="rounded border border-border/60 bg-secondary/50 px-3 py-2.5 space-y-1.5">
+          <div class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">How to create a bot</div>
+          <ol class="text-[10px] text-muted-foreground space-y-0.5 list-decimal list-inside">
+            <li>Open <a href="https://t.me/BotFather" target="_blank" rel="noopener" class="text-primary hover:underline">@BotFather</a> in Telegram</li>
+            <li>Send <code class="text-primary font-mono">/newbot</code>, pick a name and username</li>
+            <li>Copy the token and paste it below</li>
+          </ol>
+        </div>
         <div class="flex flex-col gap-1.5">
           <label for="telegram_bot_token" class="text-xs text-muted-foreground">Bot Token</label>
           <input type="text" id="telegram_bot_token" name="telegram_bot_token"
             placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
             class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
-          <span class="text-[10px] text-muted-foreground">
-            Get a bot token from <a href="https://t.me/BotFather" target="_blank" rel="noopener" class="text-primary hover:underline">@BotFather</a> on Telegram.
-            Send <code class="text-primary">/newbot</code> and follow the instructions.
-          </span>
         </div>
         <div class="flex flex-col gap-1.5">
-          <label for="telegram_chat_id" class="text-xs text-muted-foreground">Chat ID</label>
+          <label for="telegram_chat_id" class="text-xs text-muted-foreground">Chat ID <span class="text-muted-foreground/60">(optional)</span></label>
           <input type="text" id="telegram_chat_id" name="telegram_chat_id"
             placeholder="123456789"
             class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
           <span class="text-[10px] text-muted-foreground">
-            Your numeric chat ID. Send a message to your bot, then visit
-            <code class="text-primary">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code>
-            to find it.
+            Send any message to your bot, then find your chat ID in
+            <a href="/settings" class="text-primary hover:underline">Settings</a>
+            or by messaging <a href="https://t.me/userinfobot" target="_blank" rel="noopener" class="text-primary hover:underline">@userinfobot</a> on Telegram.
+            You can also add it later.
           </span>
         </div>
         <div class="flex items-center justify-between pt-1">
