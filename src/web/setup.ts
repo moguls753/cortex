@@ -557,7 +557,7 @@ const OLLAMA_RECOMMENDED = [
 ];
 
 function renderStep2(llmConfig: LLMConfig): string {
-  const provider = llmConfig.provider || "anthropic";
+  const provider = llmConfig.provider || "ollama";
   const model = llmConfig.model || "";
   const activePreset = PROVIDER_PRESETS[provider];
   const activeNeedsKey = activePreset?.needsKey ?? false;
