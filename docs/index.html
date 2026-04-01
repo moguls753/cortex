@@ -782,7 +782,7 @@
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <a href="#" class="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors">Preview display &rarr;</a>
+                <a href="#" onclick="switchView('display');return false" class="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors">Preview display &rarr;</a>
               </div>
             </div>
           </div>
@@ -799,6 +799,148 @@
       </main>
     </div>
 
+
+    <!-- ═══════════════════ DISPLAY PREVIEW ═══════════════════ -->
+    <div id="view-display" class="view-panel hidden">
+      <div class="flex items-center gap-2 mb-3 shrink-0">
+        <button onclick="switchView('settings');return false" class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          Back to Settings
+        </button>
+        <span class="text-[10px] text-muted-foreground">E-ink Kitchen Display Preview</span>
+      </div>
+      <div class="flex-1 min-h-0 flex items-center justify-center overflow-auto">
+        <div style="background:#f5f5f5;color:#1a1a1a;font-family:'JetBrains Mono',monospace;width:720px;aspect-ratio:1872/1404;padding:24px;display:flex;flex-direction:column;border-radius:6px;border:1px solid var(--border);">
+
+          <!-- Header -->
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid #1a1a1a;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>
+              <span style="font-size:16px;font-weight:500;letter-spacing:0.05em;">cortex</span>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:12px;color:#555;">Monday, March 9, 2026</div>
+              <div style="font-size:18px;font-weight:500;">07:30</div>
+            </div>
+          </div>
+
+          <!-- Weather strip -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #ccc;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              <div>
+                <span style="font-size:32px;font-weight:300;">8°C</span>
+                <div style="font-size:10px;color:#888;">Clear Sky</div>
+              </div>
+              <div style="font-size:10px;color:#888;margin-left:8px;">
+                H 14° &nbsp; L 3°
+              </div>
+            </div>
+            <div style="display:flex;gap:16px;">
+              <div style="text-align:center;font-size:9px;color:#888;"><div>08:00</div><div style="color:#1a1a1a;font-size:11px;">9°</div></div>
+              <div style="text-align:center;font-size:9px;color:#888;"><div>09:00</div><div style="color:#1a1a1a;font-size:11px;">11°</div></div>
+              <div style="text-align:center;font-size:9px;color:#888;"><div>10:00</div><div style="color:#1a1a1a;font-size:11px;">12°</div></div>
+              <div style="text-align:center;font-size:9px;color:#888;"><div>11:00</div><div style="color:#1a1a1a;font-size:11px;">13°</div></div>
+            </div>
+          </div>
+
+          <!-- Main content: two columns -->
+          <div style="display:flex;flex:1;gap:24px;padding-top:16px;min-height:0;">
+
+            <!-- Left: Calendar events -->
+            <div style="flex:2;display:flex;flex-direction:column;overflow:hidden;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
+                <span style="font-size:12px;font-weight:500;letter-spacing:0.15em;text-transform:uppercase;">Today</span>
+                <span style="flex:1;height:1px;background:#1a1a1a;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:50px;color:#888;font-size:11px;flex-shrink:0;">09:00</span>
+                  <span style="flex:1;">Standup with Lisa</span>
+                  <span style="font-size:7px;color:#888;border:1px solid #888;border-radius:2px;padding:0 4px;">WORK</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:50px;color:#888;font-size:11px;flex-shrink:0;">10:30</span>
+                  <span style="flex:1;">Dentist Dr. Schneider</span>
+                  <span style="font-size:7px;color:#888;border:1px solid #888;border-radius:2px;padding:0 4px;">PERSONAL</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:50px;color:#888;font-size:11px;flex-shrink:0;">14:00</span>
+                  <span style="flex:1;">Design review</span>
+                  <span style="font-size:7px;color:#888;border:1px solid #888;border-radius:2px;padding:0 4px;">WORK</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:50px;color:#888;font-size:11px;flex-shrink:0;">18:00</span>
+                  <span style="flex:1;">Bouldering with Max</span>
+                  <span style="font-size:7px;color:#888;border:1px solid #888;border-radius:2px;padding:0 4px;">PERSONAL</span>
+                </div>
+              </div>
+
+              <!-- Tomorrow -->
+              <div style="display:flex;align-items:center;gap:6px;margin-top:16px;margin-bottom:8px;">
+                <span style="font-size:10px;font-weight:500;letter-spacing:0.15em;text-transform:uppercase;color:#555;">Tomorrow</span>
+                <span style="flex:1;height:1px;background:#ccc;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:11px;color:#555;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:50px;color:#888;font-size:10px;flex-shrink:0;">all day</span>
+                  <span style="flex:1;">Easter dinner prep</span>
+                  <span style="font-size:7px;color:#888;border:1px solid #ccc;border-radius:2px;padding:0 4px;">PERSONAL</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="width:50px;color:#888;font-size:10px;flex-shrink:0;">11:00</span>
+                  <span style="flex:1;">Sprint planning</span>
+                  <span style="font-size:7px;color:#888;border:1px solid #ccc;border-radius:2px;padding:0 4px;">WORK</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Vertical divider -->
+            <div style="width:1px;background:#ccc;"></div>
+
+            <!-- Right: Tasks -->
+            <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
+                <span style="font-size:12px;font-weight:500;letter-spacing:0.15em;text-transform:uppercase;">Don't Forget</span>
+                <span style="flex:1;height:1px;background:#1a1a1a;"></span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:11px;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:12px;height:12px;border:1.5px solid #1a1a1a;border-radius:2px;flex-shrink:0;"></span>
+                  <span style="flex:1;">Call landlord about Sendling</span>
+                  <span style="font-size:8px;color:#888;font-weight:bold;">overdue</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:12px;height:12px;border:1.5px solid #1a1a1a;border-radius:2px;flex-shrink:0;"></span>
+                  <span style="flex:1;">Renew health insurance card</span>
+                  <span style="font-size:8px;color:#888;">due Wed</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:12px;height:12px;border:1.5px solid #1a1a1a;border-radius:2px;flex-shrink:0;"></span>
+                  <span style="flex:1;">Fix bike rear brake</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:12px;height:12px;background:#1a1a1a;border-radius:2px;flex-shrink:0;position:relative;"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#f5f5f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;top:1px;left:1px;"><path d="M20 6 9 17l-5-5"/></svg></span>
+                  <span style="flex:1;color:#888;text-decoration:line-through;">Send invoice to client</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="display:inline-block;width:12px;height:12px;background:#1a1a1a;border-radius:2px;flex-shrink:0;position:relative;"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#f5f5f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;top:1px;left:1px;"><path d="M20 6 9 17l-5-5"/></svg></span>
+                  <span style="flex:1;color:#888;text-decoration:line-through;">Buy groceries</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid #ccc;font-size:8px;color:#888;margin-top:auto;">
+            <span>Last updated 07:30</span>
+            <span>cortex v0.1</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Status bar -->
     <footer class="flex items-center justify-between text-[10px] text-muted-foreground shrink-0">
