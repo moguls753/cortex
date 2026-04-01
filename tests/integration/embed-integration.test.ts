@@ -22,14 +22,11 @@ import {
   createFakeEmbedding,
   createEmbedResponse,
   createErrorResponse,
-  createOllamaRouter,
 } from "../helpers/mock-ollama.js";
-import { withEnv } from "../helpers/env.js";
 import { startTestDb, runMigrations, type TestDb } from "../helpers/test-db.js";
 
 // Types for the embed module
 type EmbedEntry = (sql: postgres.Sql, entryId: string) => Promise<void>;
-type RetryFailedEmbeddings = (sql: postgres.Sql) => Promise<void>;
 
 // ---------------------------------------------------------------------------
 // Test data helpers
@@ -73,7 +70,6 @@ async function insertEntry(
 describe("Embedding integration", () => {
   let db: TestDb;
   let embedEntry: EmbedEntry;
-  let retryFailedEmbeddings: RetryFailedEmbeddings;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeAll(async () => {
@@ -82,7 +78,6 @@ describe("Embedding integration", () => {
 
     const mod = await import("../../src/embed.js");
     embedEntry = mod.embedEntry;
-    retryFailedEmbeddings = mod.retryFailedEmbeddings;
   }, 120_000);
 
   afterAll(async () => {
@@ -125,7 +120,7 @@ describe("Embedding integration", () => {
     // TS-EC-3
     it("handles model deletion by logging error and storing null embedding", async () => {
       fetchSpy.mockResolvedValue(
-        createErrorResponse(500, "model 'snowflake-arctic-embed2' not found"),
+        createErrorResponse(500, "model 'qwen3-embedding' not found"),
       );
       const stdoutSpy = vi
         .spyOn(process.stdout, "write")
@@ -180,20 +175,19 @@ describe("Embedding integration", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Retry mechanism
+  // Piggyback embedding (embedEntry also embeds other pending entries)
   // ---------------------------------------------------------------------------
-  describe("Retry mechanism", () => {
+  describe("Piggyback embedding", () => {
     // TS-3.2
-    it("finds only entries with null embeddings for retry", async () => {
+    it("embeds other entries with null embeddings when embedding a target", async () => {
       fetchSpy.mockResolvedValue(createEmbedResponse());
 
-      // Two entries with null embedding, one with a valid embedding
-      await insertEntry(db.sql, {
-        name: "no-embed-1",
+      const entry1 = await insertEntry(db.sql, {
+        name: "target-entry",
         content: "Content 1",
       });
       await insertEntry(db.sql, {
-        name: "no-embed-2",
+        name: "pending-entry",
         content: "Content 2",
       });
       await insertEntry(db.sql, {
@@ -202,94 +196,95 @@ describe("Embedding integration", () => {
         embedding: createFakeEmbedding(),
       });
 
-      await retryFailedEmbeddings(db.sql);
+      await embedEntry(db.sql, entry1.id);
 
       const embedCalls = fetchSpy.mock.calls.filter(([url]) =>
         url.toString().includes("/api/embed"),
       );
+      // target + 1 pending (not the one that already has embedding)
       expect(embedCalls.length).toBe(2);
     });
 
     // TS-3.3
-    it("generates and stores embedding on retry", async () => {
-      fetchSpy.mockImplementation(
-        createOllamaRouter({ tagsModels: ["snowflake-arctic-embed2"], embedResult: undefined }),
-      );
+    it("generates and stores embedding for pending entries", async () => {
+      fetchSpy.mockResolvedValue(createEmbedResponse());
 
-      const entry = await insertEntry(db.sql, {
-        name: "retry-me",
-        content: "Needs embedding",
+      const target = await insertEntry(db.sql, {
+        name: "target",
+        content: "Target content",
+      });
+      const pending = await insertEntry(db.sql, {
+        name: "pending",
+        content: "Pending content",
       });
 
-      await retryFailedEmbeddings(db.sql);
+      await embedEntry(db.sql, target.id);
 
       const rows = await db.sql`
         SELECT embedding IS NOT NULL as has_embedding,
                vector_dims(embedding) as dim
-        FROM entries WHERE id = ${entry.id}
+        FROM entries WHERE id = ${pending.id}
       `;
       expect(rows[0].has_embedding).toBe(true);
-      expect(rows[0].dim).toBe(1024);
+      expect(rows[0].dim).toBe(4096);
     });
 
     // TS-3.4
-    it("logs error and leaves embedding null on retry failure", async () => {
-      fetchSpy.mockResolvedValue(
-        createErrorResponse(500, "internal error"),
-      );
-      const stdoutSpy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation(() => true);
+    it("silently skips pending entries that fail to embed", async () => {
+      let callCount = 0;
+      fetchSpy.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve(createEmbedResponse());
+        return Promise.resolve(createErrorResponse(500, "internal error"));
+      });
 
-      const entry = await insertEntry(db.sql, {
+      const target = await insertEntry(db.sql, {
+        name: "target",
+        content: "Target content",
+      });
+      const failing = await insertEntry(db.sql, {
         name: "will-fail",
         content: "Content",
       });
 
-      await retryFailedEmbeddings(db.sql);
-
-      const logOutput = stdoutSpy.mock.calls
-        .map(([chunk]) => chunk.toString())
-        .join("");
-      expect(logOutput).toContain('"level":"error"');
-      expect(logOutput).toContain(entry.id);
+      await embedEntry(db.sql, target.id);
 
       const rows = await db.sql`
         SELECT embedding IS NULL as is_null
-        FROM entries WHERE id = ${entry.id}
+        FROM entries WHERE id = ${failing.id}
       `;
       expect(rows[0].is_null).toBe(true);
     });
 
     // TS-EC-6
-    it("retries entries sequentially in created_at order", async () => {
+    it("processes pending entries in created_at order", async () => {
       fetchSpy.mockResolvedValue(createEmbedResponse());
 
       const now = Date.now();
       const entryA = await insertEntry(db.sql, {
         name: "entry-a",
         content: "Content A",
-        createdAt: new Date(now - 180_000), // 3 min ago
+        createdAt: new Date(now - 180_000),
       });
-      const entryB = await insertEntry(db.sql, {
+      await insertEntry(db.sql, {
         name: "entry-b",
         content: "Content B",
-        createdAt: new Date(now - 120_000), // 2 min ago
+        createdAt: new Date(now - 120_000),
       });
-      const entryC = await insertEntry(db.sql, {
+      await insertEntry(db.sql, {
         name: "entry-c",
         content: "Content C",
-        createdAt: new Date(now - 60_000), // 1 min ago
+        createdAt: new Date(now - 60_000),
       });
 
-      await retryFailedEmbeddings(db.sql);
+      await embedEntry(db.sql, entryA.id);
 
       const embedCalls = fetchSpy.mock.calls.filter(([url]) =>
         url.toString().includes("/api/embed"),
       );
+      // entry-a (target) + entry-b + entry-c (pending, ordered by created_at)
       expect(embedCalls.length).toBe(3);
 
-      // Verify ordering: A before B before C
       const texts = embedCalls.map(([, options]) => {
         const body = JSON.parse((options as RequestInit).body as string);
         return body.input as string;
@@ -297,83 +292,6 @@ describe("Embedding integration", () => {
       expect(texts[0]).toContain("entry-a");
       expect(texts[1]).toContain("entry-b");
       expect(texts[2]).toContain("entry-c");
-    });
-
-    // TS-EC-8
-    it("re-pulls missing model during retry", async () => {
-      // Router: tags shows no models → pull succeeds → embed succeeds
-      fetchSpy.mockImplementation(
-        createOllamaRouter({
-          tagsModels: [],
-          pullResult: "success",
-        }),
-      );
-
-      const entry = await insertEntry(db.sql, {
-        name: "needs-pull",
-        content: "Content",
-      });
-
-      await retryFailedEmbeddings(db.sql);
-
-      // Verify the sequence: tags → pull → embed
-      const tagsCalls = fetchSpy.mock.calls.filter(([url]) =>
-        url.toString().includes("/api/tags"),
-      );
-      const pullCalls = fetchSpy.mock.calls.filter(([url]) =>
-        url.toString().includes("/api/pull"),
-      );
-      const embedCalls = fetchSpy.mock.calls.filter(([url]) =>
-        url.toString().includes("/api/embed"),
-      );
-      expect(tagsCalls.length).toBeGreaterThanOrEqual(1);
-      expect(pullCalls.length).toBe(1);
-      expect(embedCalls.length).toBe(1);
-
-      // Entry should have embedding after retry
-      const rows = await db.sql`
-        SELECT embedding IS NOT NULL as has_embedding
-        FROM entries WHERE id = ${entry.id}
-      `;
-      expect(rows[0].has_embedding).toBe(true);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Configuration resolution
-  // ---------------------------------------------------------------------------
-  describe("Configuration resolution", () => {
-    // TS-C-2
-    it("uses Ollama URL from settings table over env var", async () => {
-      const restoreEnv = withEnv({
-        OLLAMA_URL: "http://env-ollama:11434",
-      });
-
-      try {
-        await db.sql`
-          INSERT INTO settings (key, value) VALUES ('ollama_url', 'http://db-ollama:11434')
-        `;
-
-        fetchSpy.mockResolvedValue(createEmbedResponse());
-
-        const entry = await insertEntry(db.sql, {
-          name: "config-test",
-          content: "Content",
-        });
-
-        // Use retry (which resolves URL from DB) rather than direct call
-        await retryFailedEmbeddings(db.sql);
-
-        const embedCalls = fetchSpy.mock.calls.filter(([url]) =>
-          url.toString().includes("/api/embed"),
-        );
-        expect(embedCalls.length).toBeGreaterThanOrEqual(1);
-        const calledUrl = embedCalls[0][0].toString();
-        expect(calledUrl).toContain("http://db-ollama:11434");
-        expect(calledUrl).not.toContain("http://env-ollama:11434");
-      } finally {
-        restoreEnv();
-      }
     });
   });
 
@@ -384,7 +302,7 @@ describe("Embedding integration", () => {
     // TS-NG-1
     it("regenerates embedding when entry content is updated", async () => {
       const originalEmbedding = createFakeEmbedding();
-      const newEmbedding = Array.from({ length: 1024 }, (_, i) =>
+      const newEmbedding = Array.from({ length: 4096 }, (_, i) =>
         Math.cos(i) * 0.5,
       );
 

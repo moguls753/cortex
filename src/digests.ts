@@ -11,13 +11,10 @@ import {
   getDailyDigestData,
   getWeeklyReviewData,
   cacheDigest,
-  getEntriesNeedingRetry,
   type DailyDigestData,
   type WeeklyReviewData,
 } from "./digests-queries.js";
 import { sendDigestEmail, isSmtpConfigured } from "./email.js";
-import { embedEntry } from "./embed.js";
-import { classifyEntry } from "./classify.js";
 import cron from "node-cron";
 
 const log = createLogger("digests");
@@ -271,40 +268,6 @@ export async function generateWeeklyReview(sql: Sql, broadcaster?: SSEBroadcaste
   }
 }
 
-export async function runBackgroundRetry(sql: Sql): Promise<void> {
-  const entries = await getEntriesNeedingRetry(sql, 50);
-  if (entries.length === 0) return;
-
-  for (const entry of entries) {
-    if (entry.embedding === null) {
-      try {
-        await embedEntry(sql, entry.id);
-      } catch (err) {
-        console.error(JSON.stringify({
-          module: "digests",
-          action: "embed_retry",
-          entryId: entry.id,
-          entryName: entry.name,
-          error: err instanceof Error ? err.message : String(err),
-        }));
-      }
-    }
-
-    if (entry.category === null) {
-      try {
-        await classifyEntry(sql, entry.id);
-      } catch (err) {
-        console.error(JSON.stringify({
-          module: "digests",
-          action: "classify_retry",
-          entryId: entry.id,
-          entryName: entry.name,
-          error: err instanceof Error ? err.message : String(err),
-        }));
-      }
-    }
-  }
-}
 
 export async function startScheduler(
   sql: Sql,
@@ -333,11 +296,7 @@ export async function startScheduler(
       generateWeeklyReview(sql, broadcaster);
     }, { timezone });
 
-    const retryJob = cron.schedule("*/15 * * * *", () => {
-      runBackgroundRetry(sql);
-    }, { timezone });
-
-    jobs = [dailyJob, weeklyJob, retryJob];
+    jobs = [dailyJob, weeklyJob];
   }
 
   await scheduleAll();

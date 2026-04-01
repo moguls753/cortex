@@ -163,8 +163,8 @@ describe("DB NOTIFY Integration", () => {
       // Small delay to ensure the INSERT notification is drained
       await new Promise((r) => setTimeout(r, 100));
 
-      // Simulate embedding update — generate a fake 1024-dim vector
-      const fakeVec = `[${Array.from({ length: 1024 }, (_, i) => Math.sin(i) * 0.5).join(",")}]`;
+      // Simulate embedding update — generate a fake 4096-dim vector
+      const fakeVec = `[${Array.from({ length: 4096 }, (_, i) => Math.sin(i) * 0.5).join(",")}]`;
       await db.sql`UPDATE entries SET embedding = ${fakeVec}::vector WHERE id = ${entryId}`;
 
       await new Promise((r) => setTimeout(r, 300));

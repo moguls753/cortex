@@ -31,7 +31,7 @@ const TEST_SECRET = "test-session-secret-at-least-32-chars-long!!";
 // ─── Module Mocks (external services only) ──────────────────────────
 
 vi.mock("../../src/embed.js", () => ({
-  generateEmbedding: vi.fn().mockResolvedValue(new Array(1024).fill(0)),
+  generateEmbedding: vi.fn().mockResolvedValue(new Array(4096).fill(0)),
 }));
 
 // ─── Types & Factories ─────────────────────────────────────────────
@@ -75,14 +75,14 @@ function createMockEntry(overrides: EntryData = {}): Required<EntryData> {
 
 function createQueryEmbedding(): number[] {
   // Unit vector in first dimension: [1, 0, 0, ..., 0]
-  const vec = new Array(1024).fill(0);
+  const vec = new Array(4096).fill(0);
   vec[0] = 1;
   return vec;
 }
 
 function createSimilarEmbedding(): number[] {
   // Cosine similarity ~0.8 to query embedding
-  const vec = new Array(1024).fill(0);
+  const vec = new Array(4096).fill(0);
   vec[0] = 0.8;
   vec[1] = 0.6;
   return vec;
@@ -90,7 +90,7 @@ function createSimilarEmbedding(): number[] {
 
 function createDissimilarEmbedding(): number[] {
   // Cosine similarity ~0.3 to query embedding (below 0.5 threshold)
-  const vec = new Array(1024).fill(0);
+  const vec = new Array(4096).fill(0);
   vec[0] = 0.3;
   vec[1] = 0.954;
   return vec;
@@ -106,7 +106,7 @@ async function seedEntry(
   const embedding = entry.embedding;
 
   if (embedding) {
-    // Cast embedding array to pgvector via string literal + ::vector(1024)
+    // Cast embedding array to pgvector via string literal + ::vector(4096)
     const embeddingLiteral = `[${embedding.join(",")}]`;
     await sql`
       INSERT INTO entries (id, name, category, content, fields, tags, confidence,
@@ -114,7 +114,7 @@ async function seedEntry(
       VALUES (${entry.id}, ${entry.name}, ${entry.category}, ${entry.content},
               ${JSON.stringify(entry.fields)}, ${entry.tags}, ${entry.confidence},
               ${entry.source}, ${entry.source_type},
-              ${embeddingLiteral}::vector(1024),
+              ${embeddingLiteral}::vector(4096),
               ${entry.deleted_at}, ${entry.created_at}, ${entry.updated_at})
     `;
   } else {

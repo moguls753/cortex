@@ -58,19 +58,19 @@ describe("Embedding", () => {
   // ---------------------------------------------------------------------------
   describe("Embedding generation", () => {
     // TS-1.1
-    it("returns a 1024-dimensional float array for text input", async () => {
+    it("returns a 4096-dimensional float array for text input", async () => {
       fetchSpy.mockResolvedValueOnce(createEmbedResponse());
 
       const result = await generateEmbedding("This is a test sentence");
 
       expect(result).not.toBeNull();
-      expect(result).toHaveLength(1024);
+      expect(result).toHaveLength(4096);
       expect(result!.every((n) => Number.isFinite(n))).toBe(true);
 
       // Verify the request uses the correct model
       const [, options] = fetchSpy.mock.calls[0];
       const body = JSON.parse((options as RequestInit).body as string);
-      expect(body.model).toBe("snowflake-arctic-embed2");
+      expect(body.model).toBe("qwen3-embedding");
     });
 
     // TS-1.2
@@ -81,7 +81,7 @@ describe("Embedding", () => {
         "Meeting notes from the product review",
       );
 
-      expect(result).toHaveLength(1024);
+      expect(result).toHaveLength(4096);
       const [, options] = fetchSpy.mock.calls[0];
       const body = JSON.parse((options as RequestInit).body as string);
       expect(body.input).toBe("Meeting notes from the product review");
@@ -95,7 +95,7 @@ describe("Embedding", () => {
         "Besprechungsnotizen aus der Produktbewertung",
       );
 
-      expect(result).toHaveLength(1024);
+      expect(result).toHaveLength(4096);
       const [, options] = fetchSpy.mock.calls[0];
       const body = JSON.parse((options as RequestInit).body as string);
       expect(body.input).toBe(
@@ -111,7 +111,7 @@ describe("Embedding", () => {
         "Meeting about the Projektzeitplan and next steps",
       );
 
-      expect(result).toHaveLength(1024);
+      expect(result).toHaveLength(4096);
     });
 
     // TS-EC-1
@@ -121,7 +121,7 @@ describe("Embedding", () => {
       const result = await generateEmbedding("Hello");
 
       expect(result).not.toBeNull();
-      expect(result).toHaveLength(1024);
+      expect(result).toHaveLength(4096);
     });
 
     // TS-EC-5
@@ -131,7 +131,7 @@ describe("Embedding", () => {
 
       const result = await generateEmbedding(inputText);
 
-      expect(result).toHaveLength(1024);
+      expect(result).toHaveLength(4096);
       const [, options] = fetchSpy.mock.calls[0];
       const body = JSON.parse((options as RequestInit).body as string);
       expect(body.input).toBe(inputText);
@@ -152,7 +152,7 @@ describe("Embedding", () => {
         .map(([chunk]) => chunk.toString())
         .join("");
       expect(logOutput).toContain('"level":"error"');
-      expect(logOutput).toMatch(/1024/);
+      expect(logOutput).toMatch(/4096/);
       expect(logOutput).toMatch(/512/);
     });
   });
@@ -221,7 +221,7 @@ describe("Embedding", () => {
     it("checks Ollama model list on initialization", async () => {
       fetchSpy.mockImplementation(
         createOllamaRouter({
-          tagsModels: ["snowflake-arctic-embed2:latest"],
+          tagsModels: ["qwen3-embedding:latest"],
         }),
       );
 
@@ -251,14 +251,14 @@ describe("Embedding", () => {
       const body = JSON.parse(
         (pullCalls[0][1] as RequestInit).body as string,
       );
-      expect(body.name ?? body.model).toContain("snowflake-arctic-embed2");
+      expect(body.name ?? body.model).toContain("qwen3-embedding");
     });
 
     // TS-2.3
     it("skips model pull when model is already present", async () => {
       fetchSpy.mockImplementation(
         createOllamaRouter({
-          tagsModels: ["snowflake-arctic-embed2:latest"],
+          tagsModels: ["qwen3-embedding:latest"],
         }),
       );
 

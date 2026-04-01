@@ -39,11 +39,11 @@ export async function semanticSearch(
   const rows = await sql`
     SELECT id, name, category, content, fields, tags, confidence,
            source, source_type, deleted_at, created_at, updated_at,
-           1 - (embedding <=> ${embeddingLiteral}::vector(1024)) AS similarity
+           1 - (embedding <=> ${embeddingLiteral}::vector(4096)) AS similarity
     FROM entries
     WHERE deleted_at IS NULL
       AND embedding IS NOT NULL
-      AND 1 - (embedding <=> ${embeddingLiteral}::vector(1024)) >= 0.5
+      AND 1 - (embedding <=> ${embeddingLiteral}::vector(4096)) >= 0.6
       ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
       ${tag ? sql`AND ${tag} = ANY(tags)` : sql``}
     ORDER BY similarity DESC

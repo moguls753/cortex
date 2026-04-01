@@ -17,7 +17,7 @@ export async function searchBySimilarity(
     FROM entries
     WHERE deleted_at IS NULL
       AND embedding IS NOT NULL
-      AND 1 - (embedding <=> ${vecStr}::vector) >= 0.5
+      AND 1 - (embedding <=> ${vecStr}::vector) >= 0.6
     ORDER BY similarity DESC
     LIMIT ${limit}
   `;
@@ -51,7 +51,7 @@ export async function insertMcpEntry(
         ${data.tags},
         ${data.source},
         ${data.source_type},
-        ${vecStr}::vector(1024)
+        ${vecStr}::vector(4096)
       )
       RETURNING *
     `;
@@ -148,7 +148,7 @@ export async function updateEntryFields(
       setClauses.push("embedding = NULL");
     } else {
       const vecStr = `[${(updates.embedding as number[]).join(",")}]`;
-      setClauses.push("embedding = $" + (values.length + 1) + "::vector(1024)");
+      setClauses.push("embedding = $" + (values.length + 1) + "::vector(4096)");
       values.push(vecStr);
     }
   }

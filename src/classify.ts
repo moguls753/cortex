@@ -7,7 +7,6 @@ import { generateEmbedding } from "./embed.js";
 import { createLogger } from "./logger.js";
 import { getLLMConfig } from "./llm/config.js";
 import { resolveConfigValue } from "./config.js";
-import { sleep } from "./sleep.js";
 
 const log = createLogger("classify");
 
@@ -249,7 +248,7 @@ export async function getSimilarEntries(
     FROM entries
     WHERE deleted_at IS NULL
       AND embedding IS NOT NULL
-      AND 1 - (embedding <=> ${vecStr}::vector) >= 0.5
+      AND 1 - (embedding <=> ${vecStr}::vector) >= 0.6
     ORDER BY similarity DESC
     LIMIT 3
   `;
@@ -432,100 +431,43 @@ export async function classifyEntry(
       tags = ${result.tags}
     WHERE id = ${entryId}
   `;
-}
 
-// ---------------------------------------------------------------------------
-// Retry failed classifications
-// ---------------------------------------------------------------------------
-
-export async function retryFailedClassifications(
-  sql: postgres.Sql,
-): Promise<void> {
-  const entries = await sql`
-    SELECT id, name, content FROM entries
-    WHERE category IS NULL AND deleted_at IS NULL
+  // Classify any other entries that are still unclassified
+  const pending = await sql`
+    SELECT id FROM entries
+    WHERE category IS NULL AND deleted_at IS NULL AND id != ${entryId}
     ORDER BY created_at ASC
   `;
-
-  if (entries.length === 0) return;
-
-  let template: string;
-  try {
-    template = await loadPromptTemplate();
-  } catch {
-    log.error("Failed to load classification prompt template during retry");
-    return;
-  }
-
-  const outputLanguage = await resolveOutputLanguage(sql);
-
-  // Gather context for all entries up front
-  const prepared: Array<{ id: string; prompt: string }> = [];
-  for (const entry of entries) {
-    const entryId = entry.id as string;
-    const text = (entry.content as string | null) || (entry.name as string);
-
-    const contextEntries = await assembleContext(sql, text);
-    const contextStr = formatContextEntries(
-      contextEntries
-        .filter((e) => e.id !== entryId)
-        .map((e) => ({
-          name: e.name,
-          category: e.category ?? "unclassified",
-          content: e.content,
-        })),
-    );
-
-    let inputText = text;
-    if (inputText.length > MAX_INPUT_LENGTH) {
-      inputText = inputText.substring(0, MAX_INPUT_LENGTH);
-    }
-
-    prepared.push({ id: entryId, prompt: assemblePrompt(template, contextStr, inputText, outputLanguage) });
-  }
-
-  // LLM calls with exponential backoff on 429s
-  let backoffMs = 1_000;
-
-  const provider = createLLMProvider(await resolveLLMConfig(sql));
-  for (const { id, prompt } of prepared) {
-
-    let response: string;
+  for (const other of pending) {
     try {
-      response = await provider.chat(prompt);
-    } catch (error) {
-      const err = error as Error & { status?: number };
-      log.error("Retry classification failed for entry", {
-        entryId: id,
-        status: err.status ?? null,
-        error: err.message,
-      });
+      const rows = await sql`SELECT name, content FROM entries WHERE id = ${other.id}`;
+      if (rows.length === 0) continue;
+      const e = rows[0] as { name: string; content: string | null };
+      const text = e.content || e.name;
 
-      if (err.status === 429) {
-        await sleep(backoffMs);
-        backoffMs *= 2;
+      const [contextRaw, outputLanguage] = await Promise.all([
+        assembleContext(sql, text),
+        resolveOutputLanguage(sql),
+      ]);
+      const contextEntries = contextRaw
+        .filter((c) => c.id !== (other.id as string))
+        .map((c) => ({ name: c.name, category: c.category ?? null, content: c.content ?? null }));
+
+      const result = await classifyText(text, { entryId: other.id as string, contextEntries, outputLanguage, sql });
+      if (result) {
+        await sql`
+          UPDATE entries SET
+            category = ${result.category},
+            name = ${result.name},
+            confidence = ${result.confidence},
+            fields = ${JSON.stringify(result.fields)}::jsonb,
+            tags = ${result.tags}
+          WHERE id = ${other.id}
+        `;
       }
-      continue;
+    } catch {
+      // will be picked up on next classifyEntry call
     }
-
-    // Reset backoff on success
-    backoffMs = 1_000;
-
-    const validated = validateClassificationResponse(response);
-    if (!validated) {
-      log.error("Invalid retry classification response", { entryId: id });
-      continue;
-    }
-
-    await sql`
-      UPDATE entries SET
-        category = ${validated.category},
-        name = ${validated.name},
-        confidence = ${validated.confidence},
-        fields = ${JSON.stringify(validated.fields)}::jsonb,
-        tags = ${validated.tags}
-      WHERE id = ${id}
-    `;
   }
 }
 

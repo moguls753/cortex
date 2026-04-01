@@ -21,13 +21,12 @@ export async function runMigrations(url: string): Promise<void> {
         confidence    REAL,
         source        TEXT NOT NULL CHECK (source IN ('telegram', 'webapp', 'mcp')),
         source_type   TEXT DEFAULT 'text' CHECK (source_type IN ('text', 'voice')),
-        embedding     vector(1024),
+        embedding     vector(4096),
         deleted_at    TIMESTAMPTZ,
         created_at    TIMESTAMPTZ DEFAULT now(),
         updated_at    TIMESTAMPTZ DEFAULT now()
       );
 
-      CREATE INDEX IF NOT EXISTS entries_embedding_idx ON entries USING hnsw (embedding vector_cosine_ops);
       CREATE INDEX IF NOT EXISTS entries_category_idx ON entries (category);
       CREATE INDEX IF NOT EXISTS entries_created_at_idx ON entries (created_at);
       CREATE INDEX IF NOT EXISTS entries_tags_idx ON entries USING gin (tags);
@@ -120,6 +119,17 @@ export async function runMigrations(url: string): Promise<void> {
 
       ALTER TABLE entries ADD COLUMN IF NOT EXISTS google_calendar_event_id TEXT;
       ALTER TABLE entries ADD COLUMN IF NOT EXISTS google_calendar_target TEXT;
+
+      -- Drop HNSW index (not needed, and incompatible with 4096 dims)
+      DROP INDEX IF EXISTS entries_embedding_idx;
+      -- Migrate embedding column to vector(4096) if still at 1024
+      DO $$ BEGIN
+        IF (SELECT atttypmod FROM pg_attribute
+            WHERE attrelid = 'entries'::regclass AND attname = 'embedding') = 1028 THEN
+          UPDATE entries SET embedding = NULL WHERE embedding IS NOT NULL;
+          ALTER TABLE entries ALTER COLUMN embedding TYPE vector(4096);
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS "user" (
         id             INTEGER PRIMARY KEY CHECK (id = 1),

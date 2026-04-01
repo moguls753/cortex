@@ -28,7 +28,7 @@ const TEST_SECRET = "test-session-secret-at-least-32-chars-long!!";
 // ─── Module Mocks (external services only) ──────────────────────────
 
 vi.mock("../../src/embed.js", () => ({
-  generateEmbedding: vi.fn().mockResolvedValue(new Array(1024).fill(0)),
+  generateEmbedding: vi.fn().mockResolvedValue(new Array(4096).fill(0)),
   embedEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -86,7 +86,7 @@ async function seedEntry(
       VALUES (${entry.id}, ${entry.name}, ${entry.category}, ${entry.content},
               ${JSON.stringify(entry.fields)}, ${entry.tags}, ${entry.confidence},
               ${entry.source}, ${entry.source_type},
-              ${embeddingLiteral}::vector(1024),
+              ${embeddingLiteral}::vector(4096),
               ${entry.deleted_at}, ${entry.created_at}, ${entry.updated_at})
     `;
   } else {
@@ -359,7 +359,7 @@ describe("Web Entry Integration", () => {
     // TS-5.4
     it("preserves previous embedding when Ollama is down", async () => {
       // Create a known fake embedding
-      const fakeEmbedding = new Array(1024).fill(0).map((_, i) => Math.sin(i) * 0.5);
+      const fakeEmbedding = new Array(4096).fill(0).map((_, i) => Math.sin(i) * 0.5);
 
       const entryId = await seedEntry(db.sql, {
         content: "original content",

@@ -19,14 +19,6 @@ export interface CachedDigest {
   generated_at: Date;
 }
 
-export interface RetryEntry {
-  id: string;
-  name: string;
-  content: string | null;
-  embedding: number[] | null;
-  category: string | null;
-}
-
 export async function getDailyDigestData(sql: Sql): Promise<DailyDigestData> {
   const activeProjects = await sql`
     SELECT id, name, fields FROM entries
@@ -121,20 +113,3 @@ export async function getLatestDigest(sql: Sql, type: "daily" | "weekly"): Promi
   return { content: rows[0].content, generated_at: rows[0].generated_at };
 }
 
-export async function getEntriesNeedingRetry(sql: Sql, limit: number): Promise<RetryEntry[]> {
-  const rows = await sql`
-    SELECT id, name, content, embedding::text, category FROM entries
-    WHERE deleted_at IS NULL
-      AND (embedding IS NULL OR category IS NULL)
-    ORDER BY created_at ASC
-    LIMIT ${limit}
-  `;
-
-  return rows.map((r: any) => ({
-    id: r.id,
-    name: r.name,
-    content: r.content,
-    embedding: r.embedding ? JSON.parse(r.embedding) : null,
-    category: r.category,
-  }));
-}

@@ -26,7 +26,7 @@ vi.mock("../../src/web/browse-queries.js", () => ({
 }));
 
 vi.mock("../../src/embed.js", () => ({
-  generateEmbedding: vi.fn().mockResolvedValue(new Array(1024).fill(0)),
+  generateEmbedding: vi.fn().mockResolvedValue(new Array(4096).fill(0)),
 }));
 
 // ─── Types & Factories ─────────────────────────────────────────────
@@ -261,7 +261,7 @@ describe("Web Browse", () => {
     // TS-2.1
     it("returns semantic search results ranked by similarity", async () => {
       const { generateEmbedding } = await import("../../src/embed.js");
-      const mockEmbedding = new Array(1024).fill(0);
+      const mockEmbedding = new Array(4096).fill(0);
       vi.mocked(generateEmbedding).mockResolvedValue(mockEmbedding);
 
       const { semanticSearch, getFilterTags } = await import(
@@ -309,7 +309,7 @@ describe("Web Browse", () => {
     // TS-2.4
     it("overrides default sort order with similarity ranking", async () => {
       const { generateEmbedding } = await import("../../src/embed.js");
-      vi.mocked(generateEmbedding).mockResolvedValue(new Array(1024).fill(0));
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(4096).fill(0));
 
       const { semanticSearch } = await import(
         "../../src/web/browse-queries.js"
@@ -384,7 +384,7 @@ describe("Web Browse", () => {
     // TS-3.5
     it("shows fallback notice when text search replaces semantic", async () => {
       const { generateEmbedding } = await import("../../src/embed.js");
-      vi.mocked(generateEmbedding).mockResolvedValue(new Array(1024).fill(0));
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(4096).fill(0));
 
       const { semanticSearch, textSearch } = await import(
         "../../src/web/browse-queries.js"
@@ -592,7 +592,7 @@ describe("Web Browse", () => {
     // TS-5.5
     it("preserves filter state via URL query parameters", async () => {
       const { generateEmbedding } = await import("../../src/embed.js");
-      vi.mocked(generateEmbedding).mockResolvedValue(new Array(1024).fill(0));
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(4096).fill(0));
 
       const { semanticSearch, getFilterTags } = await import(
         "../../src/web/browse-queries.js"
@@ -634,7 +634,7 @@ describe("Web Browse", () => {
     // TS-6.1
     it("shows no results message with suggestion", async () => {
       const { generateEmbedding } = await import("../../src/embed.js");
-      vi.mocked(generateEmbedding).mockResolvedValue(new Array(1024).fill(0));
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(4096).fill(0));
 
       const { semanticSearch, textSearch } = await import(
         "../../src/web/browse-queries.js"
@@ -657,7 +657,7 @@ describe("Web Browse", () => {
     // TS-6.2
     it("truncates search query to 500 characters", async () => {
       const { generateEmbedding } = await import("../../src/embed.js");
-      vi.mocked(generateEmbedding).mockResolvedValue(new Array(1024).fill(0));
+      vi.mocked(generateEmbedding).mockResolvedValue(new Array(4096).fill(0));
 
       const { semanticSearch, getFilterTags } = await import(
         "../../src/web/browse-queries.js"

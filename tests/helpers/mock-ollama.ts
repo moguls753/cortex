@@ -7,7 +7,7 @@
  * Generate a deterministic fake embedding vector.
  * Uses Math.sin for reproducibility — same dim always produces the same values.
  */
-export function createFakeEmbedding(dim = 1024): number[] {
+export function createFakeEmbedding(dim = 4096): number[] {
   return Array.from({ length: dim }, (_, i) => Math.sin(i) * 0.5);
 }
 

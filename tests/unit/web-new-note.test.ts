@@ -48,7 +48,7 @@ vi.mock("../../src/classify.js", () => ({
 
 vi.mock("../../src/embed.js", () => ({
   embedEntry: vi.fn().mockResolvedValue(undefined),
-  generateEmbedding: vi.fn().mockResolvedValue(new Array(1024).fill(0)),
+  generateEmbedding: vi.fn().mockResolvedValue(new Array(4096).fill(0)),
 }));
 
 vi.mock("../../src/google-calendar.js", () => ({

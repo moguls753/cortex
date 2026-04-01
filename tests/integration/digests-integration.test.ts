@@ -77,7 +77,7 @@ async function seedEntry(
       ${overrides.content ?? null},
       ${overrides.category ?? null},
       ${sqlConn.json(fields)},
-      ${embeddingLiteral}::vector(1024),
+      ${embeddingLiteral}::vector(4096),
       ${overrides.deleted_at ?? null},
       ${overrides.created_at ?? new Date()},
       ${overrides.updated_at ?? overrides.created_at ?? new Date()},
@@ -87,9 +87,6 @@ async function seedEntry(
   return id;
 }
 
-function createFakeEmbedding(): number[] {
-  return Array.from({ length: 1024 }, (_, i) => Math.sin(i) * 0.5);
-}
 
 // --- Tests ---
 
@@ -299,115 +296,4 @@ describe("Digests Integration", () => {
     });
   });
 
-  // ============================================================
-  // Background Retry Queries
-  // ============================================================
-  describe("Background Retry Queries", () => {
-    it("finds and embeds entries with null embedding, excluding soft-deleted", async () => {
-      // TS-4.1
-      const { getEntriesNeedingRetry } = await import("../../src/digests-queries.js");
-
-      // Entry A: needs embedding (active)
-      await seedEntry(sql, {
-        name: "Entry A",
-        category: "ideas",
-        embedding: null,
-      });
-
-      // Entry B: needs embedding (active)
-      await seedEntry(sql, {
-        name: "Entry B",
-        category: "tasks",
-        embedding: null,
-      });
-
-      // Entry C: needs embedding but soft-deleted (excluded)
-      await seedEntry(sql, {
-        name: "Entry C",
-        category: "reference",
-        embedding: null,
-        deleted_at: new Date(),
-      });
-
-      // Entry D: has embedding (doesn't need retry)
-      await seedEntry(sql, {
-        name: "Entry D",
-        category: "projects",
-        embedding: createFakeEmbedding(),
-      });
-
-      const result = await getEntriesNeedingRetry(sql, 50);
-
-      // Should include A and B only (both have null embedding, not deleted)
-      const names = result.map((e) => e.name);
-      expect(names).toContain("Entry A");
-      expect(names).toContain("Entry B");
-      expect(names).not.toContain("Entry C");
-      expect(names).not.toContain("Entry D");
-    });
-
-    it("finds and reclassifies entries with null category", async () => {
-      // TS-4.2
-      const { getEntriesNeedingRetry } = await import("../../src/digests-queries.js");
-
-      // Entry A: null category, has embedding
-      await seedEntry(sql, {
-        name: "Entry A",
-        category: null,
-        embedding: createFakeEmbedding(),
-      });
-
-      // Entry B: null category, null embedding (needs both)
-      await seedEntry(sql, {
-        name: "Entry B",
-        category: null,
-        embedding: null,
-      });
-
-      // Entry C: has category (doesn't need retry for classification)
-      await seedEntry(sql, {
-        name: "Entry C",
-        category: "projects",
-        embedding: createFakeEmbedding(),
-      });
-
-      const result = await getEntriesNeedingRetry(sql, 50);
-
-      const names = result.map((e) => e.name);
-      expect(names).toContain("Entry A");
-      expect(names).toContain("Entry B");
-      expect(names).not.toContain("Entry C");
-
-      const entryA = result.find((e) => e.name === "Entry A");
-      expect(entryA!.embedding).not.toBeNull();
-
-      const entryB = result.find((e) => e.name === "Entry B");
-      expect(entryB!.embedding).toBeNull();
-    });
-
-    it("limits retry to 50 entries, oldest first", async () => {
-      // TS-4.4
-      const { getEntriesNeedingRetry } = await import("../../src/digests-queries.js");
-
-      // Seed 60 entries with null embedding, staggered timestamps
-      for (let i = 0; i < 60; i++) {
-        const createdAt = new Date();
-        createdAt.setMinutes(createdAt.getMinutes() - (60 - i)); // entry 0 is oldest
-        await seedEntry(sql, {
-          name: `Entry ${i}`,
-          category: "ideas",
-          embedding: null,
-          created_at: createdAt,
-        });
-      }
-
-      const result = await getEntriesNeedingRetry(sql, 50);
-
-      expect(result).toHaveLength(50);
-      // First entry should be the oldest (Entry 0)
-      expect(result[0].name).toBe("Entry 0");
-      // Last entry should be Entry 49
-      expect(result[49].name).toBe("Entry 49");
-    });
-  });
 });

@@ -71,7 +71,7 @@ vi.mock("../../src/classify.js", async (importOriginal) => {
 
 // Mock embedding module
 const mockEmbedEntry = vi.fn().mockResolvedValue(undefined);
-const mockGenerateEmbedding = vi.fn().mockResolvedValue(new Array(1024).fill(0));
+const mockGenerateEmbedding = vi.fn().mockResolvedValue(new Array(4096).fill(0));
 vi.mock("../../src/embed.js", () => ({
   embedEntry: mockEmbedEntry,
   generateEmbedding: mockGenerateEmbedding,

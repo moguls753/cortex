@@ -1,11 +1,10 @@
 import type postgres from "postgres";
 import { createLogger } from "./logger.js";
-import { resolveConfigValue } from "./config.js";
 
 const log = createLogger("embed");
 
-const EMBEDDING_MODEL = "snowflake-arctic-embed2";
-const EMBEDDING_DIM = 1024;
+const EMBEDDING_MODEL = "qwen3-embedding";
+const EMBEDDING_DIM = 4096;
 const MAX_TEXT_LENGTH = 32_000; // Conservative proxy for 8192 tokens
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -19,6 +18,9 @@ const defaultOllamaUrl = process.env.OLLAMA_URL || "http://ollama:11434";
 export function prepareEmbeddingInput(entry: {
   name: string;
   content: string | null;
+  category?: string | null;
+  tags?: string[] | null;
+  fields?: Record<string, unknown> | null;
 }): string | null {
   const name = entry.name?.trim() || "";
   const content = entry.content?.trim() || "";
@@ -28,7 +30,19 @@ export function prepareEmbeddingInput(entry: {
     return null;
   }
 
-  let text = name && content ? `${name} ${content}` : name || content;
+  const parts: string[] = [];
+  if (entry.category) parts.push(`[${entry.category}]`);
+  if (name) parts.push(name);
+  if (content) parts.push(content);
+  if (entry.tags && entry.tags.length > 0) parts.push(entry.tags.join(", "));
+  if (entry.fields) {
+    const fieldParts = Object.entries(entry.fields)
+      .filter(([, v]) => v != null && v !== "")
+      .map(([k, v]) => `${k}: ${v}`);
+    if (fieldParts.length > 0) parts.push(fieldParts.join(", "));
+  }
+
+  let text = parts.join(" ");
 
   if (text.length > MAX_TEXT_LENGTH) {
     const truncated = text.substring(0, MAX_TEXT_LENGTH);
@@ -120,7 +134,7 @@ async function doGenerateEmbedding(
 }
 
 /**
- * Call Ollama /api/embed to generate a 1024-dim embedding for the given text.
+ * Call Ollama /api/embed to generate a 4096-dim embedding for the given text.
  * Returns null on non-timeout errors (connection failure, bad response, wrong dimensions).
  * Throws on timeout (30s).
  */
@@ -186,14 +200,14 @@ export async function embedEntry(
   entryId: string,
 ): Promise<void> {
   const rows =
-    await sql`SELECT name, content FROM entries WHERE id = ${entryId}`;
+    await sql`SELECT name, content, category, tags, fields FROM entries WHERE id = ${entryId}`;
   if (rows.length === 0) {
     log.error("Entry not found for embedding", { entryId });
     return;
   }
 
-  const entry = rows[0] as { name: string; content: string | null };
-  const text = prepareEmbeddingInput({ name: entry.name, content: entry.content });
+  const entry = rows[0] as { name: string; content: string | null; category: string | null; tags: string[] | null; fields: Record<string, unknown> | null };
+  const text = prepareEmbeddingInput(entry);
   if (!text) return;
 
   let embedding: number[] | null;
@@ -211,55 +225,30 @@ export async function embedEntry(
     const vecStr = `[${embedding.join(",")}]`;
     await sql`UPDATE entries SET embedding = ${vecStr}::vector WHERE id = ${entryId}`;
   }
-}
 
-/**
- * Retry all entries with null embeddings, processing sequentially oldest-first.
- * Resolves Ollama URL from DB settings, checks/pulls model, then embeds each entry.
- */
-export async function retryFailedEmbeddings(
-  sql: postgres.Sql,
-): Promise<void> {
-  const ollamaUrl =
-    (await resolveConfigValue("ollama_url", sql)) || defaultOllamaUrl;
-
-  try {
-    await ensureModel(ollamaUrl);
-  } catch (error) {
-    log.error("Failed to verify embedding model during retry", {
-      error: (error as Error).message,
-    });
-    return;
-  }
-
-  const entries = await sql`
-    SELECT id, name, content FROM entries
-    WHERE embedding IS NULL AND deleted_at IS NULL
+  // Embed any other entries that are still missing embeddings
+  const pending = await sql`
+    SELECT id, name, content, category, tags, fields FROM entries
+    WHERE embedding IS NULL AND deleted_at IS NULL AND id != ${entryId}
     ORDER BY created_at ASC
   `;
-
-  for (const entry of entries) {
-    const text = prepareEmbeddingInput({
-      name: entry.name as string,
-      content: entry.content as string | null,
+  for (const other of pending) {
+    const otherText = prepareEmbeddingInput({
+      name: other.name as string,
+      content: other.content as string | null,
+      category: other.category as string | null,
+      tags: other.tags as string[] | null,
+      fields: other.fields as Record<string, unknown> | null,
     });
-    if (!text) continue;
-
+    if (!otherText) continue;
     try {
-      const embedding = await generateEmbedding(text, ollamaUrl);
-      if (embedding) {
-        const vecStr = `[${embedding.join(",")}]`;
-        await sql`UPDATE entries SET embedding = ${vecStr}::vector WHERE id = ${entry.id}`;
-      } else {
-        log.error("Failed to generate embedding during retry", {
-          entryId: entry.id as string,
-        });
+      const otherEmbedding = await generateEmbedding(otherText);
+      if (otherEmbedding) {
+        const vecStr = `[${otherEmbedding.join(",")}]`;
+        await sql`UPDATE entries SET embedding = ${vecStr}::vector WHERE id = ${other.id}`;
       }
-    } catch (error) {
-      log.error("Error during embedding retry", {
-        entryId: entry.id as string,
-        error: (error as Error).message,
-      });
+    } catch {
+      // will be picked up on next embedEntry call
     }
   }
 }

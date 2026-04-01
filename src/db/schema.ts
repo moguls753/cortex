@@ -22,7 +22,7 @@ export const entries = pgTable(
     confidence: real("confidence"),
     source: text("source").notNull(),
     sourceType: text("source_type").default("text"),
-    // embedding column is vector(1024), defined via raw SQL migration
+    // embedding column is vector(4096), defined via raw SQL migration
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),

@@ -29,7 +29,6 @@ vi.mock("../../src/digests-queries.js", () => ({
   }),
   cacheDigest: vi.fn().mockResolvedValue(undefined),
   getLatestDigest: vi.fn().mockResolvedValue(null),
-  getEntriesNeedingRetry: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../../src/llm/index.js", () => ({
@@ -52,13 +51,6 @@ vi.mock("../../src/config.js", () => ({
   resolveConfigValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../src/embed.js", () => ({
-  embedEntry: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("../../src/classify.js", () => ({
-  classifyEntry: vi.fn().mockResolvedValue(undefined),
-}));
 
 vi.mock("node-cron", () => ({
   default: {
@@ -72,19 +64,15 @@ import {
   getDailyDigestData,
   getWeeklyReviewData,
   cacheDigest,
-  getEntriesNeedingRetry,
 } from "../../src/digests-queries.js";
 import { createLLMProvider } from "../../src/llm/index.js";
 import { getLLMConfig } from "../../src/llm/config.js";
 import { sendDigestEmail, isSmtpConfigured } from "../../src/email.js";
 import { resolveConfigValue } from "../../src/config.js";
-import { embedEntry } from "../../src/embed.js";
-import { classifyEntry } from "../../src/classify.js";
 import cron from "node-cron";
 import {
   generateDailyDigest,
   generateWeeklyReview,
-  runBackgroundRetry,
   startScheduler,
 } from "../../src/digests.js";
 
@@ -119,12 +107,9 @@ describe("Digests", () => {
       stalledProjects: [],
     });
     (cacheDigest as any).mockResolvedValue(undefined);
-    (getEntriesNeedingRetry as any).mockResolvedValue([]);
     (isSmtpConfigured as any).mockReturnValue(false);
     (sendDigestEmail as any).mockResolvedValue(undefined);
     (resolveConfigValue as any).mockResolvedValue(undefined);
-    (embedEntry as any).mockResolvedValue(undefined);
-    (classifyEntry as any).mockResolvedValue(undefined);
     (createLLMProvider as any).mockReturnValue({ chat: mockChat });
     mockGetLLMConfig.mockResolvedValue({
       provider: "anthropic",
@@ -598,98 +583,6 @@ describe("Digests", () => {
     });
   });
 
-  // ============================================================
-  // Group 4: Background Retry (US-4)
-  // ============================================================
-  describe("Background Retry (US-4)", () => {
-    it("handles embedding success with classification failure independently", async () => {
-      // TS-4.3
-      (getEntriesNeedingRetry as any).mockResolvedValue([
-        { id: "e1", name: "Entry", content: "text", embedding: null, category: null },
-      ]);
-      (embedEntry as any).mockResolvedValue(undefined);
-      (classifyEntry as any).mockRejectedValue(new Error("Classification failed"));
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      await runBackgroundRetry(mockSql);
-
-      expect(embedEntry).toHaveBeenCalledWith(mockSql, "e1");
-      expect(classifyEntry).toHaveBeenCalledWith(mockSql, "e1");
-      expect(consoleErrorSpy).toHaveBeenCalled();
-    });
-
-    it("logs failed entries and leaves them for next cycle", async () => {
-      // TS-4.5
-      (getEntriesNeedingRetry as any).mockResolvedValue([
-        { id: "e1", name: "Entry 1", content: "text", embedding: null, category: "ideas" },
-        { id: "e2", name: "Entry 2", content: "text", embedding: null, category: "tasks" },
-      ]);
-      (embedEntry as any).mockRejectedValue(new Error("Ollama timeout"));
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      await runBackgroundRetry(mockSql);
-
-      expect(embedEntry).toHaveBeenCalledTimes(2);
-      expect(consoleErrorSpy).toHaveBeenCalled();
-    });
-
-    it("attempts both embedding and classification for entry with both null", async () => {
-      // TS-4.6
-      (getEntriesNeedingRetry as any).mockResolvedValue([
-        { id: "e1", name: "Entry", content: "text", embedding: null, category: null },
-      ]);
-
-      await runBackgroundRetry(mockSql);
-
-      expect(embedEntry).toHaveBeenCalledWith(mockSql, "e1");
-      expect(classifyEntry).toHaveBeenCalledWith(mockSql, "e1");
-    });
-
-    it("handles Ollama down for all embedding retries", async () => {
-      // TS-4.7
-      (getEntriesNeedingRetry as any).mockResolvedValue([
-        { id: "e1", name: "Entry 1", content: "text", embedding: null, category: "ideas" },
-        { id: "e2", name: "Entry 2", content: "text", embedding: null, category: "tasks" },
-        { id: "e3", name: "Entry 3", content: "text", embedding: null, category: "reference" },
-      ]);
-      (embedEntry as any).mockRejectedValue(new Error("ECONNREFUSED"));
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      await runBackgroundRetry(mockSql);
-
-      expect(embedEntry).toHaveBeenCalledTimes(3);
-      expect(classifyEntry).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalled();
-    });
-
-    it("handles Claude down for all classification retries", async () => {
-      // TS-4.8
-      const fakeEmbedding = Array.from({ length: 1024 }, (_, i) => Math.sin(i) * 0.5);
-      (getEntriesNeedingRetry as any).mockResolvedValue([
-        { id: "e1", name: "Entry 1", content: "text", embedding: fakeEmbedding, category: null },
-        { id: "e2", name: "Entry 2", content: "text", embedding: fakeEmbedding, category: null },
-        { id: "e3", name: "Entry 3", content: "text", embedding: fakeEmbedding, category: null },
-      ]);
-      (classifyEntry as any).mockRejectedValue(new Error("Claude API error"));
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      await runBackgroundRetry(mockSql);
-
-      expect(classifyEntry).toHaveBeenCalledTimes(3);
-      expect(embedEntry).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalled();
-    });
-
-    it("completes immediately with no API calls when nothing needs retry", async () => {
-      // TS-4.9
-      (getEntriesNeedingRetry as any).mockResolvedValue([]);
-
-      await runBackgroundRetry(mockSql);
-
-      expect(embedEntry).not.toHaveBeenCalled();
-      expect(classifyEntry).not.toHaveBeenCalled();
-    });
-  });
 
   // ============================================================
   // Group 5: Scheduling & Configuration (US-5)
@@ -754,12 +647,6 @@ describe("Digests", () => {
       // Weekly default
       expect(cron.schedule).toHaveBeenCalledWith(
         "0 8 * * 1",
-        expect.any(Function),
-        expect.any(Object),
-      );
-      // Background retry every 15 minutes
-      expect(cron.schedule).toHaveBeenCalledWith(
-        "*/15 * * * *",
         expect.any(Function),
         expect.any(Object),
       );

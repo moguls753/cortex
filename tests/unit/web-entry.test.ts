@@ -27,7 +27,7 @@ vi.mock("../../src/web/entry-queries.js", () => ({
 }));
 
 vi.mock("../../src/embed.js", () => ({
-  generateEmbedding: vi.fn().mockResolvedValue(new Array(1024).fill(0)),
+  generateEmbedding: vi.fn().mockResolvedValue(new Array(4096).fill(0)),
   embedEntry: vi.fn().mockResolvedValue(undefined),
 }));
 

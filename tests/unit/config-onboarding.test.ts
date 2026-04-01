@@ -104,7 +104,7 @@ vi.mock("../../src/email.js", () => ({
 }));
 
 vi.mock("../../src/embed.js", () => ({
-  generateEmbedding: vi.fn().mockResolvedValue(new Array(1024).fill(0)),
+  generateEmbedding: vi.fn().mockResolvedValue(new Array(4096).fill(0)),
   embedEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -179,7 +179,6 @@ vi.mock("../../src/digests-queries.js", () => ({
   }),
   cacheDigest: vi.fn().mockResolvedValue(undefined),
   getLatestDigest: vi.fn().mockResolvedValue(null),
-  getEntriesNeedingRetry: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("node-cron", () => ({

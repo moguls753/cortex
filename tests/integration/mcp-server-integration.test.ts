@@ -76,14 +76,14 @@ function createMockEntry(overrides: EntryData = {}): Required<EntryData> {
 
 function createQueryEmbedding(): number[] {
   // Unit vector in first dimension: [1, 0, 0, ..., 0]
-  const vec = new Array(1024).fill(0);
+  const vec = new Array(4096).fill(0);
   vec[0] = 1;
   return vec;
 }
 
 function createSimilarEmbedding(): number[] {
   // Cosine similarity ~0.8 to query embedding
-  const vec = new Array(1024).fill(0);
+  const vec = new Array(4096).fill(0);
   vec[0] = 0.8;
   vec[1] = 0.6;
   return vec;
@@ -91,7 +91,7 @@ function createSimilarEmbedding(): number[] {
 
 function createDissimilarEmbedding(): number[] {
   // Cosine similarity ~0.3 to query embedding (below 0.5 threshold)
-  const vec = new Array(1024).fill(0);
+  const vec = new Array(4096).fill(0);
   vec[0] = 0.3;
   vec[1] = 0.954;
   return vec;
@@ -114,7 +114,7 @@ async function seedEntry(
       VALUES (${entry.id}, ${entry.name}, ${entry.category}, ${entry.content},
               ${sql.json(entry.fields)}, ${entry.tags}, ${entry.confidence},
               ${entry.source}, ${entry.source_type},
-              ${embeddingLiteral}::vector(1024),
+              ${embeddingLiteral}::vector(4096),
               ${entry.deleted_at}, ${entry.created_at}, ${entry.updated_at})
     `;
   } else {
@@ -211,7 +211,7 @@ describe("MCP Server Integration", () => {
       });
 
       // Seed entry C: borderline (cosine ~0.45 — below 0.5 threshold)
-      const borderlineEmbedding = new Array(1024).fill(0);
+      const borderlineEmbedding = new Array(4096).fill(0);
       borderlineEmbedding[0] = 0.45;
       borderlineEmbedding[1] = 0.893; // cosine to [1,0,...] ≈ 0.45
       await seedEntry(db.sql, {

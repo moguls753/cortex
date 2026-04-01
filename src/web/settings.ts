@@ -503,7 +503,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-xs text-muted-foreground">Model</label>
-            <input type="text" value="snowflake-arctic-embed2" readonly
+            <input type="text" value="qwen3-embedding" readonly
               class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none cursor-default" />
             <span class="text-[10px] text-muted-foreground">Generates vector embeddings for all entries via the Ollama container.</span>
           </div>

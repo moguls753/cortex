@@ -23,7 +23,6 @@ import {
   createClassificationJSON,
 } from "../helpers/mock-llm.js";
 import { createFakeEmbedding } from "../helpers/mock-ollama.js";
-import { withEnv } from "../helpers/env.js";
 import { startTestDb, runMigrations, type TestDb } from "../helpers/test-db.js";
 
 // ---------------------------------------------------------------------------
@@ -49,12 +48,6 @@ vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
 }));
 
-vi.mock("../../src/sleep.js", () => ({
-  sleep: (ms: number) => {
-    setTimeout(() => {}, ms);
-    return Promise.resolve();
-  },
-}));
 
 // ---------------------------------------------------------------------------
 // Types — will fail until src/classify.ts exists
@@ -79,7 +72,6 @@ type ClassifyEntry = (
   entryId: string,
 ) => Promise<void>;
 
-type RetryFailedClassifications = (sql: postgres.Sql) => Promise<void>;
 
 // ---------------------------------------------------------------------------
 // Test data helpers
@@ -173,7 +165,6 @@ describe("Classification integration", () => {
   let getSimilarEntries: GetSimilarEntries;
   let assembleContext: AssembleContext;
   let classifyEntry: ClassifyEntry;
-  let retryFailedClassifications: RetryFailedClassifications;
 
   beforeAll(async () => {
     db = await startTestDb();
@@ -184,7 +175,6 @@ describe("Classification integration", () => {
     getSimilarEntries = mod.getSimilarEntries;
     assembleContext = mod.assembleContext;
     classifyEntry = mod.classifyEntry;
-    retryFailedClassifications = mod.retryFailedClassifications;
   }, 120_000);
 
   afterAll(async () => {
@@ -461,15 +451,15 @@ describe("Classification integration", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Retry
+  // Piggyback classification (classifyEntry also classifies other pending entries)
   // ---------------------------------------------------------------------------
-  describe("retry", () => {
+  describe("piggyback classification", () => {
     // TS-4.6
-    it("retries classification for entries with null category", async () => {
+    it("classifies other entries with null category when classifying a target", async () => {
       mockChat.mockResolvedValue(createClassificationJSON());
       mockGenerateEmbedding.mockResolvedValue(createFakeEmbedding());
 
-      await insertEntry(db.sql, {
+      const target = await insertEntry(db.sql, {
         name: "null-cat-1",
         content: "Content 1",
         category: null,
@@ -485,37 +475,44 @@ describe("Classification integration", () => {
         category: "tasks",
       });
 
-      await retryFailedClassifications(db.sql);
+      await classifyEntry(db.sql, target.id);
 
-      // Should have been called exactly twice (not for "tasks" entry)
+      // target + 1 pending (not the "tasks" entry)
       expect(mockChat).toHaveBeenCalledTimes(2);
     });
 
     // TS-4.7
-    it("updates entry with classification result on successful retry", async () => {
-      mockChat.mockResolvedValueOnce(
-        createClassificationJSON({
-          category: "projects",
-          name: "Alpha Project",
-          confidence: 0.88,
-          tags: ["work"],
-          fields: { status: "active" },
-        }),
-      );
+    it("updates pending entry with classification result", async () => {
+      mockChat
+        .mockResolvedValueOnce(createClassificationJSON()) // target
+        .mockResolvedValueOnce(
+          createClassificationJSON({
+            category: "projects",
+            name: "Alpha Project",
+            confidence: 0.88,
+            tags: ["work"],
+            fields: { status: "active" },
+          }),
+        ); // pending
       mockGenerateEmbedding.mockResolvedValue(createFakeEmbedding());
 
-      const entry = await insertEntry(db.sql, {
+      const target = await insertEntry(db.sql, {
+        name: "target-entry",
+        content: "Target content",
+        category: null,
+      });
+      const pending = await insertEntry(db.sql, {
         name: "unclassified",
         content: "Project Alpha discussion",
         category: null,
         confidence: null,
       });
 
-      await retryFailedClassifications(db.sql);
+      await classifyEntry(db.sql, target.id);
 
       const rows = await db.sql`
         SELECT category, name, confidence, tags, fields
-        FROM entries WHERE id = ${entry.id}
+        FROM entries WHERE id = ${pending.id}
       `;
       expect(rows[0].category).toBe("projects");
       expect(rows[0].name).toBe("Alpha Project");
@@ -525,11 +522,11 @@ describe("Classification integration", () => {
     });
 
     // TS-4.8
-    it("skips soft-deleted entries during retry", async () => {
+    it("skips soft-deleted entries during piggyback classification", async () => {
       mockChat.mockResolvedValue(createClassificationJSON());
       mockGenerateEmbedding.mockResolvedValue(createFakeEmbedding());
 
-      await insertEntry(db.sql, {
+      const target = await insertEntry(db.sql, {
         name: "active-null",
         content: "Active content",
         category: null,
@@ -542,65 +539,15 @@ describe("Classification integration", () => {
         deletedAt: new Date(),
       });
 
-      await retryFailedClassifications(db.sql);
+      await classifyEntry(db.sql, target.id);
 
-      // Only the active entry should be retried
+      // Only the target entry should be classified (deleted is excluded)
       expect(mockChat).toHaveBeenCalledTimes(1);
 
-      // Verify the deleted entry still has null category
       const rows = await db.sql`
         SELECT category FROM entries WHERE name = 'deleted-null'
       `;
       expect(rows[0].category).toBeNull();
-    });
-
-    // TS-C-3
-    it("applies exponential backoff on consecutive 429 responses during retry", async () => {
-      vi.useFakeTimers();
-
-      try {
-        const err429 = () => {
-          const e = new Error("Rate limited") as Error & { status: number };
-          e.status = 429;
-          return e;
-        };
-
-        // First 2 calls → 429, 3rd succeeds
-        mockChat
-          .mockRejectedValueOnce(err429())
-          .mockRejectedValueOnce(err429())
-          .mockResolvedValueOnce(createClassificationJSON());
-        mockGenerateEmbedding.mockResolvedValue(createFakeEmbedding());
-
-        const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
-
-        for (let i = 0; i < 3; i++) {
-          await insertEntry(db.sql, {
-            name: `retry-backoff-${i}`,
-            content: `Content ${i}`,
-            category: null,
-          });
-        }
-
-        const retryPromise = retryFailedClassifications(db.sql);
-
-        // Advance timers to let backoff delays complete
-        await vi.advanceTimersByTimeAsync(120_000);
-
-        await retryPromise;
-
-        // Verify mockChat was called 3 times total
-        expect(mockChat).toHaveBeenCalledTimes(3);
-
-        // Verify exponential backoff: delays should increase
-        const delays = setTimeoutSpy.mock.calls
-          .map(([, delay]) => delay as number)
-          .filter((d) => d > 0);
-        expect(delays.length).toBeGreaterThanOrEqual(2);
-        expect(delays[1]).toBeGreaterThan(delays[0]);
-      } finally {
-        vi.useRealTimers();
-      }
     });
   });
 
@@ -676,9 +623,15 @@ describe("Classification integration", () => {
   // ---------------------------------------------------------------------------
   describe("non-goals", () => {
     // TS-NG-2
-    it("does not re-classify existing entries when the prompt changes", async () => {
+    it("does not re-classify existing entries during piggyback", async () => {
+      mockChat.mockResolvedValue(createClassificationJSON());
       mockGenerateEmbedding.mockResolvedValue(createFakeEmbedding());
 
+      const target = await insertEntry(db.sql, {
+        name: "target-entry",
+        content: "Target content",
+        category: null,
+      });
       await insertEntry(db.sql, {
         name: "people-entry",
         content: "People content",
@@ -692,15 +645,10 @@ describe("Classification integration", () => {
         confidence: 0.85,
       });
 
-      // Simulate prompt change
-      mockReadFile.mockResolvedValueOnce(
-        "NEW prompt: {context_entries}\n\n{input_text}",
-      );
+      await classifyEntry(db.sql, target.id);
 
-      await retryFailedClassifications(db.sql);
-
-      // These entries already have categories → should NOT be retried
-      expect(mockChat).not.toHaveBeenCalled();
+      // Only the target should be classified (other two already have categories)
+      expect(mockChat).toHaveBeenCalledTimes(1);
 
       // Verify categories unchanged
       const rows = await db.sql`

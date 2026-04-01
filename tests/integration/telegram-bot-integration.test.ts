@@ -476,7 +476,7 @@ describe("Telegram Bot Integration", () => {
       });
 
       // Return a different embedding after correction
-      const newEmbedding = Array.from({ length: 1024 }, (_, i) => Math.cos(i) * 0.5);
+      const newEmbedding = Array.from({ length: 4096 }, (_, i) => Math.cos(i) * 0.5);
       mockGenerateEmbedding.mockResolvedValue(newEmbedding);
       mockChat.mockResolvedValue(
         createClassificationJSON({ category: "projects", name: "New Project" }),
@@ -761,7 +761,7 @@ describe("Telegram Bot Integration", () => {
           tags: ["work"],
         }),
       );
-      const newEmbedding = Array.from({ length: 1024 }, (_, i) => Math.cos(i) * 0.3);
+      const newEmbedding = Array.from({ length: 4096 }, (_, i) => Math.cos(i) * 0.3);
       mockGenerateEmbedding.mockResolvedValue(newEmbedding);
 
       await handleFixCommand(
