@@ -38,15 +38,10 @@
         <span class="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">v0.1</span>
       </div>
       <nav class="flex items-center gap-1">
-        <a href="#" onclick="switchView('browse');return false" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" data-nav="search" title="Search">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <span class="hidden sm:inline">Search</span>
-        </a>
         <a href="#" onclick="switchView('browse');return false" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" data-nav="browse" title="Browse">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
           <span class="hidden sm:inline">Browse</span>
         </a>
-
         <a href="#" onclick="switchView('settings');return false" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" data-nav="settings" title="Settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
           <span class="hidden sm:inline">Settings</span>
@@ -100,13 +95,13 @@
                 <div class="border-l-[3px] border-accent pl-3">
                   <div class="text-[10px] font-medium uppercase tracking-widest text-accent mb-1.5">STUCK ON</div>
                   <div class="text-sm text-foreground">
-                    <p class="my-0.5">Cortex &mdash; Second Brain App: Deployment is pending and needs MCP integration testing. Ensure the server environment is ready to proceed.</p>
+                    <p class="my-0.5">Guitar Practice Routine &mdash; no update in 6 days. Pick a next action or mark it paused.</p>
                   </div>
                 </div>
                 <div class="border-l-[3px] border-primary/50 pl-3">
                   <div class="text-[10px] font-medium uppercase tracking-widest text-primary/80 mb-1.5">SMALL WIN</div>
                   <div class="text-sm text-foreground">
-                    <p class="my-0.5">Send the fast.ai link to Lisa and quickly ask about her Anthropic contact. This will strengthen your professional network.</p>
+                    <p class="my-0.5">You filed 8 thoughts this week and finished 2 tasks &mdash; that&rsquo;s a good rhythm.</p>
                   </div>
                 </div>
               </div>
@@ -405,7 +400,7 @@
           <span class="rounded-full px-2 py-0.5 text-[10px] border border-border text-muted-foreground">typescript</span>
         </div>
         <div class="rounded-md border border-border bg-card p-4 prose-sm">
-          <p>Building a self-hosted second brain. Telegram capture working, web dashboard next. Using PostgreSQL + pgvector for semantic search.</p>
+          <p>Self-hosted second brain with Telegram capture, AI classification, semantic search, MCP server, multi-calendar Google Calendar integration, and e-ink kitchen display. All 12 features complete, 318 tests passing.</p>
         </div>
         <div class="rounded-md border border-border bg-card p-4">
           <h2 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Fields</h2>
@@ -413,9 +408,9 @@
             <dt class="text-xs text-muted-foreground">status</dt>
             <dd class="text-xs text-foreground">active</dd>
             <dt class="text-xs text-muted-foreground">next_action</dt>
-            <dd class="text-xs text-foreground">Deploy to home server and test MCP integration</dd>
+            <dd class="text-xs text-foreground">Add e-ink kitchen display with weather and calendar events</dd>
             <dt class="text-xs text-muted-foreground">notes</dt>
-            <dd class="text-xs text-foreground">All 12 features complete, 318 tests passing</dd>
+            <dd class="text-xs text-foreground">All 12 features complete, 318 tests passing. Multi-calendar Google Calendar integration shipped.</dd>
           </dl>
         </div>
         <div class="flex items-center gap-4 text-[10px] text-muted-foreground">
@@ -518,14 +513,14 @@
 
     <!-- ═══════════════════ SETTINGS ═══════════════════ -->
     <div id="view-settings" class="view-panel hidden">
-      <main class="flex-1 overflow-y-auto scrollbar-thin">
+      <main class="flex-1 overflow-y-auto scrollbar-thin pr-2">
         <div class="space-y-3 pb-4">
 
           <div class="flex items-center justify-between">
             <h1 class="text-lg font-medium tracking-tight">Settings</h1>
           </div>
 
-          <!-- Telegram -->
+          <!-- ═══ Telegram ═══ -->
           <div class="rounded-md border border-border bg-card p-4">
             <div class="flex items-center gap-2 mb-3">
               <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
@@ -533,6 +528,11 @@
               <span class="flex-1 h-px bg-border"></span>
             </div>
             <div class="space-y-3">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Bot Token</label>
+                <input type="password" value="7482916350:AAH" placeholder="Bot token from @BotFather" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                <span class="text-[10px] text-muted-foreground">Requires app restart to take effect.</span>
+              </div>
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs text-muted-foreground">Authorized Chat IDs</label>
                 <div class="flex flex-wrap gap-1.5 min-h-[28px]">
@@ -551,7 +551,7 @@
             </div>
           </div>
 
-          <!-- Language Model -->
+          <!-- ═══ Language Model ═══ -->
           <div class="rounded-md border border-border bg-card p-4">
             <div class="flex items-center gap-2 mb-3">
               <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg>
@@ -566,18 +566,23 @@
                   <option>OpenAI (ChatGPT)</option>
                   <option>Groq</option>
                   <option>Gemini</option>
-                  <option>Local LLM</option>
-                  <option>Ollama</option>
+                  <option>LM Studio</option>
+                  <option>Ollama (Local)</option>
                 </select>
               </div>
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs text-muted-foreground">Model</label>
-                <input type="text" value="claude-sonnet-4-20250514" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
+                <select class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                  <option selected>claude-sonnet-4-20250514</option>
+                  <option>claude-opus-4-20250514</option>
+                  <option>claude-haiku-4-20250414</option>
+                  <option>Other...</option>
+                </select>
               </div>
             </div>
             <div class="mt-3 flex flex-col gap-1.5">
               <label class="text-xs text-muted-foreground">Anthropic API Key</label>
-              <input type="password" value="sk-ant-xxxxxxxx" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+              <input type="password" value="sk-ant-xxxxxxxx" autocomplete="new-password" placeholder="Paste key..." class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
             </div>
             <div class="mt-3 flex flex-col gap-1.5">
               <label class="text-xs text-muted-foreground">Base URL</label>
@@ -593,7 +598,21 @@
             </div>
           </div>
 
-          <!-- Digests -->
+          <!-- ═══ Embeddings ═══ -->
+          <div class="rounded-md border border-border bg-card p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Embeddings</span>
+              <span class="flex-1 h-px bg-border"></span>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-muted-foreground">Model</label>
+              <input type="text" value="snowflake-arctic-embed2" readonly class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none cursor-default">
+              <span class="text-[10px] text-muted-foreground">Generates vector embeddings for all entries via the Ollama container.</span>
+            </div>
+          </div>
+
+          <!-- ═══ Digests ═══ -->
           <div class="rounded-md border border-border bg-card p-4">
             <div class="flex items-center gap-2 mb-3">
               <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -627,6 +646,26 @@
                 <input type="text" value="Europe/Berlin" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
               </div>
             </div>
+            <div class="grid grid-cols-2 gap-4 mt-3">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Output Language</label>
+                <select class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                  <option selected>English</option>
+                  <option>German</option>
+                  <option>French</option>
+                  <option>Spanish</option>
+                  <option>Italian</option>
+                  <option>Portuguese</option>
+                  <option>Dutch</option>
+                  <option>Polish</option>
+                  <option>Turkish</option>
+                  <option>Japanese</option>
+                  <option>Chinese</option>
+                  <option>Korean</option>
+                </select>
+                <span class="text-[10px] text-muted-foreground">Digests, classification names, and tags</span>
+              </div>
+            </div>
             <div class="mt-3 flex items-center gap-2">
               <span class="text-xs text-muted-foreground">Generate now</span>
               <button type="button" class="flex items-center gap-1 rounded-md border border-border bg-secondary px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary transition-colors">
@@ -638,7 +677,117 @@
             </div>
           </div>
 
-          <!-- Save -->
+          <!-- ═══ Google Calendar ═══ -->
+          <div class="rounded-md border border-border bg-card p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
+              <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Google Calendar</span>
+              <span class="flex-1 h-px bg-border"></span>
+            </div>
+            <div class="space-y-3">
+              <!-- OAuth Credentials -->
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs text-muted-foreground">Client ID</label>
+                  <input type="text" value="482716395-abc.apps.googleusercontent.com" placeholder="From Google Cloud Console" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs text-muted-foreground">Client Secret</label>
+                  <input type="password" value="" autocomplete="new-password" placeholder="••••••••  (leave blank to keep)" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                </div>
+              </div>
+
+              <!-- Connection status -->
+              <div class="flex items-center gap-3">
+                <span class="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Connected
+                </span>
+                <button type="button" class="flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-xs text-destructive hover:bg-destructive/20 hover:border-destructive/50 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg> Disconnect
+                </button>
+              </div>
+
+              <!-- Multi-calendar list -->
+              <div class="flex flex-col gap-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs text-muted-foreground">Calendars</label>
+                  <button type="button" class="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+                </div>
+                <div class="space-y-2">
+                  <div class="flex gap-2 items-center">
+                    <input type="text" value="Personal" placeholder="Name" class="h-8 w-32 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                    <input type="text" value="eike@gmail.com" placeholder="calendar-id@group.calendar.google.com" class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                    <button type="button" class="text-muted-foreground hover:text-destructive transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                  </div>
+                  <div class="flex gap-2 items-center">
+                    <input type="text" value="Work" placeholder="Name" class="h-8 w-32 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                    <input type="text" value="work-cal@group.calendar.google.com" placeholder="calendar-id@group.calendar.google.com" class="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                    <button type="button" class="text-muted-foreground hover:text-destructive transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                  </div>
+                </div>
+                <div class="flex flex-col gap-1.5 mt-1">
+                  <label class="text-xs text-muted-foreground">Default calendar</label>
+                  <select class="h-8 w-48 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                    <option selected>Personal</option>
+                    <option>Work</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Default event duration (minutes)</label>
+                <input type="number" value="60" min="15" max="480" placeholder="60" class="h-8 w-32 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ Display ═══ -->
+          <div class="rounded-md border border-border bg-card p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+              <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Display</span>
+              <span class="flex-1 h-px bg-border"></span>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center gap-2">
+                <input type="checkbox" checked class="rounded border-border">
+                <label class="text-xs text-muted-foreground">Enable display</label>
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-muted-foreground">Security Token</label>
+                <input type="text" value="" placeholder="Optional — leave blank to disable token auth" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs text-muted-foreground">Latitude</label>
+                  <input type="text" value="48.137" placeholder="e.g. 52.52" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs text-muted-foreground">Longitude</label>
+                  <input type="text" value="11.575" placeholder="e.g. 13.405" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                </div>
+              </div>
+              <span class="text-[10px] text-muted-foreground">Find coordinates at open-meteo.com</span>
+              <div class="flex flex-col gap-1.5 max-w-xs">
+                <label class="text-xs text-muted-foreground">Max Tasks</label>
+                <input type="number" value="7" min="1" max="20" class="h-8 w-24 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" readonly>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs text-muted-foreground">Width (px)</label>
+                  <input type="number" value="1872" placeholder="e.g. 800" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs text-muted-foreground">Height (px)</label>
+                  <input type="number" value="1404" placeholder="e.g. 480" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" readonly>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <a href="#" class="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors">Preview display &rarr;</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ Save ═══ -->
           <div class="flex items-center justify-between pt-1">
             <span class="text-[10px] text-muted-foreground">Changes take effect immediately after save</span>
             <button type="button" class="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
@@ -679,11 +828,6 @@
       document.querySelectorAll('[data-nav="' + name + '"]').forEach(function(n) {
         n.classList.add('text-foreground', 'bg-secondary');
       });
-      if (name === 'browse') {
-        document.querySelectorAll('[data-nav="search"]').forEach(function(n) {
-          n.classList.add('text-foreground', 'bg-secondary');
-        });
-      }
     }
 
     function showEntry(id) {
