@@ -74,23 +74,6 @@ import { generateEmbedding, embedEntry } from "../../src/embed.js";
 import { resolveConfigValue } from "../../src/config.js";
 
 // ---------------------------------------------------------------------------
-// Embedding Factories
-// ---------------------------------------------------------------------------
-
-function createQueryEmbedding(): number[] {
-  const vec = new Array(1024).fill(0);
-  vec[0] = 1;
-  return vec;
-}
-
-function createSimilarEmbedding(): number[] {
-  const vec = new Array(1024).fill(0);
-  vec[0] = 0.8;
-  vec[1] = 0.6;
-  return vec;
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

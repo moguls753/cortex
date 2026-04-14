@@ -9,7 +9,7 @@ A self-hosted, agent-readable second brain. See `ARCHITECTURE.md` for the full a
 These were decided during the spec interview and are final:
 
 - **LLM-agnostic:** Classification and digests use a provider abstraction (`src/llm/`). Two implementations: Anthropic SDK and OpenAI-compatible SDK (covers LM Studio, Ollama chat, OpenAI, etc.). Config: `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_BASE_URL`.
-- **Embedding model:** snowflake-arctic-embed2 via Ollama, 1024 dimensions, multilingual (EN+DE).
+- **Embedding model:** qwen3-embedding via Ollama, 4096 dimensions, multilingual (EN+DE).
 - **Voice capture:** Telegram voice messages transcribed via faster-whisper (medium model) in a Docker container.
 - **Inline correction:** Low-confidence (< threshold) Telegram replies include inline category buttons for quick correction.
 - **Context-aware classification:** Before classifying, fetch last 5 recent entries + top 3 semantically similar entries as context for the LLM.
@@ -29,7 +29,7 @@ These were decided during the spec interview and are final:
 - Runtime: Node.js + TypeScript
 - Web: Hono
 - DB: PostgreSQL + pgvector + Drizzle ORM
-- Embeddings: Ollama + snowflake-arctic-embed2
+- Embeddings: Ollama + qwen3-embedding
 - LLM: Provider abstraction (Anthropic SDK / OpenAI SDK)
 - Voice: faster-whisper (medium)
 - Telegram: grammY

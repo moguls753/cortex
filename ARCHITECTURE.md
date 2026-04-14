@@ -30,7 +30,7 @@ Telegram Bot ──┐           ┌── LLM Provider           PostgreSQL + p
 Web Editor ────┘           │    compatible endpoint)                           settings)
 (long notes)               ├── Ollama
                            │   (local embeddings,     SSE ────────────────── Live updates
-                           │    snowflake-arctic-                              (new entries,
+                           │    qwen3-                              (new entries,
                            │    embed2)                                        digest refresh)
                            │
                            └── faster-whisper                                MCP Server
@@ -50,7 +50,7 @@ Web Editor ────┘           │    compatible endpoint)                
 | Runtime | Node.js + TypeScript | One language everywhere |
 | Web framework | Hono | Lightweight, TypeScript-first, serves API + pages + SSE |
 | Database | PostgreSQL + pgvector | Vector search, battle-tested, boring (good) |
-| Embeddings | Ollama + snowflake-arctic-embed2 | Local, free, private, 1024 dimensions, multilingual (EN+DE) |
+| Embeddings | Ollama + qwen3-embedding | Local, free, private, 4096 dimensions, multilingual (EN+DE) |
 | LLM (classification + digests) | Any: Anthropic, OpenAI, OpenAI-compatible | Provider abstraction — two implementations: `@anthropic-ai/sdk` and `openai` SDK (covers LM Studio, Ollama chat, OpenAI, etc.) |
 | Voice | faster-whisper (medium model) | Local speech-to-text, no external API needed |
 | Telegram | grammY | Best TypeScript Telegram bot library |
@@ -105,7 +105,7 @@ CREATE TABLE entries (
     confidence    REAL,                  -- classification confidence (null if manual via webapp)
     source        TEXT NOT NULL CHECK (source IN ('telegram', 'webapp', 'mcp')),
     source_type   TEXT DEFAULT 'text' CHECK (source_type IN ('text', 'voice')),
-    embedding     vector(1024),          -- snowflake-arctic-embed2 dimensions
+    embedding     vector(4096),          -- qwen3-embedding dimensions
     deleted_at    TIMESTAMPTZ,           -- soft delete (null = active)
     created_at    TIMESTAMPTZ DEFAULT now(),
     updated_at    TIMESTAMPTZ DEFAULT now()
@@ -562,7 +562,7 @@ Log errors with structured JSON logging (timestamp, level, module, message, cont
 3. faster-whisper starts, API is available
 4. App starts:
    a. Runs Drizzle migrations (creates tables, indexes, triggers if not exist)
-   b. Checks Ollama connectivity, pulls model if not present (`ollama pull snowflake-arctic-embed2`)
+   b. Checks Ollama connectivity, pulls model if not present (`ollama pull qwen3-embedding`)
    c. Starts Hono web server (including SSE endpoint)
    d. Starts grammY Telegram bot (long-polling mode — no public URL needed)
    e. Starts cron jobs (daily digest, weekly review, embedding retry)
@@ -649,7 +649,7 @@ services:
         environment:
             - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
             - OLLAMA_URL=http://ollama:11434
-            - OLLAMA_MODEL=${OLLAMA_MODEL:-snowflake-arctic-embed2}
+            - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3-embedding}
             - WHISPER_URL=http://whisper:8000
             - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
             - LLM_API_KEY
@@ -713,7 +713,7 @@ volumes:
     whisper_data:
 ```
 
-Note: The Ollama container ships with no models. On first startup, the app pulls the embedding model automatically (see Startup Sequence). Alternatively, run manually: `docker exec cortex-ollama-1 ollama pull snowflake-arctic-embed2`
+Note: The Ollama container ships with no models. On first startup, the app pulls the embedding model automatically (see Startup Sequence). Alternatively, run manually: `docker exec cortex-ollama-1 ollama pull qwen3-embedding`
 
 Note: The faster-whisper container downloads the medium model on first use. Subsequent starts use the cached model.
 
@@ -736,7 +736,7 @@ LLM_MODEL=claude-sonnet-4-20250514
 LLM_BASE_URL=
 
 # Ollama (local embeddings)
-OLLAMA_MODEL=snowflake-arctic-embed2
+OLLAMA_MODEL=qwen3-embedding
 
 # App
 PORT=3000
@@ -779,7 +779,7 @@ TZ=Europe/Berlin
 
 Everything else runs locally:
 - PostgreSQL + pgvector (storage + vector search)
-- Ollama + snowflake-arctic-embed2 (embeddings, multilingual)
+- Ollama + qwen3-embedding (embeddings, multilingual)
 - faster-whisper (voice transcription)
 - nodemailer (SMTP — talks to your own mail server)
 - grammY (Telegram Bot API — free)

@@ -16,7 +16,7 @@ The Foundation feature establishes the operational baseline for the Cortex appli
 **US-1: As a developer, I want environment variables loaded and validated at startup so that misconfiguration is caught early.**
 
 - AC-1.1: Required environment variables (`DATABASE_URL`, `LLM_API_KEY`, `TELEGRAM_BOT_TOKEN`, `WEBAPP_PASSWORD`, `SESSION_SECRET`) cause startup failure with a clear error message naming the missing variable if any are absent.
-- AC-1.2: Optional environment variables have documented defaults: `PORT=3000`, `OLLAMA_MODEL=snowflake-arctic-embed2`, `TZ=Europe/Berlin`, `LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-sonnet-4-20250514`, `LLM_BASE_URL=` (empty, provider-dependent default), `DAILY_DIGEST_CRON=30 7 * * *`, `WEEKLY_DIGEST_CRON=0 16 * * 0`.
+- AC-1.2: Optional environment variables have documented defaults: `PORT=3000`, `OLLAMA_MODEL=qwen3-embedding`, `TZ=Europe/Berlin`, `LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-sonnet-4-20250514`, `LLM_BASE_URL=` (empty, provider-dependent default), `DAILY_DIGEST_CRON=30 7 * * *`, `WEEKLY_DIGEST_CRON=0 16 * * 0`.
 - AC-1.3: Settings table values override environment variable values when present. When a key exists in the `settings` table, its value takes precedence over the corresponding env var.
 - AC-1.4: Configuration is exported as a typed TypeScript object (`config`) importable by all other modules. Includes LLM provider settings (`llmProvider`, `llmApiKey`, `llmModel`, `llmBaseUrl`).
 
