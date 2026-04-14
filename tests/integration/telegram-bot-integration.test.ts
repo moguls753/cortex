@@ -212,7 +212,7 @@ describe("Telegram Bot Integration", () => {
     await db?.stop();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockChat.mockReset();
     mockCreateLLMProvider.mockReset();
     mockCreateLLMProvider.mockReturnValue({ chat: mockChat });
@@ -221,6 +221,15 @@ describe("Telegram Bot Integration", () => {
     mockReadFile.mockResolvedValue(
       "Classify this: {context_entries}\n\nInput: {input_text}",
     );
+    await sql`
+      INSERT INTO settings (key, value) VALUES ('llm_config', ${JSON.stringify({
+        provider: "anthropic",
+        model: "claude-sonnet-4-20250514",
+        baseUrl: "",
+        apiKeys: { anthropic: "test-key" },
+      })})
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    `;
 
     // Default: classification succeeds
     mockChat.mockResolvedValue(createClassificationJSON());
@@ -785,13 +794,12 @@ describe("Telegram Bot Integration", () => {
 
   describe("startup sequence", () => {
     it("starts the bot after DB migrations and server start without blocking", async () => {
-      // TS-6.3
-      const restoreEnv = withEnv({
-        TELEGRAM_BOT_TOKEN: "fake-token:abc123",
-        DATABASE_URL: db.url,
-      });
+      // TS-6.3 — startBot() now reads the bot token from the settings table
+      // (not from env vars). Seed it and run startBot.
+      await insertSetting(sql, "telegram_bot_token", "fake-token:abc123");
 
       // Mock Bot constructor for this test
+      mockBotStart.mockReturnValue(new Promise(() => {}));
       MockBot.mockImplementation(() => ({
         start: mockBotStart,
         stop: vi.fn(),
@@ -801,11 +809,13 @@ describe("Telegram Bot Integration", () => {
         api: { config: { use: vi.fn() }, setWebhook: vi.fn() },
       }));
 
-      // The startup function should not throw and should call bot.start()
-      await startBot(sql);
-
-      expect(mockBotStart).toHaveBeenCalled();
-      restoreEnv();
+      try {
+        await startBot(sql);
+        expect(mockBotStart).toHaveBeenCalled();
+      } finally {
+        const { resetBotState } = await import("../../src/telegram.js");
+        resetBotState();
+      }
     });
   });
 

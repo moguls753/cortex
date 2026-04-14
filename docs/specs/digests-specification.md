@@ -63,7 +63,7 @@ The digest system runs three scheduled jobs via node-cron: a daily morning brief
 **As a system, I want background retry for failed embeddings and classifications.**
 
 - **AC-4.1:** A cron job runs every 15 minutes (cron expression: `*/15 * * * *`). This schedule is not user-configurable.
-- **AC-4.2:** The job finds all active (non-deleted) entries where `embedding IS NULL` and generates embeddings for them using Ollama (snowflake-arctic-embed2). The embedding is computed from the entry's `content` field (or `name` if content is empty).
+- **AC-4.2:** The job finds all active (non-deleted) entries where `embedding IS NULL` and generates embeddings for them using Ollama (qwen3-embedding). The embedding is computed from the entry's `content` field (or `name` if content is empty).
 - **AC-4.3:** The job finds all active (non-deleted) entries where `category IS NULL` and re-classifies them using Claude with the classification prompt. The context-aware pipeline is used: last 5 recent entries and top 3 similar entries are fetched as context (similar entries may not be available if the entry itself has no embedding, in which case only recent entries are used).
 - **AC-4.4:** Successfully processed entries are updated in the database immediately. Embedding and classification updates are independent: an entry can succeed at embedding but fail at classification (or vice versa) in the same cycle.
 - **AC-4.5:** Failed entries (Ollama timeout, Claude error, malformed response) are logged with structured JSON logging and left for the next cycle. No entry is marked as permanently failed.

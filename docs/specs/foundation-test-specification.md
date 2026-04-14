@@ -76,7 +76,7 @@ Scenario: Optional variables use documented defaults
   And WEEKLY_DIGEST_CRON is not set
   When the configuration module loads
   Then config.port is 3000
-  And config.ollamaModel is "snowflake-arctic-embed2"
+  And config.ollamaModel is "qwen3-embedding"
   And config.timezone is "Europe/Berlin"
   And config.llmProvider is "anthropic"
   And config.llmModel is "claude-sonnet-4-20250514"
@@ -187,7 +187,7 @@ Scenario: Migrations create the entries table with correct schema
   Given a fresh PostgreSQL database with pgvector extension available
   When Drizzle migrations run
   Then the "entries" table exists
-  And it has columns: id (uuid), category (text, nullable), name (text, not null), content (text), fields (jsonb), tags (text[]), confidence (real), source (text, not null), source_type (text), embedding (vector(1024)), deleted_at (timestamptz), created_at (timestamptz), updated_at (timestamptz)
+  And it has columns: id (uuid), category (text, nullable), name (text, not null), content (text), fields (jsonb), tags (text[]), confidence (real), source (text, not null), source_type (text), embedding (vector(4096)), deleted_at (timestamptz), created_at (timestamptz), updated_at (timestamptz)
   And the category column has a CHECK constraint allowing only 'people', 'projects', 'tasks', 'ideas', 'reference', and NULL
   And the source column has a CHECK constraint allowing only 'telegram', 'webapp', 'mcp'
   And the source_type column has a CHECK constraint allowing only 'text', 'voice'

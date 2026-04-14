@@ -26,7 +26,7 @@ const FEATURES = [
     icon: Search,
     title: "Semantic search",
     description:
-      "Vector embeddings via pgvector + snowflake-arctic-embed2. Ask questions in natural language, get ranked results by meaning.",
+      "Vector embeddings via pgvector + qwen3-embedding. Ask questions in natural language, get ranked results by meaning.",
   },
   {
     icon: Mail,

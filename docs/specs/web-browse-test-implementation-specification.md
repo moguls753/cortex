@@ -292,13 +292,13 @@ Note: The unit test verifies the handler renders entries in the order returned b
 
 #### TS-2.1: Semantic search returns results ranked by similarity (unit)
 
-- **Setup (Given):** Mock `generateEmbedding` to return a 1024-dim vector. Mock `semanticSearch` to return 3 entries in similarity-ranked order (highest first): `[entryHigh, entryMed, entryLow]`. Mock `getFilterTags` to return `[]`. Create test app. Login.
+- **Setup (Given):** Mock `generateEmbedding` to return a 4096-dim vector. Mock `semanticSearch` to return 3 entries in similarity-ranked order (highest first): `[entryHigh, entryMed, entryLow]`. Mock `getFilterTags` to return `[]`. Create test app. Login.
 - **Action (When):** `app.request("/browse?q=career+development+plans", { headers: { Cookie: cookie } })`.
 - **Assertion (Then):** Response status 200. Body contains all 3 entry names in order (use index comparison). Verify `generateEmbedding` was called with `"career development plans"`. Verify `semanticSearch` was called with the embedding vector. Similarity scores are NOT present in the response body.
 
 #### TS-2.2: Semantic search excludes results below similarity threshold (integration)
 
-- **Setup (Given):** Mock `generateEmbedding` to return the query embedding `[1, 0, 0, ..., 0]` (1024-dim). Seed entry "A" with a similar embedding (cosine similarity ~0.8 to query). Seed entry "B" with a dissimilar embedding (cosine similarity ~0.3 to query). Create integration app. Login.
+- **Setup (Given):** Mock `generateEmbedding` to return the query embedding `[1, 0, 0, ..., 0]` (4096-dim). Seed entry "A" with a similar embedding (cosine similarity ~0.8 to query). Seed entry "B" with a dissimilar embedding (cosine similarity ~0.3 to query). Create integration app. Login.
 - **Action (When):** `app.request("/browse?q=test+query", { headers: { Cookie: cookie } })`.
 - **Assertion (Then):** Response body contains entry "A" name. Entry "B" name does NOT appear.
 
@@ -443,7 +443,7 @@ Verifies `browseEntries` does NOT filter on `embedding IS NOT NULL`.
 
 #### TS-5.5: Filter state reflected in URL query parameters (unit)
 
-- **Setup (Given):** Mock `generateEmbedding` to return a 1024-dim vector. Mock `semanticSearch` to return 2 entries (so semantic search succeeds — the test is about filter state preservation, not search behavior). Mock `getFilterTags` to return `["work"]`. Create test app. Login.
+- **Setup (Given):** Mock `generateEmbedding` to return a 4096-dim vector. Mock `semanticSearch` to return 2 entries (so semantic search succeeds — the test is about filter state preservation, not search behavior). Mock `getFilterTags` to return `["work"]`. Create test app. Login.
 - **Action (When):** `app.request("/browse?category=projects&tag=work&q=budget", { headers: { Cookie: cookie } })`.
 - **Assertion (Then):** Response status 200. The rendered HTML reflects the filter state:
   - The "Projects" category tab is marked as active/selected
@@ -559,14 +559,14 @@ For integration tests that need controlled cosine similarity:
 ```typescript
 function createQueryEmbedding(): number[] {
   // Unit vector in first dimension: [1, 0, 0, ..., 0]
-  const vec = new Array(1024).fill(0);
+  const vec = new Array(4096).fill(0);
   vec[0] = 1;
   return vec;
 }
 
 function createSimilarEmbedding(): number[] {
   // Cosine similarity ~0.8 to query embedding
-  const vec = new Array(1024).fill(0);
+  const vec = new Array(4096).fill(0);
   vec[0] = 0.8;
   vec[1] = 0.6;
   return vec;
@@ -574,7 +574,7 @@ function createSimilarEmbedding(): number[] {
 
 function createDissimilarEmbedding(): number[] {
   // Cosine similarity ~0.3 to query embedding (below 0.5 threshold)
-  const vec = new Array(1024).fill(0);
+  const vec = new Array(4096).fill(0);
   vec[0] = 0.3;
   vec[1] = 0.954;
   return vec;
@@ -653,7 +653,7 @@ async function clearEntries(sql: Sql): Promise<void> {
 2. **Embedding** — Via `vi.mock()` on `src/embed.ts`:
    ```typescript
    vi.mock("../../src/embed.js", () => ({
-     generateEmbedding: vi.fn().mockResolvedValue(new Array(1024).fill(0)),
+     generateEmbedding: vi.fn().mockResolvedValue(new Array(4096).fill(0)),
    }));
    ```
 
@@ -707,6 +707,6 @@ All 33 test scenarios from the test specification (TS-1.1 through TS-6.7) are ma
 
 5. **TS-5.6** (entries without embeddings excluded from semantic) — when semantic search returns results (entry A), the handler does NOT fall back to text search, so entry B (which has matching content but no embedding) never appears. This is correct behavior: fallback only triggers when semantic returns EMPTY.
 
-6. **Embedding vector insertion** — pgvector requires the embedding to be cast to `::vector` type. The `seedEntry` helper uses `sql` template literal with explicit `::vector` cast. If the postgres.js driver doesn't support this syntax directly, an alternative is `sql`INSERT ... VALUES (... ${sql.array(embedding)}::vector(1024))`.
+6. **Embedding vector insertion** — pgvector requires the embedding to be cast to `::vector` type. The `seedEntry` helper uses `sql` template literal with explicit `::vector` cast. If the postgres.js driver doesn't support this syntax directly, an alternative is `sql`INSERT ... VALUES (... ${sql.array(embedding)}::vector(4096))`.
 
 7. **TS-4.3** (AND logic) uses `mode=text` to avoid needing embeddings while testing the combined filter SQL. This is acceptable because the AND filter logic is in the query functions (independent of search mode), and semantic search AND logic is already tested by TS-2.3.

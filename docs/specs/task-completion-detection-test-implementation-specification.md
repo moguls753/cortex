@@ -190,7 +190,7 @@ beforeEach(() => {
 
   // Default embedding
   mockGenerateEmbedding.mockResolvedValue(
-    Array.from({ length: 1024 }, (_, i) => Math.sin(i) * 0.5)
+    Array.from({ length: 4096 }, (_, i) => Math.sin(i) * 0.5)
   );
 });
 ```

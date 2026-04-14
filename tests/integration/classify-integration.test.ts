@@ -181,7 +181,7 @@ describe("Classification integration", () => {
     await db?.stop();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockChat.mockReset();
     mockCreateLLMProvider.mockReset();
     mockCreateLLMProvider.mockReturnValue({ chat: mockChat });
@@ -190,12 +190,22 @@ describe("Classification integration", () => {
     mockReadFile.mockResolvedValue(
       "Classify this: {context_entries}\n\nInput: {input_text}",
     );
+    // Seed an LLM config so classifyText does not bail on the "not configured" check.
+    await db.sql`
+      INSERT INTO settings (key, value) VALUES ('llm_config', ${JSON.stringify({
+        provider: "anthropic",
+        model: "claude-sonnet-4-20250514",
+        baseUrl: "",
+        apiKeys: { anthropic: "test-key" },
+      })})
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    `;
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
     await db.sql`DELETE FROM entries WHERE source = 'webapp'`;
-    await db.sql`DELETE FROM settings WHERE key LIKE 'test_%' OR key = 'confidence_threshold'`;
+    await db.sql`DELETE FROM settings WHERE key LIKE 'test_%' OR key = 'confidence_threshold' OR key = 'llm_config'`;
   });
 
   // ---------------------------------------------------------------------------

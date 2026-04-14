@@ -165,7 +165,7 @@ describe("Schema — settings table (TS-3.2)", () => {
 });
 
 describe("Schema — indexes (TS-3.3)", () => {
-  it("creates HNSW, category, created_at, and GIN tags indexes", async () => {
+  it("creates category, created_at, and GIN tags indexes", async () => {
     const indexes = await db.sql`
       SELECT indexname, indexdef
       FROM pg_indexes
@@ -176,11 +176,12 @@ describe("Schema — indexes (TS-3.3)", () => {
       (i: { indexdef: string }) => i.indexdef.toLowerCase(),
     );
 
-    // HNSW index with vector_cosine_ops on embedding
+    // HNSW index is intentionally not created: pgvector HNSW does not support
+    // vectors with more than 2000 dimensions, and qwen3-embedding is 4096-dim.
     const hnswIndex = indexDefs.find(
       (d: string) => d.includes("hnsw") && d.includes("vector_cosine_ops"),
     );
-    expect(hnswIndex).toBeDefined();
+    expect(hnswIndex).toBeUndefined();
 
     // Index on category
     const categoryIndex = indexDefs.find((d: string) => d.includes("category"));

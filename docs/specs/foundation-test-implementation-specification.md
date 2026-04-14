@@ -88,7 +88,7 @@ tests/
 - **Action (When):** Dynamically import `src/config.ts`.
 - **Assertion (Then):** Verify each default:
   - `config.port === 3000`
-  - `config.ollamaModel === "snowflake-arctic-embed2"`
+  - `config.ollamaModel === "qwen3-embedding"`
   - `config.timezone === "Europe/Berlin"`
   - `config.llmProvider === "anthropic"`
   - `config.llmModel === "claude-sonnet-4-20250514"`

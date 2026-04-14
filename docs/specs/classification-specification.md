@@ -68,7 +68,7 @@ The Classification feature integrates with a configurable LLM provider (Anthropi
 
 ## Non-Goals
 
-- **Using embedding-only models for classification:** Ollama's embedding models (e.g., snowflake-arctic-embed2) are not used for classification. Classification requires a chat/instruct LLM via the provider abstraction.
+- **Using embedding-only models for classification:** Ollama's embedding models (e.g., qwen3-embedding) are not used for classification. Classification requires a chat/instruct LLM via the provider abstraction.
 - **Storing the raw LLM API response:** Only the parsed and validated fields are stored. The raw API response is not persisted, though it may be logged at debug level for troubleshooting.
 - **Re-classifying entries automatically when the prompt changes:** Editing the classification prompt does not trigger re-classification of existing entries. Only new entries and entries with `category: null` go through classification.
 - **Classifying into multiple categories:** Every entry gets exactly one category. An entry about a person working on a project is classified into whichever category the LLM deems most relevant, following the decision tree (person-first, then project, then task, then idea, then reference).

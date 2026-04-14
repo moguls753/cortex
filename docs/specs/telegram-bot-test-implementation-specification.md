@@ -693,9 +693,9 @@ All integration tests share a single testcontainers PostgreSQL instance (started
 
 **TS-1.8: Embedding generated and stored**
 
-- **Setup (Given):** Mock `generateEmbedding` to return `createFakeEmbedding(1024)`. Mock LLM to return valid classification JSON.
+- **Setup (Given):** Mock `generateEmbedding` to return `createFakeEmbedding()`. Mock LLM to return valid classification JSON.
 - **Action (When):** Process a text update with `"New project idea"`.
-- **Assertion (Then):** Query the new entry from DB. It has a non-null `embedding` column with 1024 dimensions.
+- **Assertion (Then):** Query the new entry from DB. It has a non-null `embedding` column with 4096 dimensions.
 - **Teardown:** Delete test entries.
 
 **TS-1.9: Entry stored with correct fields**

@@ -172,7 +172,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     const llmBaseUrl = llmConfig.baseUrl;
     const dailyCron = resolveEffective(dbSettings, "daily_digest_cron", DEFAULTS.daily_digest_cron);
     const weeklyCron = resolveEffective(dbSettings, "weekly_digest_cron", DEFAULTS.weekly_digest_cron);
-    const timezone = resolveEffective(dbSettings, "timezone", DEFAULTS.timezone);
+    const timezone = resolveEffective(dbSettings, "timezone", process.env.TZ || DEFAULTS.timezone);
     const threshold = resolveEffective(dbSettings, "confidence_threshold", DEFAULTS.confidence_threshold);
     const ollamaUrl = resolveEffective(dbSettings, "ollama_url", DEFAULTS.ollama_url);
     const email = resolveEffective(dbSettings, "digest_email_to", DEFAULTS.digest_email_to);

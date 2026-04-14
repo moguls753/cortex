@@ -91,7 +91,7 @@ Cortex is organized into four layers:
 
 **Capture** -- Two input channels feed the application. The Telegram bot accepts text and voice messages for quick capture. The web editor provides a full-form interface for longer notes. Both channels feed into a shared processing pipeline.
 
-**Intelligence** -- Three AI services process incoming data. The Claude API (claude-sonnet-4-20250514) performs structured JSON classification and generates daily/weekly digests. Ollama runs the snowflake-arctic-embed2 model locally to produce 1024-dimensional multilingual embeddings. faster-whisper runs locally to transcribe voice messages to text.
+**Intelligence** -- Three AI services process incoming data. The Claude API (claude-sonnet-4-20250514) performs structured JSON classification and generates daily/weekly digests. Ollama runs the qwen3-embedding model locally to produce 4096-dimensional multilingual embeddings. faster-whisper runs locally to transcribe voice messages to text.
 
 **Storage** -- PostgreSQL with the pgvector extension stores all entries, embeddings, and settings in a single-table design with JSONB fields for category-specific data.
 
@@ -136,7 +136,7 @@ Requirements are organized by feature area. Each requirement has a unique ID, Mo
 **Acceptance Criteria:**
 1. `PORT` defaults to `3000` when not set.
 2. `ANTHROPIC_MODEL` defaults to `claude-sonnet-4-20250514` when not set.
-3. `OLLAMA_MODEL` defaults to `snowflake-arctic-embed2` when not set.
+3. `OLLAMA_MODEL` defaults to `qwen3-embedding` when not set.
 4. `TZ` defaults to `Europe/Berlin` when not set.
 5. `DAILY_DIGEST_CRON` defaults to `30 7 * * *` when not set.
 6. `WEEKLY_DIGEST_CRON` defaults to `0 16 * * 0` when not set.
@@ -232,7 +232,7 @@ Requirements are organized by feature area. Each requirement has a unique ID, Mo
 7. `confidence` -- nullable REAL for classification confidence score. Null when entry is created manually via webapp.
 8. `source` -- TEXT NOT NULL with CHECK constraint limiting values to `telegram`, `webapp`, `mcp`.
 9. `source_type` -- TEXT defaulting to `text` with CHECK constraint limiting values to `text`, `voice`.
-10. `embedding` -- `vector(1024)` nullable, stores snowflake-arctic-embed2 embeddings.
+10. `embedding` -- `vector(4096)` nullable, stores qwen3-embedding embeddings.
 11. `deleted_at` -- nullable TIMESTAMPTZ for soft delete. Null means active.
 12. `created_at` -- TIMESTAMPTZ defaulting to `now()`.
 13. `updated_at` -- TIMESTAMPTZ defaulting to `now()`.
@@ -310,12 +310,12 @@ Requirements are organized by feature area. Each requirement has a unique ID, Mo
 
 **Priority:** MUST
 
-**Description:** The system shall generate 1024-dimensional embeddings using the snowflake-arctic-embed2 model via Ollama for all entry content.
+**Description:** The system shall generate 4096-dimensional embeddings using the qwen3-embedding model via Ollama for all entry content.
 
 **Acceptance Criteria:**
 1. Embedding requests are sent to the Ollama HTTP API at the configured URL.
-2. The model used is `snowflake-arctic-embed2` (configurable via `OLLAMA_MODEL`).
-3. Generated embeddings are 1024-dimensional float vectors.
+2. The model used is `qwen3-embedding` (configurable via `OLLAMA_MODEL`).
+3. Generated embeddings are 4096-dimensional float vectors.
 4. Embeddings support multilingual content (English and German at minimum).
 
 #### REQ-EMB-002: Check Ollama connectivity on startup
@@ -335,7 +335,7 @@ Requirements are organized by feature area. Each requirement has a unique ID, Mo
 **Description:** If the embedding model is not available on the Ollama instance, the application shall pull it automatically.
 
 **Acceptance Criteria:**
-1. On startup, if the configured model is not present, the application executes `ollama pull snowflake-arctic-embed2`.
+1. On startup, if the configured model is not present, the application executes `ollama pull qwen3-embedding`.
 2. The pull operation is logged.
 3. After a successful pull, embedding generation is available.
 
@@ -1259,7 +1259,7 @@ Requirements are organized by feature area. Each requirement has a unique ID, Mo
 
 **Acceptance Criteria:**
 1. On startup, the app checks if the configured model is available on the Ollama instance.
-2. If the model is not present, `ollama pull snowflake-arctic-embed2` is executed.
+2. If the model is not present, `ollama pull qwen3-embedding` is executed.
 3. The pull result is logged.
 
 #### REQ-START-004: Start Hono server
@@ -1433,7 +1433,7 @@ Requirements are organized by feature area. Each requirement has a unique ID, Mo
 
 **Description:** The embedding model shall support English and German at minimum.
 
-**Fit Criteria:** The snowflake-arctic-embed2 model is used, which supports multilingual content. A query in English returns semantically similar entries written in German, and vice versa, with similarity >= 0.5 for genuinely related content.
+**Fit Criteria:** The qwen3-embedding model is used, which supports multilingual content. A query in English returns semantically similar entries written in German, and vice versa, with similarity >= 0.5 for genuinely related content.
 
 #### REQ-NFR-009: Soft delete pattern
 
@@ -1486,8 +1486,8 @@ Requirements are organized by feature area. Each requirement has a unique ID, Mo
 | Authentication | None (internal network) |
 | Direction | Request/Response |
 | Default URL | `http://ollama:11434` |
-| Model | snowflake-arctic-embed2 |
-| Output | 1024-dimensional float vectors |
+| Model | qwen3-embedding |
+| Output | 4096-dimensional float vectors |
 | Usage | Embedding generation for semantic search |
 
 ### 5.4 faster-whisper HTTP API
@@ -1559,7 +1559,7 @@ Requirements are organized by feature area. Each requirement has a unique ID, Mo
 | PostgreSQL | 16 (pgvector/pgvector:pg16) | Data storage, vector search |
 | pgvector | (bundled with image) | Vector similarity extension |
 | Ollama | ollama/ollama (latest) | Local embedding generation |
-| snowflake-arctic-embed2 | (pulled by Ollama) | Multilingual embedding model (1024 dims) |
+| qwen3-embedding | (pulled by Ollama) | Multilingual embedding model (4096 dims) |
 | faster-whisper | fedirz/faster-whisper-server:latest | Voice transcription |
 | grammY | (latest) | Telegram bot framework |
 | Drizzle ORM | (latest) | Database access and migrations |

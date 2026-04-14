@@ -315,14 +315,14 @@ async function seedEntry(sql, overrides = {}) {
 ```ts
 // Unit vector pointing in one direction (similar to query)
 function createSimilarEmbedding(): number[] {
-  const v = new Array(1024).fill(0);
+  const v = new Array(4096).fill(0);
   v[0] = 1.0;
   return v;
 }
 
 // Unit vector pointing in orthogonal direction (dissimilar)
 function createDissimilarEmbedding(): number[] {
-  const v = new Array(1024).fill(0);
+  const v = new Array(4096).fill(0);
   v[512] = 1.0;
   return v;
 }

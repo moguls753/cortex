@@ -64,14 +64,15 @@ describe("Config settings override (TS-1.6, TS-1.7)", () => {
     expect(resolved).toBe("db-model");
   });
 
-  it("returns env var when no database setting exists (TS-1.7)", async () => {
-    // Set env var, no settings row
+  it("returns undefined when no database setting exists (TS-1.7)", async () => {
+    // resolveConfigValue is a DB-only reader; env var fallback is handled by
+    // individual callers (e.g. digests.ts) which coalesce with `config.*` defaults.
     restoreEnv = withEnv({ LLM_MODEL: "env-model" });
 
     const { resolveConfigValue } = await import("../../src/config.js");
 
     const resolved = await resolveConfigValue("llm_model", db.sql);
-    expect(resolved).toBe("env-model");
+    expect(resolved).toBeUndefined();
   });
 });
 
@@ -96,8 +97,7 @@ describe("Config settings edge cases (TS-EC-3, TS-EC-5)", () => {
     expect(true).toBe(true); // We got here without throwing
   });
 
-  it("falls back to env vars when settings table is empty (TS-EC-5)", async () => {
-    // Ensure settings table is empty
+  it("returns undefined when settings table is empty (TS-EC-5)", async () => {
     await db.sql`TRUNCATE settings`;
 
     restoreEnv = withEnv({ LLM_MODEL: "env-model" });
@@ -105,6 +105,6 @@ describe("Config settings edge cases (TS-EC-3, TS-EC-5)", () => {
     const { resolveConfigValue } = await import("../../src/config.js");
 
     const resolved = await resolveConfigValue("llm_model", db.sql);
-    expect(resolved).toBe("env-model");
+    expect(resolved).toBeUndefined();
   });
 });

@@ -160,7 +160,7 @@ Enable a zero-configuration first-run experience for Cortex. A new user runs `do
 
 **NG-6:** Google Calendar configuration in the wizard. It requires an OAuth flow and is too complex for onboarding. It belongs in the settings page.
 
-**NG-7:** Embedding model configuration in the wizard. The embedding model (snowflake-arctic-embed2) is auto-detected from the Ollama container and requires no user input.
+**NG-7:** Embedding model configuration in the wizard. The embedding model (qwen3-embedding) is auto-detected from the Ollama container and requires no user input.
 
 ## Open Questions
 

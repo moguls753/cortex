@@ -31,7 +31,7 @@ Web Editor ────┘           │    compatible endpoint)                
 (long notes)               ├── Ollama
                            │   (local embeddings,     SSE ────────────────── Live updates
                            │    qwen3-                              (new entries,
-                           │    embed2)                                        digest refresh)
+                           │    embedding)                                     digest refresh)
                            │
                            └── faster-whisper                                MCP Server
                                (voice transcription)                          (any AI tool:

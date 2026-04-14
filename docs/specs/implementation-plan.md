@@ -39,7 +39,7 @@ The project is greenfield. Scale is small (< 1,000 entries). There is no existin
 
 **Work:**
 
-- Ollama integration (`src/embed.ts`): connect to Ollama, generate embeddings with `snowflake-arctic-embed2` (1024 dimensions), connectivity check on startup, automatic model pull if not present (`ollama pull snowflake-arctic-embed2`)
+- Ollama integration (`src/embed.ts`): connect to Ollama, generate embeddings with `qwen3-embedding` (4096 dimensions), connectivity check on startup, automatic model pull if not present (`ollama pull qwen3-embedding`)
 - Claude API classification (`src/classify.ts`): send thought text with classification prompt, parse structured JSON response, context-aware classification using last 5 recent entries and top 3 semantically similar entries
 - Embedding retry logic: entries stored with `embedding: null` are retried, exponential backoff on Ollama failures
 
@@ -213,7 +213,7 @@ foundation → classification → digests
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| snowflake-arctic-embed2 not available on Ollama | Blocks all embedding and semantic search | Fall back to nomic-embed-text:v1.5, adjust vector dimensions from 1024 to 768, make model configurable via `OLLAMA_MODEL` env var |
+| qwen3-embedding not available on Ollama | Blocks all embedding and semantic search | Fall back to snowflake-arctic-embed2 (1024 dims) or nomic-embed-text:v1.5 (768 dims); adjust the `vector(4096)` column to match; make model configurable via `OLLAMA_MODEL` env var |
 | faster-whisper container resource usage | Slow transcription on low-spec hardware, high memory consumption | Make voice capture optional, allow disabling whisper in config, document minimum hardware requirements |
 | Claude API rate limits | Slow classification during burst capture, blocked digest generation | Batch classification requests, implement retry with exponential backoff, queue entries for async processing |
 | SSE connection management | Stale connections consuming server resources, missed events | Implement heartbeat pings every 30 seconds, client-side reconnection logic, event ID tracking for replay |
@@ -238,7 +238,7 @@ This starts:
 **Pull the embedding model (first time only):**
 
 ```bash
-docker exec cortex-ollama-1 ollama pull snowflake-arctic-embed2
+docker exec cortex-ollama-1 ollama pull qwen3-embedding
 ```
 
 **Run the application:**

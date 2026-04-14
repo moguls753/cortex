@@ -23,7 +23,7 @@
 - `describe` blocks group by user story / functional area
 - `it` blocks describe the behavior, not the implementation
 - One assertion theme per `it` block (one test scenario → one test function)
-- Test names read as sentences: `it("returns a 1024-dimensional float array for text input")`
+- Test names read as sentences: `it("returns a 4096-dimensional float array for text input")`
 - Explicit imports: `import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"`
 
 ## Test Structure
@@ -52,7 +52,7 @@ tests/
 
 | Test Scenario | Test Function | File |
 |---------------|---------------|------|
-| TS-1.1 | `it("returns a 1024-dimensional float array for text input")` | `embed.test.ts` |
+| TS-1.1 | `it("returns a 4096-dimensional float array for text input")` | `embed.test.ts` |
 | TS-1.2 | `it("generates a valid embedding for English text")` | `embed.test.ts` |
 | TS-1.3 | `it("generates a valid embedding for German text")` | `embed.test.ts` |
 | TS-1.4 | `it("generates a valid embedding for mixed English/German text")` | `embed.test.ts` |
@@ -71,44 +71,44 @@ tests/
 
 ---
 
-**TS-1.1: Returns a 1024-dimensional float array for text input**
+**TS-1.1: Returns a 4096-dimensional float array for text input**
 
-- **Setup (Given):** Mock `globalThis.fetch` to return a successful `/api/embed` response containing a 1024-element float array (`mockOllamaEmbed()`).
+- **Setup (Given):** Mock `globalThis.fetch` to return a successful `/api/embed` response containing a 4096-element float array (`mockOllamaEmbed()`).
 - **Action (When):** Call the embedding generation function with `"This is a test sentence"`.
-- **Assertion (Then):** The returned array has exactly 1024 elements. Every element is a finite number (`Number.isFinite()`).
+- **Assertion (Then):** The returned array has exactly 4096 elements. Every element is a finite number (`Number.isFinite()`).
 - **Teardown:** Restore fetch mock.
 
 **TS-1.2: Generates a valid embedding for English text**
 
 - **Setup (Given):** Mock fetch with a successful `/api/embed` response.
 - **Action (When):** Call the embedding function with `"Meeting notes from the product review"`.
-- **Assertion (Then):** The result is a 1024-element float array. Verify fetch was called with the expected text in the request body.
+- **Assertion (Then):** The result is a 4096-element float array. Verify fetch was called with the expected text in the request body.
 - **Teardown:** Restore fetch.
 
 **TS-1.3: Generates a valid embedding for German text**
 
 - **Setup (Given):** Mock fetch with a successful `/api/embed` response.
 - **Action (When):** Call the embedding function with `"Besprechungsnotizen aus der Produktbewertung"`.
-- **Assertion (Then):** The result is a 1024-element float array. Verify fetch was called with the German text in the request body.
+- **Assertion (Then):** The result is a 4096-element float array. Verify fetch was called with the German text in the request body.
 - **Teardown:** Restore fetch.
 
 **TS-1.4: Generates a valid embedding for mixed English/German text**
 
 - **Setup (Given):** Mock fetch with a successful `/api/embed` response.
 - **Action (When):** Call the embedding function with `"Meeting about the Projektzeitplan and next steps"`.
-- **Assertion (Then):** The result is a 1024-element float array.
+- **Assertion (Then):** The result is a 4096-element float array.
 - **Teardown:** Restore fetch.
 
 **TS-1.5: Concatenates entry name and content as embedding input**
 
 - **Setup (Given):** Mock fetch with a successful `/api/embed` response. Capture the request body sent to fetch.
 - **Action (When):** Call the entry embedding preparation function with `{ name: "Weekly Standup", content: "Discussed blockers and sprint goals" }`.
-- **Assertion (Then):** The text sent in the fetch request body contains both `"Weekly Standup"` and `"Discussed blockers and sprint goals"` concatenated. The model parameter in the request body is `"snowflake-arctic-embed2"`.
+- **Assertion (Then):** The text sent in the fetch request body contains both `"Weekly Standup"` and `"Discussed blockers and sprint goals"` concatenated. The model parameter in the request body is `"qwen3-embedding"`.
 - **Teardown:** Restore fetch.
 
 **TS-2.1: Checks Ollama model list on initialization**
 
-- **Setup (Given):** Mock fetch to return a `/api/tags` response with `snowflake-arctic-embed2` in the model list.
+- **Setup (Given):** Mock fetch to return a `/api/tags` response with `qwen3-embedding` in the model list.
 - **Action (When):** Call the embedding service initialization function.
 - **Assertion (Then):** Fetch was called with a URL ending in `/api/tags`. Initialization completes without error.
 - **Teardown:** Restore fetch.
@@ -117,12 +117,12 @@ tests/
 
 - **Setup (Given):** Mock fetch to return: (1) `/api/tags` with an empty model list, then (2) `/api/pull` success response.
 - **Action (When):** Call the initialization function.
-- **Assertion (Then):** Fetch was called with `/api/tags` first, then `/api/pull` with body containing `"snowflake-arctic-embed2"`. Initialization completes successfully.
+- **Assertion (Then):** Fetch was called with `/api/tags` first, then `/api/pull` with body containing `"qwen3-embedding"`. Initialization completes successfully.
 - **Teardown:** Restore fetch.
 
 **TS-2.3: Skips model pull when model is already present**
 
-- **Setup (Given):** Mock fetch to return `/api/tags` with `snowflake-arctic-embed2` in the list.
+- **Setup (Given):** Mock fetch to return `/api/tags` with `qwen3-embedding` in the list.
 - **Action (When):** Call the initialization function.
 - **Assertion (Then):** Fetch was called exactly once (only the `/api/tags` call). No `/api/pull` call was made.
 - **Teardown:** Restore fetch.
@@ -152,7 +152,7 @@ tests/
 
 - **Setup (Given):** Mock fetch with a successful embed response.
 - **Action (When):** Call the embedding function with `"Hello"`.
-- **Assertion (Then):** A 1024-element float array is returned. No error was thrown.
+- **Assertion (Then):** A 4096-element float array is returned. No error was thrown.
 - **Teardown:** Restore fetch.
 
 **TS-EC-2: Truncates text exceeding the token limit at a word boundary**
@@ -178,9 +178,9 @@ tests/
 
 **TS-EC-7: Rejects an embedding with incorrect dimensions**
 
-- **Setup (Given):** Mock fetch to return a `/api/embed` response with a 512-element array instead of 1024. Spy on stdout for log capture.
+- **Setup (Given):** Mock fetch to return a `/api/embed` response with a 512-element array instead of 4096. Spy on stdout for log capture.
 - **Action (When):** Call the embedding function.
-- **Assertion (Then):** The function returns `null` (embedding rejected). Stdout contains a JSON log entry with `level: "error"` mentioning expected 1024 and got 512.
+- **Assertion (Then):** The function returns `null` (embedding rejected). Stdout contains a JSON log entry with `level: "error"` mentioning expected 4096 and got 512.
 - **Teardown:** Restore fetch and stdout spy.
 
 ---
@@ -213,16 +213,16 @@ All integration tests share a single testcontainers PostgreSQL instance (started
 
 **TS-3.2: Finds only entries with null embeddings for retry**
 
-- **Setup (Given):** Insert three entries directly via SQL. Two with `embedding: null`, one with a valid 1024-dim embedding vector (use `createFakeEmbedding()` helper). Mock fetch with successful embed responses.
+- **Setup (Given):** Insert three entries directly via SQL. Two with `embedding: null`, one with a valid 4096-dim embedding vector (use `createFakeEmbedding()` helper). Mock fetch with successful embed responses.
 - **Action (When):** Call the retry job function.
 - **Assertion (Then):** Fetch was called exactly twice (once per null-embedding entry). The entry with the existing embedding was not processed.
 - **Teardown:** Delete all test entries. Restore fetch.
 
 **TS-3.3: Generates and stores embedding on retry**
 
-- **Setup (Given):** Insert an entry with `embedding: null` directly via SQL. Mock fetch to return a successful embed response with a known 1024-dim vector.
+- **Setup (Given):** Insert an entry with `embedding: null` directly via SQL. Mock fetch to return a successful embed response with a known 4096-dim vector.
 - **Action (When):** Call the retry job function.
-- **Assertion (Then):** Re-select the entry from the database. The `embedding` column is no longer null. The stored vector has 1024 dimensions.
+- **Assertion (Then):** Re-select the entry from the database. The `embedding` column is no longer null. The stored vector has 4096 dimensions.
 - **Teardown:** Delete the test entry. Restore fetch.
 
 **TS-3.4: Logs error and leaves embedding null on retry failure**
@@ -262,7 +262,7 @@ All integration tests share a single testcontainers PostgreSQL instance (started
 
 **TS-NG-1: Regenerates embedding when entry content is updated**
 
-- **Setup (Given):** Insert an entry with a known embedding (use `createFakeEmbedding()` and store via SQL). Record the original embedding. Mock fetch to return a different 1024-dim vector for the new content.
+- **Setup (Given):** Insert an entry with a known embedding (use `createFakeEmbedding()` and store via SQL). Record the original embedding. Mock fetch to return a different 4096-dim vector for the new content.
 - **Action (When):** Update the entry's content to new text through the application's update flow.
 - **Assertion (Then):** The entry's embedding in the database differs from the original. Fetch was called with the new content text.
 - **Teardown:** Delete the test entry. Restore fetch.
@@ -282,7 +282,7 @@ All integration tests share a single testcontainers PostgreSQL instance (started
 // Generate a deterministic fake embedding vector
 export function createFakeEmbedding(dim?: number): number[];
 
-// Mock fetch for successful /api/embed — returns a 1024-dim vector
+// Mock fetch for successful /api/embed — returns a 4096-dim vector
 export function mockOllamaEmbed(fetchSpy: vi.SpyInstance, embedding?: number[]): void;
 
 // Mock fetch for /api/tags — returns specified model names
@@ -299,7 +299,7 @@ export function createOllamaRouter(options: {
 }): (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
 ```
 
-**`createFakeEmbedding(dim = 1024)`:** Returns an array of `dim` floats. Uses a seeded/deterministic approach (e.g., `Array.from({ length: dim }, (_, i) => Math.sin(i) * 0.5)`) so tests are reproducible.
+**`createFakeEmbedding(dim = 4096)`:** Returns an array of `dim` floats. Uses a seeded/deterministic approach (e.g., `Array.from({ length: dim }, (_, i) => Math.sin(i) * 0.5)`) so tests are reproducible.
 
 **`createOllamaRouter(options)`:** Returns a function suitable for `vi.spyOn(globalThis, 'fetch').mockImplementation(router)`. Routes by URL suffix:
 - `/api/tags` → returns `{ models: options.models.map(name => ({ name })) }`
@@ -361,7 +361,7 @@ async function insertSetting(sql: postgres.Sql, key: string, value: string): Pro
 
 | Test Scenario ID | Title | Test Function | Status |
 |------------------|-------|---------------|--------|
-| TS-1.1 | 1024-dim float array | `it("returns a 1024-dimensional float array for text input")` | ✅ Mapped |
+| TS-1.1 | 4096-dim float array | `it("returns a 4096-dimensional float array for text input")` | ✅ Mapped |
 | TS-1.2 | English text | `it("generates a valid embedding for English text")` | ✅ Mapped |
 | TS-1.3 | German text | `it("generates a valid embedding for German text")` | ✅ Mapped |
 | TS-1.4 | Mixed EN/DE text | `it("generates a valid embedding for mixed English/German text")` | ✅ Mapped |

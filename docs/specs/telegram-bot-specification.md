@@ -22,7 +22,7 @@ The Telegram bot is the primary quick-capture interface for Cortex. It uses gram
 - **AC-1.1:** When I send a text message, the bot validates my chat ID against the authorized list (from the `telegram_chat_ids` setting in the settings table, falling back to the `TELEGRAM_CHAT_ID` environment variable).
 - **AC-1.2:** If my chat ID is not in the authorized list, the bot ignores the message entirely (no reply, no processing, no logging of message content).
 - **AC-1.3:** The message text is sent through the context-aware classification pipeline: the system fetches the last 5 recent entries and the top 3 semantically similar entries as context, then sends the message and context to Claude with the classification prompt. Claude returns structured JSON containing `category`, `name`, `confidence`, `fields`, `tags`, `create_calendar_event`, and `calendar_date`.
-- **AC-1.4:** An embedding is generated for the message text using Ollama (snowflake-arctic-embed2, 1024 dimensions).
+- **AC-1.4:** An embedding is generated for the message text using Ollama (qwen3-embedding, 4096 dimensions).
 - **AC-1.5:** The entry is stored in PostgreSQL with `source: 'telegram'`, `source_type: 'text'`, the raw message text as `content`, and all fields from the classification response (`category`, `name`, `confidence`, `fields`, `tags`).
 - **AC-1.6:** The bot replies with the classification result (format depends on confidence level; see US-2).
 - **AC-1.7:** If `create_calendar_event` is `true` in the classification response and Google Calendar is configured, a calendar event is created for the `calendar_date`. These fields are ephemeral and not stored in the database.
@@ -85,7 +85,7 @@ The Telegram bot is the primary quick-capture interface for Cortex. It uses gram
 - **Chat ID validation** uses the authorized list from the `telegram_chat_ids` key in the settings table. If no setting exists, it falls back to the `TELEGRAM_CHAT_ID` environment variable. The env var value is a single chat ID or comma-separated list. The settings table value is a JSON array of chat ID strings.
 - **Voice transcription** requires the faster-whisper container to be running and accessible at the URL configured by `WHISPER_URL` (default `http://whisper:8000`).
 - **Classification** requires the Claude API to be reachable and the `ANTHROPIC_API_KEY` environment variable to be set.
-- **Embedding** requires Ollama to be running and accessible at the URL configured by `OLLAMA_URL` (default `http://ollama:11434`) with the `snowflake-arctic-embed2` model loaded.
+- **Embedding** requires Ollama to be running and accessible at the URL configured by `OLLAMA_URL` (default `http://ollama:11434`) with the `qwen3-embedding` model loaded.
 - **Storage** requires PostgreSQL to be running and accessible.
 
 ### Reliability

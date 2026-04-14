@@ -12,7 +12,7 @@
 
 | Spec Requirement | Test Scenario(s) |
 |------------------|------------------|
-| AC-1.1: Call Ollama, return 1024-dim float array | TS-1.1 |
+| AC-1.1: Call Ollama, return 4096-dim float array | TS-1.1 |
 | AC-1.2: English text embeddings | TS-1.2 |
 | AC-1.3: German text embeddings | TS-1.3 |
 | AC-1.4: Mixed EN/DE text embeddings | TS-1.4 |
@@ -41,13 +41,13 @@
 
 ### US-1: Embedding Generation
 
-**TS-1.1: Generate embedding and receive 1024-dimensional float array**
+**TS-1.1: Generate embedding and receive 4096-dimensional float array**
 ```
-Scenario: Text input produces a 1024-dimensional embedding
+Scenario: Text input produces a 4096-dimensional embedding
   Given the Ollama service is reachable
-  And the snowflake-arctic-embed2 model is available
+  And the qwen3-embedding model is available
   When an embedding is generated for the text "This is a test sentence"
-  Then a float array with exactly 1024 elements is returned
+  Then a float array with exactly 4096 elements is returned
   And every element is a finite floating-point number
 ```
 
@@ -55,27 +55,27 @@ Scenario: Text input produces a 1024-dimensional embedding
 ```
 Scenario: English text produces a valid embedding
   Given the Ollama service is reachable
-  And the snowflake-arctic-embed2 model is available
+  And the qwen3-embedding model is available
   When an embedding is generated for the English text "Meeting notes from the product review"
-  Then a 1024-dimensional float array is returned
+  Then a 4096-dimensional float array is returned
 ```
 
 **TS-1.3: Generate embedding for German text**
 ```
 Scenario: German text produces a valid embedding
   Given the Ollama service is reachable
-  And the snowflake-arctic-embed2 model is available
+  And the qwen3-embedding model is available
   When an embedding is generated for the German text "Besprechungsnotizen aus der Produktbewertung"
-  Then a 1024-dimensional float array is returned
+  Then a 4096-dimensional float array is returned
 ```
 
 **TS-1.4: Generate embedding for mixed English/German text**
 ```
 Scenario: Mixed language text produces a valid embedding
   Given the Ollama service is reachable
-  And the snowflake-arctic-embed2 model is available
+  And the qwen3-embedding model is available
   When an embedding is generated for the text "Meeting about the Projektzeitplan and next steps"
-  Then a 1024-dimensional float array is returned
+  Then a 4096-dimensional float array is returned
 ```
 
 **TS-1.5: Input text is concatenation of entry name and content**
@@ -92,7 +92,7 @@ Scenario: Embedding input combines name and content fields
 ```
 Scenario: Startup checks Ollama availability via /api/tags
   Given Ollama is reachable
-  And the snowflake-arctic-embed2 model is available
+  And the qwen3-embedding model is available
   When the embedding service initializes
   Then Ollama's model list is checked
   And initialization completes successfully
@@ -102,9 +102,9 @@ Scenario: Startup checks Ollama availability via /api/tags
 ```
 Scenario: Model is pulled automatically when not present
   Given Ollama is reachable
-  And the snowflake-arctic-embed2 model is not in the model list
+  And the qwen3-embedding model is not in the model list
   When the embedding service initializes
-  Then the system pulls the snowflake-arctic-embed2 model
+  Then the system pulls the qwen3-embedding model
   And initialization completes successfully
 ```
 
@@ -112,7 +112,7 @@ Scenario: Model is pulled automatically when not present
 ```
 Scenario: No pull request when model already exists
   Given Ollama is reachable
-  And the snowflake-arctic-embed2 model is in the model list
+  And the qwen3-embedding model is in the model list
   When the embedding service initializes
   Then no model pull is performed
 ```
@@ -153,7 +153,7 @@ Scenario: Retry job successfully generates embedding for an entry
   Given an entry exists with embedding: null
   And Ollama is reachable
   When the embedding retry job runs
-  Then the entry's embedding column is updated with a 1024-dimensional vector
+  Then the entry's embedding column is updated with a 4096-dimensional vector
 ```
 
 **TS-3.4: Retry failure logs error and leaves embedding null**
@@ -201,7 +201,7 @@ Scenario: Embedding request times out after 30 seconds
 Scenario: Single-word input returns a valid embedding
   Given the Ollama service is reachable
   When an embedding is generated for the text "Hello"
-  Then a 1024-dimensional float array is returned
+  Then a 4096-dimensional float array is returned
 ```
 
 **TS-EC-2: Very long text is truncated at word boundary**
@@ -211,7 +211,7 @@ Scenario: Text exceeding model context window is truncated
   When the embedding input is prepared
   Then the text is truncated to fit within the model's context limit
   And truncation occurs at a word boundary (not mid-word)
-  And a valid 1024-dimensional embedding is returned for the truncated text
+  And a valid 4096-dimensional embedding is returned for the truncated text
 ```
 
 **TS-EC-3: Model deleted between startup and request**
@@ -240,7 +240,7 @@ Scenario: Text with emojis and special characters is embedded without modificati
   Given the Ollama service is reachable
   When an embedding is generated for the text "Notizen 📝 über das Projekt — café ☕"
   Then the text is sent to Ollama without stripping or escaping
-  And a 1024-dimensional float array is returned
+  And a 4096-dimensional float array is returned
 ```
 
 **TS-EC-6: Retry processes entries sequentially, oldest first**
@@ -258,9 +258,9 @@ Scenario: Retry job processes entries one at a time in creation order
 **TS-EC-7: Wrong dimensionality is rejected**
 ```
 Scenario: Embedding with incorrect dimension count is rejected
-  Given Ollama returns a vector with 512 elements instead of 1024
+  Given Ollama returns a vector with 512 elements instead of 4096
   When the embedding response is validated
-  Then an error is logged indicating incorrect dimensions (expected 1024, got 512)
+  Then an error is logged indicating incorrect dimensions (expected 4096, got 512)
   And the entry is stored with embedding: null
 ```
 
@@ -269,10 +269,10 @@ Scenario: Embedding with incorrect dimension count is rejected
 Scenario: Retry job re-pulls model when it is missing from Ollama
   Given an entry exists with embedding: null
   And Ollama is reachable
-  And the snowflake-arctic-embed2 model is not in the model list
+  And the qwen3-embedding model is not in the model list
   When the embedding retry job runs
   Then the system checks the model list
-  And pulls the snowflake-arctic-embed2 model
+  And pulls the qwen3-embedding model
   And generates the embedding for the entry
 ```
 
@@ -300,7 +300,7 @@ Scenario: Two entries with identical text both trigger separate embedding reques
 
 | Spec Requirement | Scenarios | Status |
 |------------------|-----------|--------|
-| AC-1.1 (Ollama call, 1024-dim) | TS-1.1 | ✅ Covered |
+| AC-1.1 (Ollama call, 4096-dim) | TS-1.1 | ✅ Covered |
 | AC-1.2 (English text) | TS-1.2 | ✅ Covered |
 | AC-1.3 (German text) | TS-1.3 | ✅ Covered |
 | AC-1.4 (Mixed EN/DE) | TS-1.4 | ✅ Covered |

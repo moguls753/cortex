@@ -155,9 +155,9 @@ Scenario: Entries appearing in both recent and similar sets are deduplicated
 ```
 Scenario: An embedding is generated via Ollama for the message text
   Given an authorized user
-  And Ollama is running with snowflake-arctic-embed2
+  And Ollama is running with qwen3-embedding
   When the user sends "New project idea: build a recipe tracker"
-  Then a 1024-dimension embedding is generated for the message text
+  Then a 4096-dimension embedding is generated for the message text
   And the embedding is stored with the entry
 ```
 

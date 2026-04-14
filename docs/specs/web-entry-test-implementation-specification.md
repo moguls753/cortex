@@ -306,7 +306,7 @@ Note: `updated_at` is handled by the DB trigger, not application code. The test 
 
 #### TS-2.5: Save re-generates embedding (integration)
 
-- **Setup (Given):** Seed an entry with content "old content". Mock `generateEmbedding` to return a new 1024-dim vector when called. Create integration app. Login.
+- **Setup (Given):** Seed an entry with content "old content". Mock `generateEmbedding` to return a new 4096-dim vector when called. Create integration app. Login.
 - **Action (When):** `app.request("/entry/<id>/edit", { method: "POST", body: new URLSearchParams({ name: "Test", category: "tasks", content: "completely new content" }), headers: { Cookie: cookie, "Content-Type": "application/x-www-form-urlencoded" } })`.
 - **Assertion (Then):** Verify `generateEmbedding` was called (or `embedEntry` — whichever the handler uses). The entry is saved with updated content.
 
@@ -480,7 +480,7 @@ async function seedEntry(
                            source, source_type, embedding, deleted_at, created_at, updated_at)
       VALUES (${entry.id}, ${entry.name}, ${entry.category}, ${entry.content},
               ${JSON.stringify(entry.fields)}, ${entry.tags}, ${entry.confidence},
-              ${entry.source}, ${entry.source_type}, ${`[${embedding.join(",")}]`}::vector(1024),
+              ${entry.source}, ${entry.source_type}, ${`[${embedding.join(",")}]`}::vector(4096),
               ${entry.deleted_at}, ${entry.created_at}, ${entry.updated_at})
     `;
   } else {
@@ -532,7 +532,7 @@ async function clearEntries(sql: Sql): Promise<void> {
 2. **Embedding** — Via `vi.mock()` on `src/embed.ts`:
    ```typescript
    vi.mock("../../src/embed.js", () => ({
-     generateEmbedding: vi.fn().mockResolvedValue(new Array(1024).fill(0)),
+     generateEmbedding: vi.fn().mockResolvedValue(new Array(4096).fill(0)),
      embedEntry: vi.fn().mockResolvedValue(undefined),
    }));
    ```

@@ -20,7 +20,7 @@ Local access works via `docker exec` into the running container, communicating o
 **As an AI tool, I want to search the brain by meaning so I can find relevant context.**
 
 - **AC-1.1:** `search_brain` accepts `{ query: string, limit?: number }`.
-- **AC-1.2:** The query is embedded using Ollama (snowflake-arctic-embed2, 1024 dimensions) and compared against stored entry embeddings via cosine similarity.
+- **AC-1.2:** The query is embedded using Ollama (qwen3-embedding, 4096 dimensions) and compared against stored entry embeddings via cosine similarity.
 - **AC-1.3:** Only results with similarity >= 0.5 are returned.
 - **AC-1.4:** Results are ranked by similarity score, highest first.
 - **AC-1.5:** Default limit is 10. Maximum limit is 50. If the caller provides a limit greater than 50, it is clamped to 50.
@@ -33,7 +33,7 @@ Local access works via `docker exec` into the running container, communicating o
 
 - **AC-2.1:** `add_thought` accepts `{ text: string }`.
 - **AC-2.2:** The text goes through the context-aware classification pipeline: the system fetches the last 5 recent entries and the top 3 semantically similar entries as context, then sends the text and context to Claude with the classification prompt. Claude returns structured JSON containing `category`, `name`, `confidence`, `fields`, `tags`.
-- **AC-2.3:** An embedding is generated for the text using Ollama (snowflake-arctic-embed2, 1024 dimensions).
+- **AC-2.3:** An embedding is generated for the text using Ollama (qwen3-embedding, 4096 dimensions).
 - **AC-2.4:** The entry is stored in PostgreSQL with `source: 'mcp'`, `source_type: 'text'`, the raw text as `content`, and all fields from the classification response.
 - **AC-2.5:** Returns: `id` (UUID), `category`, `name`, `confidence`, `tags`.
 

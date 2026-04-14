@@ -146,6 +146,8 @@ describe("Telegram Bot", () => {
     mockGetAllSettings.mockReset();
     MockBot.mockClear();
     mockBotStart.mockReset();
+    // bot.start() must return a promise — startBot() chains .catch() on it.
+    mockBotStart.mockReturnValue(new Promise(() => {}));
     mockBotApiSetWebhook.mockReset();
     mockBotOn.mockReset();
     mockBotCommand.mockReset();

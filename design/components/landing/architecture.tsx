@@ -46,7 +46,7 @@ ${"─".repeat(83)}
             },
             {
               label: "Embeddings",
-              value: "snowflake-arctic-embed2",
+              value: "qwen3-embedding",
             },
             {
               label: "Transcription",

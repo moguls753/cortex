@@ -762,7 +762,7 @@ async function seedEntry(sql: Sql, overrides: Partial<{
       ${overrides.content ?? null},
       ${overrides.category ?? null},
       ${sql.json(fields)},
-      ${embeddingLiteral}::vector(1024),
+      ${embeddingLiteral}::vector(4096),
       ${overrides.deleted_at ?? null},
       ${overrides.created_at ?? new Date()},
       ${overrides.updated_at ?? overrides.created_at ?? new Date()}

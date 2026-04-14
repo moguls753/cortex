@@ -164,7 +164,9 @@ describe("Embedding integration", () => {
       const embedCalls = fetchSpy.mock.calls.filter(([url]) =>
         url.toString().includes("/api/embed"),
       );
-      expect(embedCalls.length).toBe(2);
+      // 3 calls: first embedEntry embeds entry1 + piggybacks entry2; second
+      // embedEntry unconditionally re-embeds entry2 as its explicit target.
+      expect(embedCalls.length).toBe(3);
 
       const rows = await db.sql`
         SELECT id, embedding IS NOT NULL as has_embedding

@@ -24,7 +24,7 @@ Allow browsing, filtering, and searching entries by category, tags, semantic mea
 ### US-2: As a user, I want semantic search to find entries by meaning.
 
 - **AC-2.1:** A search bar at the top of the browse page accepts natural language queries (e.g., "what do I know about career changes").
-- **AC-2.2:** The query is embedded using Ollama (snowflake-arctic-embed2) and compared against entry embeddings via cosine similarity in pgvector.
+- **AC-2.2:** The query is embedded using Ollama (qwen3-embedding) and compared against entry embeddings via cosine similarity in pgvector.
 - **AC-2.3:** Only results with similarity >= 0.5 are shown (entries below this threshold are excluded).
 - **AC-2.4:** Results are ranked by similarity score (highest first). Similarity scores are not displayed to the user.
 - **AC-2.5:** Search can be combined with a category filter (e.g., search "budget" within Projects only).
@@ -56,7 +56,7 @@ Allow browsing, filtering, and searching entries by category, tags, semantic mea
 
 - **Search query that matches nothing:** Show a "No results found" message with a suggestion to try different terms or broaden the search.
 - **Very long search query:** Truncate or limit the input to a reasonable length (e.g., 500 characters). Ollama can handle long inputs, but excessively long queries may produce poor embeddings.
-- **Search in German:** Semantic search works for German because snowflake-arctic-embed2 supports multilingual embeddings (EN+DE). Text search also works for German as it is a simple case-insensitive substring match.
+- **Search in German:** Semantic search works for German because qwen3-embedding supports multilingual embeddings (EN+DE). Text search also works for German as it is a simple case-insensitive substring match.
 - **Empty database (no entries):** Show an empty state message (e.g., "No entries yet. Start capturing thoughts via the dashboard or Telegram.").
 - **Entries with no tags:** These entries are shown in the "All" tag view but are excluded when a specific tag filter is active.
 - **Entries with no embedding:** These entries appear in category browsing and text search but are excluded from semantic search results. They are not flagged differently on the browse page (they simply do not appear in semantic results).

@@ -29,7 +29,7 @@ Create long-form notes with manual or AI-assisted categorization. The new note p
 
 ### US-3: As a user, I want to save my note.
 
-- **AC-3.1:** Save generates an embedding for the note content via Ollama (snowflake-arctic-embed2).
+- **AC-3.1:** Save generates an embedding for the note content via Ollama (qwen3-embedding).
 - **AC-3.2:** The entry is stored in PostgreSQL with `source: 'webapp'` and `confidence: null` (manual entry).
 - **AC-3.3:** Category-specific fields are populated based on the selected category. Default values are used for fields not explicitly set (e.g., `status: 'active'` for projects, `status: 'pending'` for tasks).
 - **AC-3.4:** After successful save, the user is redirected to `/entry/:id` to view the newly created entry.
