@@ -18,6 +18,7 @@ Decision tips:
 - "Katja mentioned she's moving to Berlin next month" → **people** (it's context about Katja)
 - "Build a CLI tool for log parsing" → could be **projects** (if multi-step) or **ideas** (if just a thought). Use your judgment based on specificity.
 - "The docker compose --watch flag auto-reloads on file changes" → **reference**
+- "Auto habe ich abgeholt" / "I picked up the car" → **reference** (reporting something you already did is NOT a task — tasks are things you still need to do. Status updates and completion reports go to reference or the relevant category like people/projects.)
 
 ## Fields per category
 
@@ -41,17 +42,18 @@ For all categories: notes = additional details not captured in other fields (tim
 
 Return ONLY a single valid JSON object. No explanation, no extra text, no wrapping.
 
-Use exactly this structure — one flat object with all 8 keys at the top level:
+Use exactly this structure — one flat object with all 9 keys at the top level:
 
 ```
-{"category":"...","name":"...","confidence":0.0,"fields":{...},"tags":[...],"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
+{"category":"...","name":"...","confidence":0.0,"fields":{...},"tags":[...],"is_task_completion":false,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
 ```
 
-All 8 keys must appear in one object. Do NOT split into multiple objects.
+All 9 keys must appear in one object. Do NOT split into multiple objects.
 
 - **name**: Short descriptive name, max 6 words, in {output_language}.
 - **confidence**: 0.0–1.0, how certain you are about the category.
 - **tags**: 1–5 lowercase tags, in {output_language}.
+- **is_task_completion**: true if the input implies the user completed an existing task — either explicitly ("I called the landlord") or implicitly ("The landlord said the apartment is available next month"). Set to false for new tasks, general thoughts, or anything that does not indicate a previously pending task was done.
 - **create_calendar_event**: true only if there is a specific date/time for a meeting, appointment, or deadline.
 - **calendar_date**: The date in YYYY-MM-DD if create_calendar_event is true, otherwise null.
 - **calendar_time**: The time in HH:MM (24h) if a specific time is mentioned, otherwise null.
@@ -61,19 +63,22 @@ All 8 keys must appear in one object. Do NOT split into multiple objects.
 All examples below assume {output_language} output.
 
 Input: "Heute treffen wir uns um 20 Uhr mit Katja"
-{"category":"tasks","name":"Meeting with Katja","confidence":0.92,"fields":{"due_date":"{today}","status":"pending","notes":"at 8 PM"},"tags":["meeting","katja"],"create_calendar_event":true,"calendar_date":"{today}","calendar_time":"20:00"}
+{"category":"tasks","name":"Meeting with Katja","confidence":0.92,"fields":{"due_date":"{today}","status":"pending","notes":"at 8 PM"},"tags":["meeting","katja"],"is_task_completion":false,"create_calendar_event":true,"calendar_date":"{today}","calendar_time":"20:00"}
 
 Input: "Katja works at Siemens, she's an expert in UX design"
-{"category":"people","name":"Katja - UX at Siemens","confidence":0.95,"fields":{"context":"Works at Siemens, UX design expert","follow_ups":null},"tags":["katja","siemens","ux"],"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
+{"category":"people","name":"Katja - UX at Siemens","confidence":0.95,"fields":{"context":"Works at Siemens, UX design expert","follow_ups":null},"tags":["katja","siemens","ux"],"is_task_completion":false,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
 
 Input: "I should build a meal planning app with weekly grocery lists"
-{"category":"ideas","name":"Meal planning app","confidence":0.85,"fields":{"oneliner":"App for meal planning with auto grocery lists","notes":null},"tags":["app-idea","meal-planning"],"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
+{"category":"ideas","name":"Meal planning app","confidence":0.85,"fields":{"oneliner":"App for meal planning with auto grocery lists","notes":null},"tags":["app-idea","meal-planning"],"is_task_completion":false,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
 
 Input: "Website redesign — finished wireframes, need to build the component library next"
-{"category":"projects","name":"Website redesign","confidence":0.93,"fields":{"status":"active","next_action":"Build component library","notes":"Wireframes finished"},"tags":["website","design"],"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
+{"category":"projects","name":"Website redesign","confidence":0.93,"fields":{"status":"active","next_action":"Build component library","notes":"Wireframes finished"},"tags":["website","design"],"is_task_completion":false,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
 
 Input: "git stash apply vs git stash pop: apply keeps the stash, pop removes it"
-{"category":"reference","name":"git stash apply vs pop","confidence":0.95,"fields":{"notes":"apply keeps stash entry, pop removes it after applying"},"tags":["git","cli"],"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
+{"category":"reference","name":"git stash apply vs pop","confidence":0.95,"fields":{"notes":"apply keeps stash entry, pop removes it after applying"},"tags":["git","cli"],"is_task_completion":false,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
+
+Input: "I called the landlord about the Sendling apartment"
+{"category":"people","name":"Landlord Sendling Call","confidence":0.88,"fields":{"context":"Called about Sendling apartment","follow_ups":null},"tags":["landlord","sendling"],"is_task_completion":true,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
 
 {calendar_section}
 ## Context
@@ -84,6 +89,6 @@ These are recent and related entries from the knowledge base. Use them to mainta
 
 ## Input to classify
 
-Respond with a single JSON object containing all 8 keys: category, name, confidence, fields, tags, create_calendar_event, calendar_date, calendar_time.
+Respond with a single JSON object containing all 9 keys: category, name, confidence, fields, tags, is_task_completion, create_calendar_event, calendar_date, calendar_time.
 
 {input_text}

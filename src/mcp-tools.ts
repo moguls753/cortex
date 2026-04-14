@@ -13,6 +13,7 @@ import {
 } from "./mcp-queries.js";
 import { createLogger } from "./logger.js";
 import { processCalendarEvent, handleEntryCalendarCleanup, getCalendarNames } from "./google-calendar.js";
+import { detectTaskCompletion } from "./task-completion.js";
 
 const log = createLogger("mcp");
 
@@ -208,15 +209,52 @@ export async function handleAddThought(sql: any, params: { text: string }): Prom
       }
     }
 
+    // Task completion detection
+    let completedTasks: Array<{ entry_id: string; name: string }> = [];
+    let pendingConfirmation: Array<{ entry_id: string; name: string; confidence: number }> = [];
+    let reclassifiedCategory: string | null = null;
+    if (classification?.is_task_completion) {
+      try {
+        const completionResult = await detectTaskCompletion(
+          params.text,
+          {
+            category: classification.category,
+            name: classification.name,
+            confidence: classification.confidence,
+            is_task_completion: true,
+            fields: classification.fields,
+            tags: classification.tags,
+          },
+          sql,
+          entry.id,
+        );
+        completedTasks = completionResult.autoCompleted.map((t) => ({
+          entry_id: t.entry_id,
+          name: t.name,
+        }));
+        pendingConfirmation = completionResult.needsConfirmation;
+        reclassifiedCategory = completionResult.reclassifiedCategory;
+      } catch {
+        // Completion detection failure never blocks entry storage
+      }
+    }
+
+    const actualCategory = reclassifiedCategory ?? entry.category;
     const resultData: Record<string, unknown> = {
       id: entry.id,
-      category: entry.category,
+      category: actualCategory,
       name: entry.name,
       confidence: entry.confidence,
       tags: entry.tags,
     };
     if (calendarResult?.created) {
       resultData.calendar = "📅 Calendar event created";
+    }
+    if (completedTasks.length > 0) {
+      resultData.completed_tasks = completedTasks;
+    }
+    if (pendingConfirmation.length > 0) {
+      resultData.possible_completions = pendingConfirmation;
     }
     return ok(resultData);
   } catch (e) {

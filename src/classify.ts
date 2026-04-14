@@ -49,6 +49,7 @@ export function validateClassificationResponse(raw: string): {
   confidence: number;
   fields: Record<string, unknown>;
   tags: string[];
+  is_task_completion: boolean;
   create_calendar_event: boolean;
   calendar_date: string | null;
   calendar_time: string | null;
@@ -72,7 +73,7 @@ export function validateClassificationResponse(raw: string): {
     return null;
   }
 
-  const { category, name, confidence, fields, tags, create_calendar_event, calendar_date, calendar_time, calendar_name } = parsed;
+  const { category, name, confidence, fields, tags, is_task_completion, create_calendar_event, calendar_date, calendar_time, calendar_name } = parsed;
 
   // category
   if (typeof category !== "string" || !(VALID_CATEGORIES as readonly string[]).includes(category)) {
@@ -102,6 +103,9 @@ export function validateClassificationResponse(raw: string): {
   // tags
   if (!Array.isArray(tags)) return null;
 
+  // is_task_completion
+  const taskCompletion = typeof is_task_completion === "boolean" ? is_task_completion : false;
+
   // create_calendar_event
   const calEvent = typeof create_calendar_event === "boolean" ? create_calendar_event : false;
 
@@ -120,6 +124,7 @@ export function validateClassificationResponse(raw: string): {
     confidence: conf,
     fields: fields as Record<string, unknown>,
     tags: tags as string[],
+    is_task_completion: taskCompletion,
     create_calendar_event: calEvent,
     calendar_date: calDate,
     calendar_time: calTime,
@@ -296,6 +301,7 @@ export async function classifyText(
   confidence: number | null;
   fields: Record<string, unknown>;
   tags: string[];
+  is_task_completion?: boolean;
   create_calendar_event?: boolean;
   calendar_date?: string | null;
   calendar_time?: string | null;
@@ -381,6 +387,7 @@ export async function classifyText(
     confidence: validated.confidence,
     fields: validated.fields,
     tags: validated.tags,
+    is_task_completion: validated.is_task_completion,
     create_calendar_event: validated.create_calendar_event,
     calendar_date: validated.calendar_date,
     calendar_time: validated.calendar_time,

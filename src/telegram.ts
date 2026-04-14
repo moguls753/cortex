@@ -19,6 +19,7 @@ import { resolveConfigValue } from "./config.js";
 import { createLogger } from "./logger.js";
 import { processCalendarEvent, getCalendarNames } from "./google-calendar.js";
 import { getAllSettings } from "./web/settings-queries.js";
+import { detectTaskCompletion, formatCompletionReply } from "./task-completion.js";
 
 const log = createLogger("telegram");
 
@@ -193,20 +194,68 @@ export async function handleTextMessage(
       }
     }
 
+    // Task completion detection
+    let completionResult: { autoCompleted: Array<{ entry_id: string; name: string; confidence: number }>; needsConfirmation: Array<{ entry_id: string; name: string; confidence: number }>; reclassifiedCategory: string | null } | null = null;
+    if (classResult.is_task_completion) {
+      try {
+        completionResult = await detectTaskCompletion(
+          text,
+          {
+            category: classResult.category,
+            name: classResult.name,
+            confidence: classResult.confidence,
+            is_task_completion: true,
+            fields: classResult.fields,
+            tags: classResult.tags,
+          },
+          sql,
+          entryId,
+        );
+      } catch {
+        // Completion detection failure never blocks entry storage
+      }
+    }
+
     // Reply
     const reply = ctx.reply as (text: string, options?: unknown) => Promise<unknown>;
-    const category = capitalize(classResult.category!);
-    const name = classResult.name;
+    const actualCategory = completionResult?.reclassifiedCategory
+      ? capitalize(completionResult.reclassifiedCategory)
+      : capitalize(classResult.category!);
+    const nameStr = classResult.name;
     const pct = formatConfidence(classResult.confidence!);
 
-    if (confident) {
+    const hasCompletions = completionResult &&
+      (completionResult.autoCompleted.length > 0 || completionResult.needsConfirmation.length > 0);
+
+    if (hasCompletions) {
+      const classText = confident
+        ? `✅ Filed as ${actualCategory} → ${nameStr} (${pct})`
+        : `❓ Best guess: ${actualCategory} → ${nameStr} (${pct})`;
+      const formatted = formatCompletionReply({
+        classificationText: classText,
+        autoCompleted: completionResult!.autoCompleted,
+        needsConfirmation: completionResult!.needsConfirmation,
+      });
+      const replyOptions: Record<string, unknown> = { parse_mode: undefined };
+      // Merge completion buttons with category correction buttons if both exist
+      const categoryButtons = !confident
+        ? (buildInlineKeyboard(entryId) as { inline_keyboard: unknown[][] }).inline_keyboard
+        : [];
+      const completionButtons = formatted.inlineKeyboard ?? [];
+      if (categoryButtons.length > 0 || completionButtons.length > 0) {
+        replyOptions.reply_markup = {
+          inline_keyboard: [...categoryButtons, ...completionButtons],
+        };
+      }
+      await reply(formatted.text, replyOptions);
+    } else if (confident) {
       await reply(
-        `✅ Filed as ${category} → ${name} (${pct}) — reply /fix to correct`,
+        `✅ Filed as ${actualCategory} → ${nameStr} (${pct}) — reply /fix to correct`,
         { parse_mode: undefined },
       );
     } else {
       await reply(
-        `❓ Best guess: ${category} → ${name} (${pct})`,
+        `❓ Best guess: ${actualCategory} → ${nameStr} (${pct})`,
         { reply_markup: buildInlineKeyboard(entryId) },
       );
     }
@@ -323,19 +372,67 @@ export async function handleVoiceMessage(
       }
     }
 
+    // Task completion detection
+    let completionResult: { autoCompleted: Array<{ entry_id: string; name: string; confidence: number }>; needsConfirmation: Array<{ entry_id: string; name: string; confidence: number }>; reclassifiedCategory: string | null } | null = null;
+    if (classResult.is_task_completion) {
+      try {
+        completionResult = await detectTaskCompletion(
+          transcript,
+          {
+            category: classResult.category,
+            name: classResult.name,
+            confidence: classResult.confidence,
+            is_task_completion: true,
+            fields: classResult.fields,
+            tags: classResult.tags,
+          },
+          sql,
+          entryId,
+        );
+      } catch {
+        // Completion detection failure never blocks entry storage
+      }
+    }
+
     // Reply with transcript + classification
-    const category = capitalize(classResult.category!);
-    const name = classResult.name;
+    const actualCategory = completionResult?.reclassifiedCategory
+      ? capitalize(completionResult.reclassifiedCategory)
+      : capitalize(classResult.category!);
+    const nameStr = classResult.name;
     const pct = formatConfidence(classResult.confidence!);
 
-    if (confident) {
+    const hasCompletions = completionResult &&
+      (completionResult.autoCompleted.length > 0 || completionResult.needsConfirmation.length > 0);
+
+    if (hasCompletions) {
+      const classText = confident
+        ? `🎤 '${transcript}'\n✅ Filed as ${actualCategory} → ${nameStr} (${pct})`
+        : `🎤 '${transcript}'\n❓ Best guess: ${actualCategory} → ${nameStr} (${pct})`;
+      const formatted = formatCompletionReply({
+        classificationText: classText,
+        autoCompleted: completionResult!.autoCompleted,
+        needsConfirmation: completionResult!.needsConfirmation,
+      });
+      const replyOptions: Record<string, unknown> = { parse_mode: undefined };
+      if (formatted.inlineKeyboard) {
+        const existingButtons = !confident
+          ? (buildInlineKeyboard(entryId) as { inline_keyboard: unknown[][] }).inline_keyboard
+          : [];
+        replyOptions.reply_markup = {
+          inline_keyboard: [...existingButtons, ...formatted.inlineKeyboard],
+        };
+      } else if (!confident) {
+        replyOptions.reply_markup = buildInlineKeyboard(entryId);
+      }
+      await reply(formatted.text, replyOptions);
+    } else if (confident) {
       await reply(
-        `🎤 '${transcript}'\n✅ Filed as ${category} → ${name} (${pct})`,
+        `🎤 '${transcript}'\n✅ Filed as ${actualCategory} → ${nameStr} (${pct})`,
         { parse_mode: undefined },
       );
     } else {
       await reply(
-        `🎤 '${transcript}'\n❓ Best guess: ${category} → ${name} (${pct})`,
+        `🎤 '${transcript}'\n❓ Best guess: ${actualCategory} → ${nameStr} (${pct})`,
         { reply_markup: buildInlineKeyboard(entryId) },
       );
     }
@@ -375,6 +472,51 @@ export async function handleCallbackQuery(
     }
 
     const parts = callbackQuery.data.split(":");
+
+    // Handle task completion confirmation buttons
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (parts.length === 2 && (parts[0] === "task_complete_yes" || parts[0] === "task_complete_no")) {
+      const [action, taskEntryId] = parts;
+      const answer = ctx.answerCallbackQuery as () => Promise<unknown>;
+
+      if (!UUID_RE.test(taskEntryId)) {
+        await answer();
+        return;
+      }
+
+      if (action === "task_complete_yes") {
+        try {
+          const { confirmTaskCompletion } = await import("./task-completion.js");
+          await confirmTaskCompletion(taskEntryId, sql);
+
+          const taskRows = await (sql as any)`SELECT name FROM entries WHERE id = ${taskEntryId}`;
+          const taskName = taskRows.length > 0 ? (taskRows[0] as { name: string }).name : "task";
+
+          // Append completion to existing message text instead of replacing it
+          const originalText = (callbackQuery.message as any)?.text ?? "";
+          const editMessageText = ctx.editMessageText as (text: string, options?: unknown) => Promise<unknown>;
+          try {
+            await editMessageText(`${originalText}\n✅ Marked '${taskName}' as done.`, { reply_markup: undefined });
+          } catch {
+            // Message may already be edited
+          }
+        } catch {
+          // Confirmation failed — ignore
+        }
+      } else {
+        // User tapped No — remove the inline keyboard but keep the message
+        const originalText = (callbackQuery.message as any)?.text ?? "";
+        const editMessageText = ctx.editMessageText as (text: string, options?: unknown) => Promise<unknown>;
+        try {
+          await editMessageText(originalText, { reply_markup: undefined });
+        } catch {
+          // Message may already be edited
+        }
+      }
+      await answer();
+      return;
+    }
+
     if (parts.length !== 3 || parts[0] !== "correct") {
       const answer = ctx.answerCallbackQuery as () => Promise<unknown>;
       await answer();

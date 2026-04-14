@@ -12,6 +12,7 @@ import { classifyText, assembleContext } from "../classify.js";
 import { embedEntry } from "../embed.js";
 import { resolveConfigValue } from "../config.js";
 import { processCalendarEvent, getCalendarNames } from "../google-calendar.js";
+import { detectTaskCompletion } from "../task-completion.js";
 import {
   iconSparkles,
   iconCornerDownLeft,
@@ -382,8 +383,14 @@ function renderClientScript(): string {
           feedback.innerHTML = '<span class="text-destructive">Saved but classification failed: ' + esc(res.data.classificationError) + '</span>';
           setTimeout(function() { feedback.innerHTML = ''; }, 8000);
         } else {
-          feedback.innerHTML = '<span class="text-primary">Captured as <strong>' + esc(cat) + '</strong>: ' + esc(res.data.name || '') + (conf ? ' (' + conf + ')' : '') + '</span>';
-          setTimeout(function() { feedback.innerHTML = ''; }, 3000);
+          var msg = 'Captured as <strong>' + esc(cat) + '</strong>: ' + esc(res.data.name || '') + (conf ? ' (' + conf + ')' : '');
+          if (res.data.completed_tasks && res.data.completed_tasks.length > 0) {
+            res.data.completed_tasks.forEach(function(t) {
+              msg += ' · Marked <strong>' + esc(t.name) + '</strong> as done';
+            });
+          }
+          feedback.innerHTML = '<span class="text-primary">' + msg + '</span>';
+          setTimeout(function() { feedback.innerHTML = ''; }, res.data.completed_tasks ? 5000 : 3000);
         }
       }
     })
@@ -652,8 +659,40 @@ export function createDashboardRoutes(
       } catch { /* Calendar never blocks entry storage */ }
     }
 
+    // Task completion detection
+    let completedTasks: Array<{ name: string }> = [];
+    let reclassifiedCategory: string | null = null;
+    if (classification?.is_task_completion) {
+      try {
+        const completionResult = await detectTaskCompletion(
+          text,
+          {
+            category: classification.category,
+            name: classification.name,
+            confidence: classification.confidence,
+            is_task_completion: true,
+            fields: classification.fields,
+            tags: classification.tags,
+          },
+          sql,
+          entryId,
+        );
+        completedTasks = completionResult.autoCompleted.map((t) => ({ name: t.name }));
+        reclassifiedCategory = completionResult.reclassifiedCategory;
+      } catch {
+        // Completion detection failure never blocks entry storage
+      }
+    }
+
+    const actualCategory = reclassifiedCategory ?? category;
+
     const classificationError = classification?.error || null;
-    return c.json({ id: entryId, category, name, confidence, calendar: calendarCreated || undefined, classificationError }, 201);
+    return c.json({
+      id: entryId, category: actualCategory, name, confidence,
+      calendar: calendarCreated || undefined,
+      classificationError,
+      ...(completedTasks.length > 0 ? { completed_tasks: completedTasks } : {}),
+    }, 201);
   });
 
   // Form-based capture (used by web dashboard form)
