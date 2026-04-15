@@ -381,6 +381,13 @@ export async function classifyText(
     return null;
   }
 
+  log.debug("Classification result", {
+    category: validated.category,
+    confidence: validated.confidence,
+    is_task_completion: validated.is_task_completion,
+    entryId: options?.entryId ?? null,
+  });
+
   return {
     category: validated.category,
     name: validated.name,

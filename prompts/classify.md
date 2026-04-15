@@ -18,7 +18,7 @@ Decision tips:
 - "Katja mentioned she's moving to Berlin next month" → **people** (it's context about Katja)
 - "Build a CLI tool for log parsing" → could be **projects** (if multi-step) or **ideas** (if just a thought). Use your judgment based on specificity.
 - "The docker compose --watch flag auto-reloads on file changes" → **reference**
-- "Auto habe ich abgeholt" / "I picked up the car" → **reference** (reporting something you already did is NOT a task — tasks are things you still need to do. Status updates and completion reports go to reference or the relevant category like people/projects.)
+- "Auto habe ich abgeholt" / "I picked up the car" → **reference** (reporting something you already did is NOT a task for categorization — tasks are things you still need to do. However, such reports MUST still set `is_task_completion: true` if there is a plausible matching pending task, even if the category is reference.)
 
 ## Fields per category
 
@@ -53,7 +53,7 @@ All 9 keys must appear in one object. Do NOT split into multiple objects.
 - **name**: Short descriptive name, max 6 words, in {output_language}.
 - **confidence**: 0.0–1.0, how certain you are about the category.
 - **tags**: 1–5 lowercase tags, in {output_language}.
-- **is_task_completion**: true if the input implies the user completed an existing task — either explicitly ("I called the landlord") or implicitly ("The landlord said the apartment is available next month"). Set to false for new tasks, general thoughts, or anything that does not indicate a previously pending task was done.
+- **is_task_completion**: true whenever the input describes a **past action the user performed** — past tense, "I did X", "war gerade X", "habe X gemacht", "ich war X". **This flag is independent of category** — a reference entry can and should have `is_task_completion: true`. You do not need to know whether a matching task exists; that is resolved separately. Err on the side of `true` for past-action reports. Set to false only for new tasks, future plans, general thoughts, or facts that clearly do not describe the user doing something.
 - **create_calendar_event**: true only if there is a specific date/time for a meeting, appointment, or deadline.
 - **calendar_date**: The date in YYYY-MM-DD if create_calendar_event is true, otherwise null.
 - **calendar_time**: The time in HH:MM (24h) if a specific time is mentioned, otherwise null.
