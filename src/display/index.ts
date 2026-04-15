@@ -55,15 +55,23 @@ export function createDisplayRoutes(sql: Sql): Hono {
       }
 
       const timezone = settings.timezone || "Europe/Berlin";
-      const lat = settings.display_weather_lat
+      // parseFloat returns NaN for unparseable strings; Number.isFinite filters
+      // both NaN and infinities so getWeather is never called with bad coords.
+      const parsedLat = settings.display_weather_lat
         ? parseFloat(settings.display_weather_lat)
         : undefined;
-      const lng = settings.display_weather_lng
+      const parsedLng = settings.display_weather_lng
         ? parseFloat(settings.display_weather_lng)
         : undefined;
+      const lat = Number.isFinite(parsedLat) ? parsedLat : undefined;
+      const lng = Number.isFinite(parsedLng) ? parsedLng : undefined;
       const maxTasks = parseInt(settings.display_max_tasks || "7", 10);
-      const width = parseInt(settings.display_width || "1872", 10);
-      const height = parseInt(settings.display_height || "1404", 10);
+      const maxTodayEvents = parseInt(settings.display_max_today_events || "8", 10);
+      // Non-positive or NaN width/height fall back to the defaults per spec E-12.
+      const parsedWidth = parseInt(settings.display_width || "1872", 10);
+      const parsedHeight = parseInt(settings.display_height || "1404", 10);
+      const width = Number.isFinite(parsedWidth) && parsedWidth > 0 ? parsedWidth : 1872;
+      const height = Number.isFinite(parsedHeight) && parsedHeight > 0 ? parsedHeight : 1404;
 
       let selectedCalendars: string[] | undefined;
       if (settings.display_calendars) {
@@ -94,7 +102,7 @@ export function createDisplayRoutes(sql: Sql): Hono {
         todayEvents: calendarData.today,
         tomorrowEvents: calendarData.tomorrow,
         tasks,
-        maxTodayEvents: 8,
+        maxTodayEvents,
       };
 
       const png = await renderKitchenDisplay(data, width, height);
@@ -122,11 +130,18 @@ export function createDisplayRoutes(sql: Sql): Hono {
         return c.text("Not Found", 404);
       }
 
-      const host = c.req.header("host") || "localhost";
-      const protocol = c.req.header("x-forwarded-proto") || "http";
       const token = settings.display_token;
       const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
-      const imageUrl = `${protocol}://${host}/api/kitchen.png${tokenParam}`;
+
+      let imageUrl: string;
+      if (settings.display_base_url) {
+        const base = settings.display_base_url.replace(/\/+$/, "");
+        imageUrl = `${base}/api/kitchen.png${tokenParam}`;
+      } else {
+        const host = c.req.header("host") || "localhost";
+        const protocol = c.req.header("x-forwarded-proto") || "http";
+        imageUrl = `${protocol}://${host}/api/kitchen.png${tokenParam}`;
+      }
 
       return c.json({
         image_url: imageUrl,

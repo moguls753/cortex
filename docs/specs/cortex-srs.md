@@ -1425,7 +1425,9 @@ Requirements are organized by feature area. Each requirement has a unique ID, Mo
 
 **Description:** The web interface shall be usable on mobile devices.
 
-**Fit Criteria:** All pages render without horizontal scrolling on viewports >= 320px wide. Interactive elements (buttons, inputs) have touch-friendly sizing (minimum 44x44px tap targets). Tailwind responsive utility classes are used for layout adaptation.
+**Fit Criteria:** All pages declare a `<meta name="viewport" content="width=device-width, initial-scale=1.0">` so mobile browsers render at the device's natural pixel density. Main content containers are fluid (`max-w-*` plus `w-full`) so pages adapt from 320px to desktop widths without horizontal overflow. Nav labels that don't fit collapse to icon-only below the `sm` breakpoint (≥ 640px restores labels). Text in the Terminal / Command Center design system is deliberately compact — the 44×44px touch-target minimum from the original SRS draft is **NOT** a fit criterion, because it contradicts the design system's typographic density. The design targets desktop keyboard-first use with readable fallback on mobile, not touchscreen primary use.
+
+**Verification:** Structural checks only — no end-to-end mobile rendering test. `tests/unit/web-responsive.test.ts` asserts (a) all page-level renderers emit the viewport meta tag, and (b) the root layout container uses `w-full` plus a `max-w-*` bound so it fluidly adapts. Visual mobile compatibility is a manual QA responsibility.
 
 #### REQ-NFR-008: Multilingual embeddings
 

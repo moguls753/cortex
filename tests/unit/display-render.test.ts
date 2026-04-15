@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { buildLayout } from "../../src/display/layout.js";
 import type { KitchenData } from "../../src/display/types.js";
+import {
+  makeKitchenData,
+  makeEvent,
+  makeTask,
+  makeWeather,
+} from "../helpers/display-fixtures.js";
 
 const sampleData: KitchenData = {
   date: "Monday, March 31",
@@ -144,5 +150,203 @@ describe("buildLayout", () => {
     const style = element.props.style as Record<string, unknown>;
     expect(style.width).toBe(800);
     expect(style.height).toBe(480);
+  });
+
+  // ─── Explicit TS-labeled scenarios ──────────────────────────
+
+  it("TS-5.5 — event row contains time, name, and calendar badge", () => {
+    const data = makeKitchenData({
+      todayEvents: [makeEvent({ time: "09:30", name: "Standup", calendar: "WORK" })],
+      tomorrowEvents: [],
+      tasks: [],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain("09:30");
+    expect(json).toContain("Standup");
+    expect(json).toContain("WORK");
+  });
+
+  it("TS-5.6 — renders exactly maxTodayEvents rows when overflowing (KG-3: expected FAIL)", () => {
+    // Per spec AC-5.4 / KG-3, the cap is driven by settings and should be
+    // respected as data.maxTodayEvents. Current code hardcodes 8 in the
+    // route handler, but buildLayout already reads data.maxTodayEvents.
+    // The failure mode surfaces via TS-5.6 route test below — this one
+    // locks in the layout-level contract and should PASS.
+    const events = Array.from({ length: 12 }, (_, i) =>
+      makeEvent({ time: `${String(8 + i).padStart(2, "0")}:00`, name: `E${i + 1}` }),
+    );
+    const data = makeKitchenData({
+      todayEvents: events,
+      maxTodayEvents: 5,
+      tomorrowEvents: [],
+      tasks: [],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    // 5 events rendered, "E6" onward suppressed
+    expect(json).toContain("E1");
+    expect(json).toContain("E5");
+    expect(json).not.toContain("E6");
+  });
+
+  it("TS-5.7 — overflow line reads '+3 more' when 8 events with cap 5", () => {
+    const events = Array.from({ length: 8 }, (_, i) =>
+      makeEvent({ time: `${String(8 + i).padStart(2, "0")}:00`, name: `E${i + 1}` }),
+    );
+    const data = makeKitchenData({
+      todayEvents: events,
+      maxTodayEvents: 5,
+      tomorrowEvents: [],
+      tasks: [],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain("+3 more");
+  });
+
+  it("TS-5.8 — tomorrow subsection renders up to 3 events", () => {
+    const tomorrow = Array.from({ length: 7 }, (_, i) =>
+      makeEvent({ time: `${String(9 + i).padStart(2, "0")}:00`, name: `T${i + 1}` }),
+    );
+    // Layer contract: route passes the already-sliced array (see calendar-data).
+    // Emulate the handoff here by slicing to 3.
+    const data = makeKitchenData({
+      tomorrowEvents: tomorrow.slice(0, 3),
+      tasks: [],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain("T1");
+    expect(json).toContain("T2");
+    expect(json).toContain("T3");
+    expect(json).not.toContain("T4");
+  });
+
+  it("TS-5.9 — 'No events today' empty state when todayEvents is empty", () => {
+    const data = makeKitchenData({
+      todayEvents: [],
+      tomorrowEvents: [],
+      tasks: [],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain("No events today");
+  });
+
+  it("TS-5.10 — tomorrow subsection omitted entirely when empty", () => {
+    const data = makeKitchenData({
+      tomorrowEvents: [],
+      tasks: [],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    // "Tomorrow" heading is absent (case-sensitive, the code uses "Tomorrow")
+    expect(json).not.toContain("Tomorrow");
+  });
+
+  it("TS-6.5 — task row contains name, due label, and a checkbox element", () => {
+    const data = makeKitchenData({
+      todayEvents: [],
+      tomorrowEvents: [],
+      tasks: [makeTask({ name: "Buy milk", due: "due Apr 3", done: false })],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain("Buy milk");
+    expect(json).toContain("due Apr 3");
+    // Empty checkbox: 2px solid border on a 24x24 box
+    expect(json).toContain('"border":"2px solid #1a1a1a"');
+  });
+
+  it("TS-6.7 — done task has line-through on the name", () => {
+    const data = makeKitchenData({
+      todayEvents: [],
+      tomorrowEvents: [],
+      tasks: [makeTask({ name: "Done thing", due: null, done: true })],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain("line-through");
+  });
+
+  it("TS-6.8 — overdue task renders the due label in bold (fontWeight 700)", () => {
+    const data = makeKitchenData({
+      todayEvents: [],
+      tomorrowEvents: [],
+      tasks: [makeTask({ name: "Overdue thing", due: "overdue", done: false })],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain('"fontWeight":700');
+  });
+
+  it("TS-6.9 — 'All clear' empty state when tasks is empty", () => {
+    const data = makeKitchenData({
+      todayEvents: [],
+      tomorrowEvents: [],
+      tasks: [],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain("All clear");
+  });
+
+  it("TS-7.8 — weather strip shows rounded temp, condition, high/low, and 4 hourly slots", () => {
+    const data = makeKitchenData({
+      weather: makeWeather({
+        current: 13, // already rounded for display
+        condition: "Partly Cloudy",
+        high: 15,
+        low: 7,
+        hourly: [
+          { time: "11:00", temp: 13 },
+          { time: "12:00", temp: 14 },
+          { time: "13:00", temp: 15 },
+          { time: "14:00", temp: 16 },
+        ],
+      }),
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain("13\u00B0C");
+    expect(json).toContain("Partly Cloudy");
+    expect(json).toContain("H: 15");
+    expect(json).toContain("L: 7");
+    expect(json).toContain("11:00");
+    expect(json).toContain("12:00");
+    expect(json).toContain("13:00");
+    expect(json).toContain("14:00");
+  });
+
+  it("TS-8.1 — header and footer always render even with no data", () => {
+    const data = makeKitchenData({
+      todayEvents: [],
+      tomorrowEvents: [],
+      tasks: [],
+      weather: null,
+    });
+    const json = JSON.stringify(buildLayout(data, 1872, 1404));
+    expect(json).toContain("cortex");
+    expect(json).toContain(data.date);
+    expect(json).toContain(data.time);
+    expect(json).toContain("Last updated");
+  });
+
+  it("TS-E-3 — very long event name applies overflow/ellipsis/nowrap, layout dimensions preserved", () => {
+    const longName = "A".repeat(200);
+    const data = makeKitchenData({
+      todayEvents: [makeEvent({ name: longName })],
+      tomorrowEvents: [],
+      tasks: [],
+      weather: null,
+    });
+    const element = buildLayout(data, 1872, 1404);
+    const json = JSON.stringify(element);
+    expect(json).toContain('"overflow":"hidden"');
+    expect(json).toContain('"textOverflow":"ellipsis"');
+    expect(json).toContain('"whiteSpace":"nowrap"');
+    const style = element.props.style as Record<string, unknown>;
+    expect(style.width).toBe(1872);
+    expect(style.height).toBe(1404);
   });
 });

@@ -27,6 +27,27 @@ describe("formatDueDate", () => {
   });
 });
 
+// ─── TS-6.6: due-date label decision table ─────────────────────
+
+describe("formatDueDate — TS-6.6 decision table", () => {
+  const now = new Date(2026, 2, 29); // March 29, 2026 — so Apr 3 is 5 days out
+
+  const rows: Array<[string, string | null, string | null]> = [
+    ["null input", null, null],
+    ["yesterday (past)", "2026-03-28", "overdue"],
+    ["today", "2026-03-29", "due today"],
+    ["tomorrow", "2026-03-30", "due tomorrow"],
+    ["5 days out (Apr 3)", "2026-04-03", "due Apr 3"],
+  ];
+
+  it.each(rows)(
+    "TS-6.6 — %s → %s",
+    (_label, dueDate, expected) => {
+      expect(formatDueDate(dueDate, now)).toBe(expected);
+    },
+  );
+});
+
 // ─── getDisplayTasks ───────────────────────────────────────────
 
 describe("getDisplayTasks", () => {

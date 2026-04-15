@@ -275,4 +275,94 @@ describe("getDisplayEvents", () => {
 
     expect(result.today[0].name).toBe("(no title)");
   });
+
+  // ─── Explicit TS-labeled scenarios ───────────────────────────
+
+  it("TS-5.2 — display_calendars filter restricts to selected calendar only", async () => {
+    resolveCalendarConfigMock.mockResolvedValue(makeMultiConfig());
+
+    // Expected: 2 fetches (Family today + Family tomorrow). Work not fetched.
+    fetchMock
+      .mockResolvedValueOnce(
+        googleEventsResponse([
+          { summary: "Family event", start: { dateTime: "2026-03-31T10:00:00+02:00" } },
+        ]),
+      )
+      .mockResolvedValueOnce(emptyEventsResponse());
+
+    const result = await getDisplayEvents(sql, "Europe/Berlin", ["Family"]);
+
+    expect(result.today).toHaveLength(1);
+    expect(result.today[0].calendar).toBe("FAMILY");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // No URL should reference the WORK calendar id
+    for (const call of fetchMock.mock.calls) {
+      expect((call[0] as string)).not.toContain("work%40");
+    }
+  });
+
+  it("TS-5.3 — empty selectedCalendars array means all calendars", async () => {
+    resolveCalendarConfigMock.mockResolvedValue(makeMultiConfig());
+
+    fetchMock
+      .mockResolvedValue(emptyEventsResponse());
+
+    await getDisplayEvents(sql, "Europe/Berlin", []);
+
+    // Both calendars x 2 days = 4 fetches
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("TS-5.4 — undefined selectedCalendars means all calendars", async () => {
+    resolveCalendarConfigMock.mockResolvedValue(makeMultiConfig());
+
+    fetchMock.mockResolvedValue(emptyEventsResponse());
+
+    await getDisplayEvents(sql, "Europe/Berlin", undefined);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("TS-E-2 — exactly one OAuth refresh on fetch failure, then retry succeeds", async () => {
+    resolveCalendarConfigMock.mockResolvedValue(makeConfig());
+
+    fetchMock
+      .mockRejectedValueOnce(new Error("401 Unauthorized"))
+      .mockRejectedValueOnce(new Error("401 Unauthorized"))
+      .mockResolvedValueOnce(
+        googleEventsResponse([
+          { summary: "Retried", start: { dateTime: "2026-03-31T11:00:00+02:00" } },
+        ]),
+      )
+      .mockResolvedValueOnce(emptyEventsResponse());
+
+    refreshAccessTokenMock.mockResolvedValue({
+      accessToken: "fresh",
+      refreshToken: null,
+    });
+    saveAllSettingsMock.mockResolvedValue(undefined);
+
+    const result = await getDisplayEvents(sql, "Europe/Berlin");
+
+    expect(refreshAccessTokenMock).toHaveBeenCalledTimes(1);
+    expect(result.today).toHaveLength(1);
+    expect(result.today[0].name).toBe("Retried");
+  });
+
+  it("TS-E-8 — event with missing summary still present with fallback title, no throw", async () => {
+    resolveCalendarConfigMock.mockResolvedValue(makeConfig());
+
+    fetchMock
+      .mockResolvedValueOnce(
+        googleEventsResponse([
+          { start: { dateTime: "2026-03-31T14:00:00+02:00" } },
+        ]),
+      )
+      .mockResolvedValueOnce(emptyEventsResponse());
+
+    const result = await getDisplayEvents(sql, "Europe/Berlin");
+
+    expect(result.today).toHaveLength(1);
+    expect(result.today[0].name).toBe("(no title)");
+  });
 });

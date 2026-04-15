@@ -2,7 +2,7 @@
  * Integration tests for the onboarding wizard setup flow.
  * Uses testcontainers PostgreSQL for real DB operations.
  *
- * Scenarios: TS-2.3, TS-2.5, TS-E9 (integration variants)
+ * Scenarios: TS-2.3, TS-2.5, TS-E9 (integration variants), TS-F1 (regression)
  *
  * These tests exercise the full stack: HTTP request -> Hono route -> bcrypt
  * hashing -> PostgreSQL write -> query verification. No mocks for DB or
@@ -28,11 +28,13 @@ import { startTestDb, runMigrations, type TestDb } from "../helpers/test-db.js";
  * The setup routes module (`src/web/setup.ts`) is imported dynamically
  * so the test file compiles even before the source exists.
  */
+const TEST_SECRET = "test-session-secret-at-least-32-bytes-long-for-hmac";
+
 async function createSetupApp(sql: postgres.Sql): Promise<Hono> {
   const { createSetupRoutes } = await import("../../src/web/setup.js");
 
   const app = new Hono();
-  app.route("/", createSetupRoutes(sql));
+  app.route("/", createSetupRoutes(sql, TEST_SECRET));
 
   return app;
 }
@@ -160,5 +162,75 @@ describe("Onboarding Integration", () => {
     // Neither response is a 500 (no server crash)
     expect(res1.status).not.toBe(500);
     expect(res2.status).not.toBe(500);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // TS-F1 (regression): POST /setup/step/1 must not issue a session to
+  //                      an unauthenticated caller after setup is complete.
+  //                      See onboarding-implementation-review.md F-1.
+  // ═══════════════════════════════════════════════════════════════════
+  it("TS-F1 — POST /setup/step/1 refuses to mint a session after setup completes", async () => {
+    const app = await createSetupApp(db.sql);
+
+    // Complete setup legitimately.
+    const setupRes = await app.request("/setup/step/1", {
+      method: "POST",
+      body: buildAccountFormData(),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    expect(setupRes.status).toBe(302);
+
+    // Attacker attempts to POST a different password without any cookies.
+    const attackRes = await app.request("/setup/step/1", {
+      method: "POST",
+      body: new URLSearchParams({
+        display_name: "Attacker",
+        password: "attackerPassword!!",
+        confirm_password: "attackerPassword!!",
+      }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+
+    // No session cookie may be issued to an unauthenticated caller.
+    const setCookieHeader = attackRes.headers.get("set-cookie");
+    expect(setCookieHeader).toBeNull();
+
+    // And the response must redirect to /login, not to /setup/step/2.
+    expect(attackRes.status).toBe(302);
+    expect(attackRes.headers.get("location")).toBe("/login");
+
+    // Only one user row still exists and the password hash is unchanged.
+    const rows = await db.sql`SELECT COUNT(*)::int AS count FROM "user"`;
+    expect(rows[0].count).toBe(1);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // TS-F2 (regression): POST /setup/api/models must not be reachable
+  //                      by unauthenticated callers after setup completes.
+  // ═══════════════════════════════════════════════════════════════════
+  it("TS-F2 — POST /setup/api/models is gated after setup completes", async () => {
+    const app = await createSetupApp(db.sql);
+
+    // Complete setup.
+    const setupRes = await app.request("/setup/step/1", {
+      method: "POST",
+      body: buildAccountFormData(),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    expect(setupRes.status).toBe(302);
+
+    // Unauthenticated SSRF attempt — known provider but attacker-controlled baseUrl.
+    // The endpoint should reject without making the fetch.
+    const attackRes = await app.request("/setup/api/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: "anthropic",
+        apiKey: "sk-attacker",
+        baseUrl: "http://attacker.example/internal",
+      }),
+    });
+
+    expect(attackRes.status).toBe(401);
   });
 });

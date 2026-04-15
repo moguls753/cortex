@@ -199,8 +199,11 @@ function stepIndicator(current: number): string {
 
 // ─── Setup Middleware ──────────────────────────────────────────────
 
-export function createSetupMiddleware(sql: Sql, secret?: string): MiddlewareHandler {
-  const sessionSecret = secret || "cortex-default-setup-secret-for-dev-only";
+export function createSetupMiddleware(sql: Sql, secret: string): MiddlewareHandler {
+  if (!secret) {
+    throw new Error("createSetupMiddleware requires a non-empty session secret");
+  }
+  const sessionSecret = secret;
 
   return async (c, next) => {
     const path = c.req.path;
@@ -261,9 +264,12 @@ export function createSetupMiddleware(sql: Sql, secret?: string): MiddlewareHand
 
 // ─── Setup Routes ─────────────────────────────────────────────────
 
-export function createSetupRoutes(sql: Sql, secret?: string): Hono {
+export function createSetupRoutes(sql: Sql, secret: string): Hono {
+  if (!secret) {
+    throw new Error("createSetupRoutes requires a non-empty session secret");
+  }
   const app = new Hono();
-  const sessionSecret = secret || "cortex-default-setup-secret-for-dev-only";
+  const sessionSecret = secret;
 
   // ── Login Routes ──────────────────────────────────────────────
 
@@ -346,6 +352,20 @@ export function createSetupRoutes(sql: Sql, secret?: string): Hono {
 
   // POST /setup/step/1
   app.post("/setup/step/1", async (c) => {
+    // Guard: if a user already exists, reject unless the caller is the same
+    // authenticated session (idempotent same-session double-submit). This
+    // closes an auth-bypass where a `createUser` PK conflict silently issued
+    // a session cookie for the real user.
+    const preCount = await getUserCount(sql);
+    if (preCount > 0) {
+      const cookieHeader = c.req.header("cookie") ?? null;
+      if (isAuthenticated(cookieHeader, sessionSecret)) {
+        // Same-session double-submit — silently advance.
+        return c.redirect("/setup/step/2", 302);
+      }
+      return c.redirect("/login", 302);
+    }
+
     const body = await c.req.parseBody();
     const displayName = ((body.display_name as string) || "").trim();
     const password = (body.password as string) || "";
@@ -358,6 +378,9 @@ export function createSetupRoutes(sql: Sql, secret?: string): Hono {
     if (password !== confirmPassword) {
       return c.html(renderStep1("Passwords do not match.", displayName));
     }
+    if (displayName.length > 50) {
+      return c.html(renderStep1("Display name must be 50 characters or fewer.", ""));
+    }
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
@@ -369,13 +392,21 @@ export function createSetupRoutes(sql: Sql, secret?: string): Hono {
         displayName: displayName || null,
       });
     } catch (err) {
-      // Likely a duplicate — the CHECK (id = 1) constraint
-      // Just set session and redirect
-      setSessionCookie(c, sessionSecret);
-      return c.redirect("/setup/step/2", 302);
+      // Concurrent double-submit race: the other request won the PK insert.
+      // Verify the user now exists (guard against spurious DB errors), then
+      // either advance or re-render with an error. Never issue a session
+      // cookie in a failure path.
+      const postCount = await getUserCount(sql);
+      if (postCount > 0) {
+        return c.redirect("/login", 302);
+      }
+      log.error("Failed to create user account", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return c.html(renderStep1("Could not create account. Please try again.", displayName));
     }
 
-    // Auto-login
+    // Auto-login — first successful creation only.
     setSessionCookie(c, sessionSecret);
 
     return c.redirect("/setup/step/2", 302);
@@ -396,11 +427,6 @@ export function createSetupRoutes(sql: Sql, secret?: string): Hono {
     if (authRedirect) return authRedirect;
 
     const llmConfig = await getLLMConfig(sql);
-
-    // Fetch Ollama models
-    try {
-    } catch { /* ignore */ }
-
     return c.html(renderStep2(llmConfig));
   });
 
@@ -437,13 +463,28 @@ export function createSetupRoutes(sql: Sql, secret?: string): Hono {
     return c.redirect("/setup/step/3", 302);
   });
 
-  // API: fetch models for a provider (used by step 2 JS)
+  // API: fetch models for a provider (used by step 2 JS).
+  // Reachable only in setup mode (no user yet) OR when the caller holds a
+  // valid setup session. Otherwise the endpoint is a server-side request
+  // forgery surface: it fetches an attacker-controlled baseUrl on the
+  // server's behalf.
   app.post("/setup/api/models", async (c) => {
+    const count = await getUserCount(sql);
+    if (count > 0) {
+      const authRedirect = requireSetupAuth(c);
+      if (authRedirect) return c.json({ error: "unauthorized" }, 401);
+    }
     const body = await c.req.json().catch(() => ({})) as Record<string, string>;
     const provider = body.provider || "";
+    // Only allow providers from the preset allowlist — rejects arbitrary
+    // baseUrls. Ollama uses an internal Docker hostname, others use their
+    // canonical public endpoint.
+    const preset = PROVIDER_PRESETS[provider];
+    if (!preset) {
+      return c.json({ models: [] });
+    }
     const apiKey = body.apiKey || "";
-    const baseUrl = body.baseUrl || PROVIDER_PRESETS[provider]?.baseUrl || "";
-    const models = await fetchProviderModels(provider, apiKey, baseUrl);
+    const models = await fetchProviderModels(provider, apiKey, preset.baseUrl);
     return c.json({ models });
   });
 

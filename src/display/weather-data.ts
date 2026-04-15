@@ -2,33 +2,37 @@ import type { WeatherData } from "./types.js";
 
 // ─── Weather Code Mapping ───────────────────────────────────────
 
+// WMO weather code → display condition label + icon.
+// Source: kitchen-display-specification.md AC-7.6.
 const weatherCodeMap: Record<number, { condition: string; icon: string }> = {
   0: { condition: "Clear", icon: "sun" },
-  1: { condition: "Partly Cloudy", icon: "cloud" },
+  1: { condition: "Mainly Clear", icon: "cloud" },
   2: { condition: "Partly Cloudy", icon: "cloud" },
-  3: { condition: "Partly Cloudy", icon: "cloud" },
+  3: { condition: "Overcast", icon: "cloud" },
   45: { condition: "Fog", icon: "cloud" },
   48: { condition: "Fog", icon: "cloud" },
   51: { condition: "Drizzle", icon: "cloud-rain" },
   53: { condition: "Drizzle", icon: "cloud-rain" },
   55: { condition: "Drizzle", icon: "cloud-rain" },
-  56: { condition: "Drizzle", icon: "cloud-rain" },
-  57: { condition: "Drizzle", icon: "cloud-rain" },
+  56: { condition: "Freezing Drizzle", icon: "cloud-rain" },
+  57: { condition: "Freezing Drizzle", icon: "cloud-rain" },
   61: { condition: "Rain", icon: "cloud-rain" },
   63: { condition: "Rain", icon: "cloud-rain" },
   65: { condition: "Rain", icon: "cloud-rain" },
-  66: { condition: "Rain", icon: "cloud-rain" },
-  67: { condition: "Rain", icon: "cloud-rain" },
+  66: { condition: "Freezing Rain", icon: "cloud-rain" },
+  67: { condition: "Freezing Rain", icon: "cloud-rain" },
   71: { condition: "Snow", icon: "cloud-snow" },
   73: { condition: "Snow", icon: "cloud-snow" },
   75: { condition: "Snow", icon: "cloud-snow" },
-  77: { condition: "Snow", icon: "cloud-snow" },
+  77: { condition: "Snow Grains", icon: "cloud-snow" },
   80: { condition: "Rain Showers", icon: "cloud-rain" },
   81: { condition: "Rain Showers", icon: "cloud-rain" },
   82: { condition: "Rain Showers", icon: "cloud-rain" },
+  85: { condition: "Snow Showers", icon: "cloud-snow" },
+  86: { condition: "Snow Showers", icon: "cloud-snow" },
   95: { condition: "Thunderstorm", icon: "cloud-lightning" },
-  96: { condition: "Thunderstorm", icon: "cloud-lightning" },
-  99: { condition: "Thunderstorm", icon: "cloud-lightning" },
+  96: { condition: "Thunderstorm with Hail", icon: "cloud-lightning" },
+  99: { condition: "Thunderstorm with Hail", icon: "cloud-lightning" },
 };
 
 const defaultWeather = { condition: "Cloudy", icon: "cloud" };

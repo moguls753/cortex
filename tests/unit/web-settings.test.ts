@@ -911,6 +911,192 @@ describe("Web Settings", () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
+  // Kitchen Display settings (spec 2026-04-15 sweep)
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Kitchen Display settings", () => {
+    it("renders the new display_max_today_events, display_base_url, and display_calendars fields", async () => {
+      const { getAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        display_enabled: "true",
+        display_max_today_events: "6",
+        display_base_url: "https://cortex.example.com",
+        display_calendars: JSON.stringify(["FAMILY", "WORK"]),
+      });
+
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+      const res = await app.request("/settings", { headers: { Cookie: cookie } });
+      const body = await res.text();
+
+      expect(body).toContain('name="display_max_today_events"');
+      expect(body).toContain('value="6"');
+      expect(body).toContain('name="display_base_url"');
+      expect(body).toContain("https://cortex.example.com");
+      expect(body).toContain('name="display_calendars"');
+      expect(body).toContain("FAMILY, WORK");
+    });
+
+    it("round-trips display_max_today_events through save", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ display_max_today_events: "12" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(saveAllSettings).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ display_max_today_events: "12" }),
+      );
+    });
+
+    it("round-trips display_base_url through save", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ display_base_url: "https://proxy.example.com" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(saveAllSettings).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ display_base_url: "https://proxy.example.com" }),
+      );
+    });
+
+    it("normalizes display_calendars from comma-separated to a JSON array", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ display_calendars: "FAMILY, WORK , PERSONAL" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(saveAllSettings).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          display_calendars: JSON.stringify(["FAMILY", "WORK", "PERSONAL"]),
+        }),
+      );
+    });
+
+    it("saves display_calendars as empty string when the input is blank", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ display_calendars: "  " }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(saveAllSettings).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ display_calendars: "" }),
+      );
+    });
+
+    it("rejects display_max_today_events outside 1..30", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ display_max_today_events: "99" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toMatch(/error=/);
+      expect(saveAllSettings).not.toHaveBeenCalled();
+    });
+
+    it("rejects display_base_url that is not a valid http(s) URL", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ display_base_url: "not a url" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toMatch(/error=/);
+      expect(saveAllSettings).not.toHaveBeenCalled();
+    });
+
+    it("rejects display_base_url with a non-http protocol", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ display_base_url: "ftp://example.com" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toMatch(/error=/);
+      expect(saveAllSettings).not.toHaveBeenCalled();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
   // Non-Goal Guards
   // ═══════════════════════════════════════════════════════════════════
   describe("Non-Goal Guards", () => {

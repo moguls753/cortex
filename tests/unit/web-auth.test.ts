@@ -362,10 +362,18 @@ describe("Web Auth", () => {
       const app = await createTestApp();
       const sessionCookie = await loginAndGetCookie(app);
 
-      // Tamper with the cookie value
+      // Tamper with a character in the MIDDLE of the signature, not the last
+      // one. The last char of a 32-byte HMAC-SHA256 base64url encoding has 2
+      // padding bits — flipping it can collide with the original decoded byte
+      // (~6% of the time) and silently produce the same signature buffer.
       const [name, ...valueParts] = sessionCookie.split("=");
       const value = valueParts.join("=");
-      const tampered = value.slice(0, -1) + (value.slice(-1) === "a" ? "b" : "a");
+      const dotIdx = value.lastIndexOf(".");
+      const victimIdx = dotIdx + 5;
+      const victim = value[victimIdx];
+      const replacement = victim === "A" ? "B" : "A";
+      const tampered =
+        value.slice(0, victimIdx) + replacement + value.slice(victimIdx + 1);
       const tamperedCookie = `${name}=${tampered}`;
 
       const res = await app.request("/dashboard", {

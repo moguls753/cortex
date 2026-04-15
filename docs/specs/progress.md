@@ -1,6 +1,6 @@
 # Spec-DD Progress Tracker
 
-Last updated: 2026-03-07
+Last updated: 2026-04-15 (sweep)
 
 ## Feature Status
 
@@ -19,8 +19,23 @@ Last updated: 2026-03-07
 | mcp-server | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | digests | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | google-calendar | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| task-completion-detection | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| onboarding (registration wizard) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| kitchen-display (TRMNL) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
+
+## Outstanding Work
+
+- **Embedding model migration follow-up (2026-04-14, closed).** Swept `snowflake-arctic-embed2` (1024-dim) → `qwen3-embedding` (4096-dim) across docs/specs, landing page, design components, ARCHITECTURE diagram. Fixed 22 failing tests. Retained as an audit-trail entry.
+- **Kitchen Display settings UI (2026-04-15, closed).** `display_max_today_events`, `display_base_url`, and `display_calendars` are now surfaced in `src/web/settings.ts` with validation (max-today-events 1–30, base URL must parse as http/https). 8 new unit tests in `tests/unit/web-settings.test.ts` cover render + round-trip + invalid-value rejection.
+- **REQ-NFR-007 Responsive design (2026-04-15, closed).** SRS fit criteria updated to match the Terminal / Command Center design intent: viewport meta tag + fluid main containers + nav-label collapse below `sm`. The 44×44px touch-target criterion from the original draft was dropped because it contradicts the monospace-terminal design. New file `tests/unit/web-responsive.test.ts` (5 tests) asserts the structural properties.
+
+All onboarding review findings (F-1 through F-8) are closed as of 2026-04-15.
+All kitchen-display review findings (F-1 through F-8) are closed as of 2026-04-15.
+REQ-NFR-007 verified as of 2026-04-15.
+
+**Nothing outstanding.** The only work queued would be net-new features, which should start with `/spec-dd:spec <feature>`.
 
 ## Next Action
 
@@ -104,7 +119,17 @@ Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
 **Digests complete.** All 6 phases done, 42/42 tests pass (35 unit + 7 integration), review report at `digests-implementation-review.md`. 0 CRITICAL findings. 3 WARNINGs fixed during review: W-1 behavioral spec `anthropic_model` → `llm_model`, W-2 added AC-2.7 for weekly SSE push, W-3 overdue tasks inclusion kept as better UX. 1 code fix: removed redundant `DIGEST_EMAIL_TO` env var fallback. Implementation: `src/digests.ts` (pipeline + scheduler), `src/digests-queries.ts` (queries), `src/email.ts` (SMTP). Dependencies: `node-cron`, `nodemailer`. Timezone-aware date formatting for email subjects.
 
-All features complete. All 6 phases of the implementation plan are done.
+**Task Completion Detection complete.** All 6 phases done, 37 tests pass (33 unit + 4 integration), review at `task-completion-detection-implementation-review.md`, verification at `task-completion-detection-verification.md`. Added after the 13 original features.
+
+**Google Calendar complete.** All 6 phases done, 49 tests pass (39 unit + 10 integration), review at `google-calendar-implementation-review.md`, verification at `google-calendar-verification.md`. Added after task-completion.
+
+**Onboarding (Registration Wizard) complete.** All 6 phases done, 44 tests pass (41 unit + 3 integration — 31 onboarding unit + 10 config-onboarding unit + 3 integration), review at `onboarding-implementation-review.md` (2026-04-14). Implementation: `src/web/setup.ts` (6 routes: GET /setup, POST step-1 account, POST step-2 llm, POST step-3 telegram, POST /setup/ollama-pull, POST skip), `src/web/setup-queries.ts`. Dependencies: `bcryptjs`. Routes wired in `src/index.ts` via pre-auth redirect middleware that checks `user` table existence.
+
+**Embedding Model Migration (2026-04-14).** Migrated embedding model from `snowflake-arctic-embed2` (1024-dim) to `qwen3-embedding` (4096-dim). Code side handled in commit 458f79c (config + DB column + `embed.ts` constants + in-place DB migration block in `src/db/index.ts:123-132` that nulls old embeddings and alters the column type). HNSW index dropped because pgvector HNSW does not support >2000 dims. Follow-up commit swept remaining docs/specs/design/landing references, fixed 22 pre-existing broken tests (19 of which were blamed on the migration but actually stemmed from earlier unrelated commits — `resolveLLMConfig` added in `api keys via jsonb`, `bcryptjs` missing install from the onboarding feature, stale `HNSW` / piggyback / timezone assertions). 650/650 tests passing across 3 consecutive runs.
+
+**Kitchen Display complete (2026-04-15).** All 6 phases done, 155 tests pass (143 unit + 12 integration), review report at `kitchen-display-implementation-review.md`. Retroactive spec-dd backfill: Phase 1 drafted the behavioral spec from the existing design doc + code, Phase 4 expanded the test suite from 50 → 155, surfacing 16 real gaps (KG-1..KG-5 plus KG-2a), Phase 5 closed all 16 with targeted edits in `src/display/weather-data.ts` (WMO mapping extended to full AC-7.6 table) and `src/display/index.ts` (`display_max_today_events`, `display_base_url`, width/height validation). 757/757 full suite passing, stable across 2 runs, clean build.
+
+All 16 features now complete through all 6 spec-dd phases.
 
 ## Spec Files
 

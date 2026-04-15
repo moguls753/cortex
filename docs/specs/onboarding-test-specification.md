@@ -51,6 +51,17 @@
 | E-10: Ollama unreachable in step 2 | TS-E10 |
 | E-11: Empty display name | TS-E11 |
 
+### Intentionally uncovered (behavioral review F-8, 2026-04-15)
+
+These acceptance criteria are documented as non-code changes or static env-var defaults that don't warrant a dedicated test scenario. Leaving them out is deliberate, not a coverage gap:
+
+| Spec Requirement | Why uncovered |
+|---|---|
+| AC-7.4: `OLLAMA_URL` defaults to `http://ollama:11434` | One-line default in `src/config.ts`; verified by integration tests that run against the testcontainers DB (which uses the default URL transparently). No dedicated scenario. |
+| AC-7.5: `WHISPER_URL` defaults to `http://whisper:8000` | Same pattern — one-line default, no behavioral branch to test. |
+| AC-7.7: `TZ` remains an optional env var | System-level behavior inherited from Node.js; the settings-page timezone override is tested by the web-settings feature tests. |
+| AC-7.8: SMTP env vars unchanged | Out-of-scope for onboarding — SMTP configuration belongs to the digests feature. |
+
 ## Test Scenarios
 
 ### Setup Mode Detection

@@ -116,6 +116,16 @@ function isValidCron(expr: string): boolean {
   }
 }
 
+function parseDisplayCalendars(raw: string): string {
+  // Comma-separated → trimmed JSON array. Empty input → empty string (absent setting).
+  if (!raw.trim()) return "";
+  const names = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return names.length === 0 ? "" : JSON.stringify(names);
+}
+
 function validateSettings(form: Record<string, string>): string | null {
   // Chat IDs
   const chatIds = (form.chat_ids || "")
@@ -154,6 +164,26 @@ function validateSettings(form: Record<string, string>): string | null {
     }
     if (dur > 480) {
       return "Calendar event duration must be at most 480 minutes.";
+    }
+  }
+
+  // Kitchen display — max today events
+  if (form.display_max_today_events) {
+    const n = parseInt(form.display_max_today_events, 10);
+    if (isNaN(n) || n < 1 || n > 30) {
+      return "Max Today Events must be an integer between 1 and 30.";
+    }
+  }
+
+  // Kitchen display — base URL override
+  if (form.display_base_url) {
+    try {
+      const u = new URL(form.display_base_url);
+      if (u.protocol !== "http:" && u.protocol !== "https:") {
+        return "Display Base URL must use http:// or https://.";
+      }
+    } catch {
+      return "Display Base URL is not a valid URL.";
     }
   }
 
@@ -206,8 +236,21 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     const displayWeatherLat = dbSettings.display_weather_lat || "";
     const displayWeatherLng = dbSettings.display_weather_lng || "";
     const displayMaxTasks = dbSettings.display_max_tasks || "7";
+    const displayMaxTodayEvents = dbSettings.display_max_today_events || "8";
     const displayWidth = dbSettings.display_width || "";
     const displayHeight = dbSettings.display_height || "";
+    const displayBaseUrl = dbSettings.display_base_url || "";
+    // display_calendars is stored as JSON array of calendar display names.
+    // The form uses a comma-separated text input for simplicity; empty means "all".
+    let displayCalendarsDisplay = "";
+    if (dbSettings.display_calendars) {
+      try {
+        const parsed = JSON.parse(dbSettings.display_calendars) as unknown;
+        if (Array.isArray(parsed)) {
+          displayCalendarsDisplay = parsed.filter((v) => typeof v === "string").join(", ");
+        }
+      } catch { /* invalid JSON — show as empty, save will normalize */ }
+    }
     const gcalConnected = !!gcalRefreshToken;
 
     // If tokens exist, try to validate them
@@ -725,10 +768,24 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
               </div>
             </div>
             <span class="text-[10px] text-muted-foreground">Find coordinates at open-meteo.com</span>
-            <div class="flex flex-col gap-1.5 max-w-xs">
-              <label for="display_max_tasks" class="text-xs text-muted-foreground">Max Tasks</label>
-              <input type="number" id="display_max_tasks" name="display_max_tasks" value="${escapeHtml(displayMaxTasks)}" min="1" max="20"
-                class="h-8 w-24 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+            <div class="grid grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label for="display_max_tasks" class="text-xs text-muted-foreground">Max Tasks</label>
+                <input type="number" id="display_max_tasks" name="display_max_tasks" value="${escapeHtml(displayMaxTasks)}" min="1" max="20"
+                  class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label for="display_max_today_events" class="text-xs text-muted-foreground">Max Today Events</label>
+                <input type="number" id="display_max_today_events" name="display_max_today_events" value="${escapeHtml(displayMaxTodayEvents)}" min="1" max="30"
+                  class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
+              </div>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label for="display_calendars" class="text-xs text-muted-foreground">Calendar Filter</label>
+              <input type="text" id="display_calendars" name="display_calendars" value="${escapeHtml(displayCalendarsDisplay)}"
+                placeholder="Leave blank for all; comma-separated names e.g. FAMILY, WORK"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              <span class="text-[10px] text-muted-foreground">Restrict which Google Calendars appear on the display. Empty = all configured calendars.</span>
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div class="flex flex-col gap-1.5">
@@ -743,6 +800,13 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
                   placeholder="e.g. 480"
                   class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
               </div>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label for="display_base_url" class="text-xs text-muted-foreground">Base URL Override</label>
+              <input type="text" id="display_base_url" name="display_base_url" value="${escapeHtml(displayBaseUrl)}"
+                placeholder="Optional — e.g. https://cortex.example.com"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              <span class="text-[10px] text-muted-foreground">Override the URL returned by /api/display. Useful behind a reverse proxy with TLS termination. Leave blank to derive from request headers.</span>
             </div>
             ${displayEnabled === "true" ? `
             <div class="flex items-center gap-2">
@@ -1319,8 +1383,11 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       display_weather_lat: (body.display_weather_lat as string) || "",
       display_weather_lng: (body.display_weather_lng as string) || "",
       display_max_tasks: (body.display_max_tasks as string) || "",
+      display_max_today_events: (body.display_max_today_events as string) || "",
       display_width: (body.display_width as string) || "",
       display_height: (body.display_height as string) || "",
+      display_base_url: ((body.display_base_url as string) || "").trim(),
+      display_calendars_raw: ((body.display_calendars as string) || "").trim(),
     };
 
     const llmConfig: LLMConfig = {
@@ -1374,8 +1441,11 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       display_weather_lat: form.display_weather_lat,
       display_weather_lng: form.display_weather_lng,
       display_max_tasks: form.display_max_tasks,
+      display_max_today_events: form.display_max_today_events,
       display_width: form.display_width,
       display_height: form.display_height,
+      display_base_url: form.display_base_url,
+      display_calendars: parseDisplayCalendars(form.display_calendars_raw),
     };
 
     await saveAllSettings(sql, toSave);
