@@ -36,12 +36,25 @@
   function applyHealth(body) {
     if (!body || typeof body !== "object" || !body.services) return;
     var services = body.services;
+    var allReady = true;
     for (var key in services) {
       if (Object.prototype.hasOwnProperty.call(services, key)) {
         var entry = services[key];
         if (entry && typeof entry === "object") {
-          updateDot(key, entry.ready === true);
+          var ready = entry.ready === true;
+          updateDot(key, ready);
+          if (!ready) allReady = false;
         }
+      }
+    }
+    // Auto-dismiss the banner once every service is ready — no reason to
+    // keep showing stale "downloading…" text when the dots are all green.
+    if (allReady) {
+      var banner = document.getElementById("status-banner");
+      if (banner && banner.parentNode && typeof banner.parentNode.removeChild === "function") {
+        banner.parentNode.removeChild(banner);
+      } else if (banner && typeof banner.remove === "function") {
+        banner.remove();
       }
     }
   }

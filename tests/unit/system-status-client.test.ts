@@ -204,5 +204,34 @@ describe("System status — client polling script", () => {
       // Banner still dismissed.
       expect(sandbox.getBanner()?.parentNode).toBeNull();
     });
+
+    it("banner auto-dismisses when all services become ready", async () => {
+      const sandbox = createStatusClientSandbox({
+        includeTelegramDot: true,
+        initialBannerServices: [
+          { key: "whisper", detail: "Loading Whisper model" },
+        ],
+      });
+
+      // Banner starts attached.
+      expect(sandbox.getBanner()!.parentNode).not.toBeNull();
+
+      // First poll: whisper still not ready — banner stays.
+      await sandbox.respondWith({
+        status: "ok",
+        services: fakeHealthWhisperLoading(),
+        uptime: 10,
+      });
+      expect(sandbox.getBanner()!.parentNode).not.toBeNull();
+
+      // Second poll: all services now ready — banner auto-removed.
+      await sandbox.advanceTime(10_000);
+      await sandbox.respondWith({
+        status: "ok",
+        services: fakeHealthAllReady(),
+        uptime: 20,
+      });
+      expect(sandbox.getBanner()!.parentNode).toBeNull();
+    });
   });
 });

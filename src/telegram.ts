@@ -184,16 +184,6 @@ export async function handleTextMessage(
       // Embedding will be retried by cron
     }
 
-    // Calendar event creation (non-blocking)
-    let calendarResult: { created: boolean; date?: string } | null = null;
-    if (classResult.create_calendar_event) {
-      try {
-        calendarResult = await processCalendarEvent(sql, entryId, classResult);
-      } catch {
-        // Calendar errors never block entry storage
-      }
-    }
-
     // Task completion detection
     let completionResult: { autoCompleted: Array<{ entry_id: string; name: string; confidence: number }>; needsConfirmation: Array<{ entry_id: string; name: string; confidence: number }>; reclassifiedCategory: string | null } | null = null;
     if (classResult.is_task_completion) {
@@ -260,9 +250,17 @@ export async function handleTextMessage(
       );
     }
 
-    // Calendar confirmation
-    if (calendarResult?.created && classResult.calendar_date) {
-      await reply(`📅 Calendar event created for ${classResult.calendar_date}`);
+    // Calendar event creation (after reply — never blocks classification feedback)
+    if (classResult.create_calendar_event) {
+      processCalendarEvent(sql, entryId, classResult)
+        .then((result) => {
+          if (result.created && classResult.calendar_date) {
+            return reply(`📅 Calendar event created for ${classResult.calendar_date}`);
+          }
+        })
+        .catch(() => {
+          // Calendar errors never block entry storage
+        });
     }
   } catch (error) {
     const reply = ctx.reply as (text: string) => Promise<unknown>;
@@ -362,16 +360,6 @@ export async function handleVoiceMessage(
       // Will retry
     }
 
-    // Calendar event creation (non-blocking)
-    let calendarResult: { created: boolean; date?: string } | null = null;
-    if (classResult.create_calendar_event) {
-      try {
-        calendarResult = await processCalendarEvent(sql, entryId, classResult);
-      } catch {
-        // Calendar errors never block entry storage
-      }
-    }
-
     // Task completion detection
     let completionResult: { autoCompleted: Array<{ entry_id: string; name: string; confidence: number }>; needsConfirmation: Array<{ entry_id: string; name: string; confidence: number }>; reclassifiedCategory: string | null } | null = null;
     if (classResult.is_task_completion) {
@@ -437,9 +425,17 @@ export async function handleVoiceMessage(
       );
     }
 
-    // Calendar confirmation
-    if (calendarResult?.created && classResult.calendar_date) {
-      await reply(`📅 Calendar event created for ${classResult.calendar_date}`);
+    // Calendar event creation (after reply — never blocks classification feedback)
+    if (classResult.create_calendar_event) {
+      processCalendarEvent(sql, entryId, classResult)
+        .then((result) => {
+          if (result.created && classResult.calendar_date) {
+            return reply(`📅 Calendar event created for ${classResult.calendar_date}`);
+          }
+        })
+        .catch(() => {
+          // Calendar errors never block entry storage
+        });
     }
   } catch (error) {
     const reply = ctx.reply as (text: string) => Promise<unknown>;

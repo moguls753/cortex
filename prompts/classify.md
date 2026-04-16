@@ -19,6 +19,8 @@ Decision tips:
 - "Build a CLI tool for log parsing" → could be **projects** (if multi-step) or **ideas** (if just a thought). Use your judgment based on specificity.
 - "The docker compose --watch flag auto-reloads on file changes" → **reference**
 - "Auto habe ich abgeholt" / "I picked up the car" → **reference** (reporting something you already did is NOT a task for categorization — tasks are things you still need to do. However, such reports MUST still set `is_task_completion: true` if there is a plausible matching pending task, even if the category is reference.)
+- "Prepare slides for the 2pm meeting" → **tasks** with due_date, `create_calendar_event: false` (preparing FOR an event is a task, not the event itself)
+- "Meeting at 2pm with the team" → **tasks** with `create_calendar_event: true` (the meeting IS the event)
 
 ## Fields per category
 
@@ -54,7 +56,7 @@ All 9 keys must appear in one object. Do NOT split into multiple objects.
 - **confidence**: 0.0–1.0, how certain you are about the category.
 - **tags**: 1–5 lowercase tags, in {output_language}.
 - **is_task_completion**: true whenever the input describes a **past action the user performed** — past tense, "I did X", "war gerade X", "habe X gemacht", "ich war X". **This flag is independent of category** — a reference entry can and should have `is_task_completion: true`. You do not need to know whether a matching task exists; that is resolved separately. Err on the side of `true` for past-action reports. Set to false only for new tasks, future plans, general thoughts, or facts that clearly do not describe the user doing something.
-- **create_calendar_event**: true only if there is a specific date/time for a meeting, appointment, or deadline.
+- **create_calendar_event**: true ONLY if the input describes an event the user will **attend or participate in** at a specific date/time — a meeting, appointment, call, presentation, or external deadline. Set to FALSE when the input describes **work to be done before** a referenced event or time. The test: "Is the user describing something that happens at that time, or something they need to finish by that time?" If the latter, it is a task with a due_date, not a calendar event.
 - **calendar_date**: The date in YYYY-MM-DD if create_calendar_event is true, otherwise null.
 - **calendar_time**: The time in HH:MM (24h) if a specific time is mentioned, otherwise null.
 
@@ -79,6 +81,11 @@ Input: "git stash apply vs git stash pop: apply keeps the stash, pop removes it"
 
 Input: "I called the landlord about the Sendling apartment"
 {"category":"people","name":"Landlord Sendling Call","confidence":0.88,"fields":{"context":"Called about Sendling apartment","follow_ups":null},"tags":["landlord","sendling"],"is_task_completion":true,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
+
+Input: "Ich muss für das Kolloquium heute 14 Uhr noch ein paar Folien updaten"
+{"category":"tasks","name":"Slides for colloquium","confidence":0.93,"fields":{"due_date":"{today}","status":"pending","notes":"Update slides and speaker notes before 2 PM colloquium"},"tags":["colloquium","presentation"],"is_task_completion":false,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
+
+Note: create_calendar_event is FALSE because the input describes preparation work, not the colloquium event itself. The time (14:00) is when the event happens, not when the task happens — the task has a deadline (before 14:00), captured via due_date.
 
 {calendar_section}
 ## Context
