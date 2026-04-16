@@ -159,7 +159,7 @@ export async function handleTextMessage(
         VALUES (${"Untitled"}, ${text}, ${null}, ${null}, ${{}}, ${[]}, ${"telegram"}, ${"text"})
         RETURNING id
       `;
-      const reply = ctx.reply as (text: string, options?: unknown) => Promise<unknown>;
+      const reply = (ctx.reply as Function).bind(ctx) as (text: string, options?: unknown) => Promise<unknown>;
       await reply("Stored but could not classify — will retry");
       return;
     }
@@ -207,7 +207,7 @@ export async function handleTextMessage(
     }
 
     // Reply
-    const reply = ctx.reply as (text: string, options?: unknown) => Promise<unknown>;
+    const reply = (ctx.reply as Function).bind(ctx) as (text: string, options?: unknown) => Promise<unknown>;
     const actualCategory = completionResult?.reclassifiedCategory
       ? capitalize(completionResult.reclassifiedCategory)
       : capitalize(classResult.category!);
@@ -264,7 +264,7 @@ export async function handleTextMessage(
     }
   } catch (error) {
     log.error("Text handler error", { error: (error as Error)?.message || String(error), stack: (error as Error)?.stack });
-    const reply = ctx.reply as (text: string) => Promise<unknown>;
+    const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
     try {
       await reply("System temporarily unavailable");
     } catch (replyError) {
@@ -308,13 +308,13 @@ export async function handleVoiceMessage(
     try {
       transcript = await transcribeVoice(fileUrl);
     } catch {
-      const reply = ctx.reply as (text: string) => Promise<unknown>;
+      const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
       await reply("Could not transcribe voice message. Please send as text.");
       return;
     }
 
     if (!transcript) {
-      const reply = ctx.reply as (text: string) => Promise<unknown>;
+      const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
       await reply("Could not transcribe voice message. Please send as text.");
       return;
     }
@@ -328,7 +328,7 @@ export async function handleVoiceMessage(
 
     // Classify
     const classResult = await classifyText(transcript, { contextEntries, outputLanguage, calendarNames, sql });
-    const reply = ctx.reply as (text: string, options?: unknown) => Promise<unknown>;
+    const reply = (ctx.reply as Function).bind(ctx) as (text: string, options?: unknown) => Promise<unknown>;
 
     if (!classResult || classResult.category === null) {
       // Store unclassified
@@ -441,7 +441,7 @@ export async function handleVoiceMessage(
     }
   } catch (error) {
     log.error("Voice handler error", { error: (error as Error)?.message || String(error), stack: (error as Error)?.stack });
-    const reply = ctx.reply as (text: string) => Promise<unknown>;
+    const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
     try {
       await reply("System temporarily unavailable");
     } catch (replyError) {
@@ -465,7 +465,7 @@ export async function handleCallbackQuery(
     } | undefined;
 
     if (!callbackQuery?.data) {
-      const answer = ctx.answerCallbackQuery as () => Promise<unknown>;
+      const answer = (ctx.answerCallbackQuery as Function).bind(ctx) as () => Promise<unknown>;
       await answer();
       return;
     }
@@ -476,7 +476,7 @@ export async function handleCallbackQuery(
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (parts.length === 2 && (parts[0] === "task_complete_yes" || parts[0] === "task_complete_no")) {
       const [action, taskEntryId] = parts;
-      const answer = ctx.answerCallbackQuery as () => Promise<unknown>;
+      const answer = (ctx.answerCallbackQuery as Function).bind(ctx) as () => Promise<unknown>;
 
       if (!UUID_RE.test(taskEntryId)) {
         await answer();
@@ -493,7 +493,7 @@ export async function handleCallbackQuery(
 
           // Append completion to existing message text instead of replacing it
           const originalText = (callbackQuery.message as any)?.text ?? "";
-          const editMessageText = ctx.editMessageText as (text: string, options?: unknown) => Promise<unknown>;
+          const editMessageText = (ctx.editMessageText as Function).bind(ctx) as (text: string, options?: unknown) => Promise<unknown>;
           try {
             await editMessageText(`${originalText}\n✅ Marked '${taskName}' as done.`, { reply_markup: undefined });
           } catch {
@@ -505,7 +505,7 @@ export async function handleCallbackQuery(
       } else {
         // User tapped No — remove the inline keyboard but keep the message
         const originalText = (callbackQuery.message as any)?.text ?? "";
-        const editMessageText = ctx.editMessageText as (text: string, options?: unknown) => Promise<unknown>;
+        const editMessageText = (ctx.editMessageText as Function).bind(ctx) as (text: string, options?: unknown) => Promise<unknown>;
         try {
           await editMessageText(originalText, { reply_markup: undefined });
         } catch {
@@ -517,7 +517,7 @@ export async function handleCallbackQuery(
     }
 
     if (parts.length !== 3 || parts[0] !== "correct") {
-      const answer = ctx.answerCallbackQuery as () => Promise<unknown>;
+      const answer = (ctx.answerCallbackQuery as Function).bind(ctx) as () => Promise<unknown>;
       await answer();
       return;
     }
@@ -531,7 +531,7 @@ export async function handleCallbackQuery(
 
     if (rows.length === 0) {
       log.warn("Callback query references non-existent entry", { entryId });
-      const answer = ctx.answerCallbackQuery as () => Promise<unknown>;
+      const answer = (ctx.answerCallbackQuery as Function).bind(ctx) as () => Promise<unknown>;
       await answer();
       return;
     }
@@ -546,7 +546,7 @@ export async function handleCallbackQuery(
 
     // Already corrected (confidence is null) or deleted — acknowledge but don't reprocess
     if (entry.confidence === null || entry.deleted_at !== null) {
-      const answer = ctx.answerCallbackQuery as () => Promise<unknown>;
+      const answer = (ctx.answerCallbackQuery as Function).bind(ctx) as () => Promise<unknown>;
       await answer();
       return;
     }
@@ -585,7 +585,7 @@ export async function handleCallbackQuery(
     }
 
     // Edit original message
-    const editMessageText = ctx.editMessageText as (
+    const editMessageText = (ctx.editMessageText as Function).bind(ctx) as (
       text: string,
       options?: unknown,
     ) => Promise<unknown>;
@@ -593,11 +593,11 @@ export async function handleCallbackQuery(
       reply_markup: undefined,
     });
 
-    const answer = ctx.answerCallbackQuery as () => Promise<unknown>;
+    const answer = (ctx.answerCallbackQuery as Function).bind(ctx) as () => Promise<unknown>;
     await answer();
   } catch (error) {
     try {
-      const answer = ctx.answerCallbackQuery as () => Promise<unknown>;
+      const answer = (ctx.answerCallbackQuery as Function).bind(ctx) as () => Promise<unknown>;
       await answer();
     } catch {
       // ignore
@@ -627,7 +627,7 @@ export async function handleFixCommand(
     const chatId = message.chat.id;
     if (!(await isAuthorized(chatId, sql))) return;
 
-    const reply = ctx.reply as (text: string) => Promise<unknown>;
+    const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
 
     // Extract correction text after "/fix "
     const correctionText = text.startsWith("/fix ")
@@ -695,7 +695,7 @@ export async function handleFixCommand(
       await reply("Could not re-classify entry");
     }
   } catch (error) {
-    const reply = ctx.reply as (text: string) => Promise<unknown>;
+    const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
     try {
       await reply("System temporarily unavailable");
     } catch {
