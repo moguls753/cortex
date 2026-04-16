@@ -258,16 +258,17 @@ export async function handleTextMessage(
             return reply(`📅 Calendar event created for ${classResult.calendar_date}`);
           }
         })
-        .catch(() => {
-          // Calendar errors never block entry storage
+        .catch((e: unknown) => {
+          log.error("Calendar event creation failed", { error: (e as Error)?.message });
         });
     }
   } catch (error) {
+    log.error("Text handler error", { error: (error as Error)?.message || String(error), stack: (error as Error)?.stack });
     const reply = ctx.reply as (text: string) => Promise<unknown>;
     try {
       await reply("System temporarily unavailable");
-    } catch {
-      // Can't even reply
+    } catch (replyError) {
+      log.error("Text handler reply also failed", { error: (replyError as Error)?.message || String(replyError) });
     }
   }
 }
@@ -383,6 +384,7 @@ export async function handleVoiceMessage(
     }
 
     // Reply with transcript + classification
+    log.debug("Preparing voice reply", { category: classResult.category, name: classResult.name, confident, hasCompletions: false });
     const actualCategory = completionResult?.reclassifiedCategory
       ? capitalize(completionResult.reclassifiedCategory)
       : capitalize(classResult.category!);
@@ -433,16 +435,17 @@ export async function handleVoiceMessage(
             return reply(`📅 Calendar event created for ${classResult.calendar_date}`);
           }
         })
-        .catch(() => {
-          // Calendar errors never block entry storage
+        .catch((e: unknown) => {
+          log.error("Calendar event creation failed", { error: (e as Error)?.message });
         });
     }
   } catch (error) {
+    log.error("Voice handler error", { error: (error as Error)?.message || String(error), stack: (error as Error)?.stack });
     const reply = ctx.reply as (text: string) => Promise<unknown>;
     try {
       await reply("System temporarily unavailable");
-    } catch {
-      // Can't even reply
+    } catch (replyError) {
+      log.error("Voice handler reply also failed", { error: (replyError as Error)?.message || String(replyError) });
     }
   }
 }
