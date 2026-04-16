@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   iconBrain,
   iconFolderOpen,
@@ -14,11 +15,13 @@ import type { HealthStatus, ServiceStatus } from "./service-checkers.js";
 
 // ─── Client-side polling script ─────────────────────────────────────
 //
-// Loaded at module init time from src/web/system-status-client.src.js.
+// Loaded at module init time from system-status-client.src.js (co-located with
+// this module). In dev: src/web/. In production: dist/web/ (copied by build).
 // The same file is exercised by tests/helpers/status-client-sandbox.ts so the
 // test bytes and the served bytes are always identical — no drift possible.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATUS_CLIENT_SCRIPT = readFileSync(
-  resolve("src/web/system-status-client.src.js"),
+  resolve(__dirname, "system-status-client.src.js"),
   "utf8",
 );
 

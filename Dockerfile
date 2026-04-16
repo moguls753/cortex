@@ -12,6 +12,7 @@ COPY public/ public/
 
 RUN npm run build
 RUN cp -r src/display/fonts dist/display/fonts
+RUN cp src/web/system-status-client.src.js dist/web/system-status-client.src.js
 
 FROM node:22-slim
 
