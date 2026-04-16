@@ -11,6 +11,8 @@ import {
 import { classifyText, assembleContext } from "../classify.js";
 import { embedEntry } from "../embed.js";
 import { resolveConfigValue } from "../config.js";
+import { getServiceStatus } from "./service-checkers.js";
+import { isBotRunning } from "../telegram.js";
 import { processCalendarEvent, getCalendarNames } from "../google-calendar.js";
 import { detectTaskCompletion } from "../task-completion.js";
 import {
@@ -557,13 +559,14 @@ export function createDashboardRoutes(
   const app = new Hono();
 
   app.get("/", async (c) => {
-    const [rawEntries, rawStats, dailyDigest, weeklyDigest, dailyCronValue, weeklyCronValue] = await Promise.all([
+    const [rawEntries, rawStats, dailyDigest, weeklyDigest, dailyCronValue, weeklyCronValue, healthStatus] = await Promise.all([
       getRecentEntries(sql, 9),
       getDashboardStats(sql),
       getLatestDigest(sql, "daily"),
       getLatestDigest(sql, "weekly"),
       resolveConfigValue("daily_digest_cron", sql),
       resolveConfigValue("weekly_digest_cron", sql),
+      getServiceStatus(sql, { isBotRunning }),
     ]);
 
     const entries = rawEntries ?? [];
@@ -595,7 +598,7 @@ export function createDashboardRoutes(
       ${renderClientScript()}
     `;
 
-    return c.html(renderLayout("Dashboard", content, "/"));
+    return c.html(renderLayout("Dashboard", content, "/", healthStatus));
   });
 
   app.post("/api/capture", async (c) => {

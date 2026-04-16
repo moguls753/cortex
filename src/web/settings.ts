@@ -2,11 +2,12 @@ import { Hono } from "hono";
 import type postgres from "postgres";
 import { CronExpressionParser } from "cron-parser";
 import { renderLayout } from "./layout.js";
+import { getServiceStatus } from "./service-checkers.js";
 import { getAllSettings, saveAllSettings } from "./settings-queries.js";
 import { escapeHtml } from "./shared.js";
 import { getLLMConfig, saveLLMConfig } from "../llm/config.js";
 import type { LLMConfig } from "../llm/config.js";
-import { restartBot } from "../telegram.js";
+import { restartBot, isBotRunning } from "../telegram.js";
 import { createLogger } from "../logger.js";
 
 const log = createLogger("settings");
@@ -194,6 +195,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
   const app = new Hono();
 
   app.get("/settings", async (c) => {
+    const healthPromise = getServiceStatus(sql, { isBotRunning });
     const dbSettings = (await getAllSettings(sql)) ?? {};
 
     const llmConfig = await getLLMConfig(sql);
@@ -1346,7 +1348,8 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     })();
     </script>`;
 
-    return c.html(renderLayout("Settings", content, "/settings"));
+    const healthStatus = await healthPromise;
+    return c.html(renderLayout("Settings", content, "/settings", healthStatus));
   });
 
   app.post("/settings", async (c) => {

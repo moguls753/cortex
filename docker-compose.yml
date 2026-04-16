@@ -51,8 +51,15 @@ services:
     environment:
       WHISPER__MODEL: medium
       WHISPER__DEVICE: cpu
+      PRELOAD_MODELS: '["Systran/faster-whisper-medium"]'
     volumes:
       - whisper_data:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
 
 volumes:
   postgres_data:

@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type postgres from "postgres";
 import { renderLayout } from "./layout.js";
+import { getServiceStatus } from "./service-checkers.js";
+import { isBotRunning } from "../telegram.js";
 import { insertEntry } from "./dashboard-queries.js";
 import { getAllTags } from "./entry-queries.js";
 import { classifyText, assembleContext } from "../classify.js";
@@ -148,8 +150,12 @@ export function createNewNoteRoutes(sql: Sql): Hono {
 
   // GET /new - render form
   app.get("/new", async (c) => {
-    const allTags = (await getAllTags(sql)) ?? [];
-    return c.html(renderLayout("New Note", renderNewNotePage(allTags)));
+    const [rawTags, healthStatus] = await Promise.all([
+      getAllTags(sql),
+      getServiceStatus(sql, { isBotRunning }),
+    ]);
+    const allTags = rawTags ?? [];
+    return c.html(renderLayout("New Note", renderNewNotePage(allTags), "/", healthStatus));
   });
 
   // POST /new - save note
@@ -165,11 +171,17 @@ export function createNewNoteRoutes(sql: Sql): Hono {
 
     // Validate name
     if (!name) {
-      const allTags = (await getAllTags(sql)) ?? [];
+      const [rawTags, healthStatus] = await Promise.all([
+        getAllTags(sql),
+        getServiceStatus(sql, { isBotRunning }),
+      ]);
+      const allTags = rawTags ?? [];
       return c.html(
         renderLayout(
           "New Note",
           renderNewNotePage(allTags, "Name is required"),
+          "/",
+          healthStatus,
         ),
         422,
       );

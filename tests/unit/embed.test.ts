@@ -275,18 +275,26 @@ describe("Embedding", () => {
 
     // TS-2.4
     it("logs a warning and completes initialization when Ollama is unreachable", async () => {
+      vi.useFakeTimers();
       fetchSpy.mockRejectedValue(new TypeError("fetch failed"));
       const stdoutSpy = vi
         .spyOn(process.stdout, "write")
         .mockImplementation(() => true);
 
-      // Should NOT throw
-      await initializeEmbedding();
+      // initializeEmbedding now retries with 15s intervals. Start it, then
+      // advance fake timers to drain all retries without wall-clock delay.
+      const promise = initializeEmbedding();
+      // 40 retries × 15 000ms = 600 000ms total
+      await vi.advanceTimersByTimeAsync(600_000);
+      await promise;
 
       const logOutput = stdoutSpy.mock.calls
         .map(([chunk]) => chunk.toString())
         .join("");
       expect(logOutput).toContain('"level":"warn"');
+      expect(logOutput).toContain('"level":"error"');
+
+      vi.useRealTimers();
     });
   });
 

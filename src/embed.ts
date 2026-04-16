@@ -179,15 +179,42 @@ async function ensureModel(ollamaUrl: string): Promise<void> {
   }
 }
 
+const INIT_RETRY_INTERVAL_MS = 15_000;
+const INIT_MAX_RETRIES = 40; // 40 × 15s = 10 minutes
+
 /**
  * Startup: verify Ollama connectivity and ensure the embedding model is available.
- * Logs a warning and continues if Ollama is unreachable.
+ *
+ * On first boot the Ollama container may still be starting when the app calls
+ * this function. Rather than silently giving up (which leaves the model
+ * unpulled forever), retry every 15 seconds for up to 10 minutes. Once Ollama
+ * is reachable the model pull starts automatically.
+ *
+ * Runs as a fire-and-forget background task from src/index.ts — never blocks
+ * app startup or request handling.
  */
 export async function initializeEmbedding(): Promise<void> {
-  try {
-    await ensureModel(defaultOllamaUrl);
-  } catch {
-    log.warn("Ollama is unreachable during initialization");
+  for (let attempt = 1; attempt <= INIT_MAX_RETRIES; attempt++) {
+    try {
+      await ensureModel(defaultOllamaUrl);
+      return; // Model is present (or was just pulled). Done.
+    } catch (err) {
+      if (attempt === INIT_MAX_RETRIES) {
+        log.error("Embedding model initialization failed after all retries", {
+          attempts: attempt,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return;
+      }
+      log.warn("Ollama is unreachable during initialization, retrying", {
+        attempt,
+        maxRetries: INIT_MAX_RETRIES,
+        nextRetryMs: INIT_RETRY_INTERVAL_MS,
+      });
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, INIT_RETRY_INTERVAL_MS),
+      );
+    }
   }
 }
 

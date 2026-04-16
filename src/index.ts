@@ -4,7 +4,8 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { config, resolveSessionSecret } from "./config.js";
 import { createLogger } from "./logger.js";
 import { createDbConnection, runMigrations } from "./db/index.js";
-import { createHealthRoute, type ServiceCheckers } from "./web/health.js";
+import { createHealthRoute } from "./web/health.js";
+import { createServiceCheckers } from "./web/service-checkers.js";
 import { createSetupMiddleware, createSetupRoutes } from "./web/setup.js";
 import { createDashboardRoutes } from "./web/dashboard.js";
 import { createBrowseRoutes } from "./web/browse.js";
@@ -35,10 +36,8 @@ async function main(): Promise<void> {
   // Resolve session secret (env var -> DB -> auto-generate)
   const sessionSecret = await resolveSessionSecret(sql);
 
-  // Initialize embedding model (best-effort)
-  initializeEmbedding().catch(() => {
-    log.warn("Embedding model initialization failed — will retry on first use");
-  });
+  // Initialize embedding model (best-effort, retries internally for up to 10 min)
+  initializeEmbedding();
 
   // Create SSE broadcaster
   const broadcaster = createSSEBroadcaster();
@@ -50,37 +49,8 @@ async function main(): Promise<void> {
     });
   });
 
-  // Service checkers for health endpoint
-  const checkers: ServiceCheckers = {
-    checkPostgres: async () => {
-      try {
-        await sql`SELECT 1`;
-        return "connected";
-      } catch {
-        return "disconnected";
-      }
-    },
-    checkOllama: async () => {
-      try {
-        const res = await fetch(config.ollamaUrl, { signal: AbortSignal.timeout(3000) });
-        return res.ok ? "connected" : "disconnected";
-      } catch {
-        return "disconnected";
-      }
-    },
-    checkWhisper: async () => {
-      try {
-        const res = await fetch(config.whisperUrl, { signal: AbortSignal.timeout(3000) });
-        return res.ok ? "connected" : "disconnected";
-      } catch {
-        return "disconnected";
-      }
-    },
-    checkTelegram: async () => {
-      return isBotRunning() ? "polling" : "stopped";
-    },
-    getUptime: () => Math.floor((Date.now() - startTime) / 1000),
-  };
+  // Service checkers for /health endpoint and page-render status bar.
+  const checkers = createServiceCheckers({ sql, startTime, isBotRunning });
 
   // Build the app
   const app = new Hono();

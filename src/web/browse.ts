@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type postgres from "postgres";
 import { renderLayout } from "./layout.js";
+import { getServiceStatus } from "./service-checkers.js";
+import { isBotRunning } from "../telegram.js";
 import {
   browseEntries,
   semanticSearch,
@@ -210,6 +212,9 @@ export function createBrowseRoutes(sql: Sql): Hono {
   const app = new Hono();
 
   app.get("/browse", async (c) => {
+    // Start health check early so it runs in parallel with DB queries below.
+    const healthPromise = getServiceStatus(sql, { isBotRunning });
+
     const url = new URL(c.req.url);
     const rawQuery = url.searchParams.get("q") ?? undefined;
     const category = url.searchParams.get("category") ?? undefined;
@@ -313,7 +318,8 @@ export function createBrowseRoutes(sql: Sql): Hono {
       })();
       </script>` : ""}`;
 
-    return c.html(renderLayout("Browse", content, "/browse"));
+    const healthStatus = await healthPromise;
+    return c.html(renderLayout("Browse", content, "/browse", healthStatus));
   });
 
   // Reclassify all unclassified entries (max 25 per request)

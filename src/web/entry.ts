@@ -3,6 +3,8 @@ import type postgres from "postgres";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 import { renderLayout } from "./layout.js";
+import { getServiceStatus, type HealthStatus } from "./service-checkers.js";
+import { isBotRunning } from "../telegram.js";
 import {
   getEntry,
   updateEntry,
@@ -286,42 +288,45 @@ function render404(): string {
 export function createEntryRoutes(sql: Sql): Hono {
   const app = new Hono();
 
+  const health = (): Promise<HealthStatus> =>
+    getServiceStatus(sql, { isBotRunning });
+
   // View entry
   app.get("/entry/:id", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
     }
 
     const entry = await getEntry(sql, id);
     if (!entry) {
-      return c.html(renderLayout("Not Found", render404()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
     }
 
-    return c.html(renderLayout(entry.name, renderViewPage(entry)));
+    return c.html(renderLayout(entry.name, renderViewPage(entry), "/", await health()));
   });
 
   // Edit form
   app.get("/entry/:id/edit", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
     }
 
     const entry = await getEntry(sql, id);
     if (!entry) {
-      return c.html(renderLayout("Not Found", render404()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
     }
 
     const allTagsList = (await getAllTags(sql)) ?? [];
-    return c.html(renderLayout("Edit — " + entry.name, renderEditPage(entry, allTagsList)));
+    return c.html(renderLayout("Edit — " + entry.name, renderEditPage(entry, allTagsList), "/", await health()));
   });
 
   // Save edit
   app.post("/entry/:id/edit", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
     }
 
     const formData = await c.req.parseBody();
@@ -345,12 +350,12 @@ export function createEntryRoutes(sql: Sql): Hono {
     if (!name) {
       const entry = await getEntry(sql, id);
       if (!entry) {
-        return c.html(renderLayout("Not Found", render404()), 404);
+        return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
       }
       const allTagsList = (await getAllTags(sql)) ?? [];
       const errorEntry = { ...entry, name: "", category, content, tags, fields: submittedFields };
       return c.html(
-        renderLayout("Edit — " + entry.name, renderEditPage(errorEntry, allTagsList, "Name is required")),
+        renderLayout("Edit — " + entry.name, renderEditPage(errorEntry, allTagsList, "Name is required"), "/", await health()),
         422,
       );
     }
@@ -374,7 +379,7 @@ export function createEntryRoutes(sql: Sql): Hono {
   app.post("/entry/:id/delete", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
     }
     // Clean up linked calendar event before soft-delete
     try {
@@ -404,7 +409,7 @@ export function createEntryRoutes(sql: Sql): Hono {
   app.post("/entry/:id/restore", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
     }
     await restoreEntry(sql, id);
     return c.redirect(`/entry/${id}`, 303);
