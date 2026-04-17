@@ -1,20 +1,13 @@
 import type postgres from "postgres";
 import { Bot } from "grammy";
-import { readFile } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createLLMProvider } from "./llm/index.js";
 import {
   classifyText,
   assembleContext,
   isConfident,
   resolveConfidenceThreshold,
   reclassifyEntry,
-  formatContextEntries,
-  assemblePrompt,
-  validateClassificationResponse,
 } from "./classify.js";
-import { generateEmbedding, embedEntry } from "./embed.js";
+import { embedEntry } from "./embed.js";
 import { resolveConfigValue } from "./config.js";
 import { createLogger } from "./logger.js";
 import { processCalendarEvent, getCalendarNames } from "./google-calendar.js";
@@ -25,8 +18,6 @@ const log = createLogger("telegram");
 
 const CATEGORIES = ["People", "Projects", "Tasks", "Ideas", "Reference"];
 const CATEGORY_VALUES = ["people", "projects", "tasks", "ideas", "reference"];
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ---------------------------------------------------------------------------
 // Authorization
@@ -263,12 +254,12 @@ export async function handleTextMessage(
         });
     }
   } catch (error) {
-    log.error("Text handler error", { error: (error as Error)?.message || String(error), stack: (error as Error)?.stack });
-    const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
+    log.error("Text handler error", { error: (error as Error)?.message || String(error) });
     try {
+      const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
       await reply("System temporarily unavailable");
-    } catch (replyError) {
-      log.error("Text handler reply also failed", { error: (replyError as Error)?.message || String(replyError) });
+    } catch {
+      // Can't even reply
     }
   }
 }
@@ -384,7 +375,6 @@ export async function handleVoiceMessage(
     }
 
     // Reply with transcript + classification
-    log.debug("Preparing voice reply", { category: classResult.category, name: classResult.name, confident, hasCompletions: false });
     const actualCategory = completionResult?.reclassifiedCategory
       ? capitalize(completionResult.reclassifiedCategory)
       : capitalize(classResult.category!);
@@ -440,12 +430,12 @@ export async function handleVoiceMessage(
         });
     }
   } catch (error) {
-    log.error("Voice handler error", { error: (error as Error)?.message || String(error), stack: (error as Error)?.stack });
-    const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
+    log.error("Voice handler error", { error: (error as Error)?.message || String(error) });
     try {
+      const reply = (ctx.reply as Function).bind(ctx) as (text: string) => Promise<unknown>;
       await reply("System temporarily unavailable");
-    } catch (replyError) {
-      log.error("Voice handler reply also failed", { error: (replyError as Error)?.message || String(replyError) });
+    } catch {
+      // Can't even reply
     }
   }
 }
