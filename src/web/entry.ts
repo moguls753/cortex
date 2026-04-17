@@ -10,6 +10,7 @@ import {
   updateEntry,
   softDeleteEntry,
   restoreEntry,
+  permanentDeleteEntry,
   getAllTags,
 } from "./entry-queries.js";
 import { embedEntry } from "../embed.js";
@@ -110,6 +111,9 @@ function renderViewPage(entry: {
   if (entry.deleted_at) {
     html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/restore">`;
     html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-primary border border-primary hover:bg-primary hover:text-primary-foreground transition-colors">Restore</button>`;
+    html += `</form>`;
+    html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/permanent-delete" onsubmit="return confirm('Permanently delete this entry? This cannot be undone.')">`;
+    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1">${iconTrash2("size-3")} Delete permanently</button>`;
     html += `</form>`;
   } else {
     html += `<a href="/entry/${escapeHtml(entry.id)}/edit" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Edit</a>`;
@@ -413,6 +417,20 @@ export function createEntryRoutes(sql: Sql): Hono {
     }
     await restoreEntry(sql, id);
     return c.redirect(`/entry/${id}`, 303);
+  });
+
+  // Permanent delete
+  app.post("/entry/:id/permanent-delete", async (c) => {
+    const id = c.req.param("id");
+    if (!UUID_RE.test(id)) {
+      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+    }
+    const entry = await getEntry(sql, id);
+    if (!entry || !entry.deleted_at) {
+      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+    }
+    await permanentDeleteEntry(sql, id);
+    return c.redirect("/trash", 303);
   });
 
   return app;

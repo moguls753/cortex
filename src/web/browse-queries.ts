@@ -6,6 +6,7 @@ type Sql = postgres.Sql;
 export interface BrowseFilters {
   category?: string;
   tag?: string;
+  deleted?: boolean;
 }
 
 export async function browseEntries(
@@ -14,15 +15,16 @@ export async function browseEntries(
 ): Promise<EntryRow[]> {
   const category = filters?.category;
   const tag = filters?.tag;
+  const deleted = filters?.deleted ?? false;
 
   const rows = await sql`
     SELECT id, name, category, content, fields, tags, confidence,
            source, source_type, deleted_at, created_at, updated_at
     FROM entries
-    WHERE deleted_at IS NULL
+    WHERE ${deleted ? sql`deleted_at IS NOT NULL` : sql`deleted_at IS NULL`}
       ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
       ${tag ? sql`AND ${tag} = ANY(tags)` : sql``}
-    ORDER BY updated_at DESC
+    ORDER BY ${deleted ? sql`deleted_at DESC` : sql`updated_at DESC`}
   `;
   return rows as unknown as EntryRow[];
 }
@@ -34,6 +36,7 @@ export async function semanticSearch(
 ): Promise<EntryRow[]> {
   const category = filters?.category;
   const tag = filters?.tag;
+  const deleted = filters?.deleted ?? false;
   const embeddingLiteral = `[${queryEmbedding.join(",")}]`;
 
   const rows = await sql`
@@ -41,7 +44,7 @@ export async function semanticSearch(
            source, source_type, deleted_at, created_at, updated_at,
            1 - (embedding <=> ${embeddingLiteral}::vector(4096)) AS similarity
     FROM entries
-    WHERE deleted_at IS NULL
+    WHERE ${deleted ? sql`deleted_at IS NOT NULL` : sql`deleted_at IS NULL`}
       AND embedding IS NOT NULL
       AND 1 - (embedding <=> ${embeddingLiteral}::vector(4096)) >= 0.6
       ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
@@ -58,31 +61,33 @@ export async function textSearch(
 ): Promise<EntryRow[]> {
   const category = filters?.category;
   const tag = filters?.tag;
+  const deleted = filters?.deleted ?? false;
   const pattern = `%${query}%`;
 
   const rows = await sql`
     SELECT id, name, category, content, fields, tags, confidence,
            source, source_type, deleted_at, created_at, updated_at
     FROM entries
-    WHERE deleted_at IS NULL
+    WHERE ${deleted ? sql`deleted_at IS NOT NULL` : sql`deleted_at IS NULL`}
       AND (name ILIKE ${pattern} OR content ILIKE ${pattern})
       ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
       ${tag ? sql`AND ${tag} = ANY(tags)` : sql``}
-    ORDER BY updated_at DESC
+    ORDER BY ${deleted ? sql`deleted_at DESC` : sql`updated_at DESC`}
   `;
   return rows as unknown as EntryRow[];
 }
 
 export async function getFilterTags(
   sql: Sql,
-  options?: { category?: string },
+  options?: { category?: string; deleted?: boolean },
 ): Promise<string[]> {
   const category = options?.category;
+  const deleted = options?.deleted ?? false;
 
   const rows = await sql`
     SELECT DISTINCT unnest(tags) AS tag
     FROM entries
-    WHERE deleted_at IS NULL
+    WHERE ${deleted ? sql`deleted_at IS NOT NULL` : sql`deleted_at IS NULL`}
       ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
     ORDER BY tag
   `;

@@ -20,7 +20,7 @@ type Sql = postgres.Sql;
 const MAX_VISIBLE_TAGS = 10;
 const MAX_QUERY_LENGTH = 500;
 
-function categoryBadgeClass(category: string | null): string {
+export function categoryBadgeClass(category: string | null): string {
   if (!category) return "badge-unclassified";
   const map: Record<string, string> = {
     people: "badge-people",
@@ -32,7 +32,7 @@ function categoryBadgeClass(category: string | null): string {
   return map[category] ?? "badge-unclassified";
 }
 
-function categoryAbbr(category: string | null): string {
+export function categoryAbbr(category: string | null): string {
   if (!category) return "—";
   const map: Record<string, string> = {
     people: "People",
@@ -44,7 +44,7 @@ function categoryAbbr(category: string | null): string {
   return map[category] ?? "—";
 }
 
-function relativeTime(date: Date): string {
+export function relativeTime(date: Date): string {
   const now = Date.now();
   const diff = now - date.getTime();
   const minutes = Math.floor(diff / 60000);
@@ -56,44 +56,46 @@ function relativeTime(date: Date): string {
   return `${days}d ago`;
 }
 
-function buildUrl(
+export function buildUrl(
   params: { category?: string; tag?: string; q?: string; mode?: string },
+  basePath = "/browse",
 ): string {
   const parts: string[] = [];
   if (params.category) parts.push(`category=${encodeURIComponent(params.category)}`);
   if (params.tag) parts.push(`tag=${encodeURIComponent(params.tag)}`);
   if (params.q) parts.push(`q=${encodeURIComponent(params.q)}`);
   if (params.mode) parts.push(`mode=${encodeURIComponent(params.mode)}`);
-  return parts.length > 0 ? `/browse?${parts.join("&")}` : "/browse";
+  return parts.length > 0 ? `${basePath}?${parts.join("&")}` : basePath;
 }
 
-function renderCategoryTabs(
+export function renderCategoryTabs(
   activeCategory: string | undefined,
   currentTag: string | undefined,
   currentQuery: string | undefined,
   currentMode: string | undefined,
   unclassifiedCount: number,
+  basePath = "/browse",
 ): string {
   const allActive = !activeCategory;
-  const allUrl = buildUrl({ tag: currentTag, q: currentQuery, mode: currentMode });
+  const allUrl = buildUrl({ tag: currentTag, q: currentQuery, mode: currentMode }, basePath);
   let html = `<div class="flex items-center gap-1 flex-wrap">`;
   html += `<a href="${escapeHtml(allUrl)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${allActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">All</a>`;
 
   for (const cat of CATEGORIES) {
     const label = CATEGORY_LABELS[cat]!;
     const isActive = activeCategory === cat;
-    const url = buildUrl({ category: cat, tag: currentTag, q: currentQuery, mode: currentMode });
+    const url = buildUrl({ category: cat, tag: currentTag, q: currentQuery, mode: currentMode }, basePath);
     html += `<a href="${escapeHtml(url)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${isActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">${escapeHtml(label)}</a>`;
   }
 
   // Unclassified tab — only shown when unclassified entries exist
   if (unclassifiedCount > 0) {
     const isActive = activeCategory === "unclassified";
-    const url = buildUrl({ category: "unclassified", tag: currentTag, q: currentQuery, mode: currentMode });
+    const url = buildUrl({ category: "unclassified", tag: currentTag, q: currentQuery, mode: currentMode }, basePath);
     html += `<a href="${escapeHtml(url)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${isActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">Unclassified</a>`;
 
-    // Reclassify button — only when Unclassified tab is active
-    if (isActive) {
+    // Reclassify button — only when Unclassified tab is active and not in trash
+    if (isActive && basePath === "/browse") {
       html += `<span class="text-muted-foreground text-xs select-none">·</span>`;
       html += `<button type="button" id="reclassify-all-btn"
         class="rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wider border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30">
@@ -107,12 +109,13 @@ function renderCategoryTabs(
   return html;
 }
 
-function renderTagPills(
+export function renderTagPills(
   tags: string[],
   activeTag: string | undefined,
   currentCategory: string | undefined,
   currentQuery: string | undefined,
   currentMode: string | undefined,
+  basePath = "/browse",
 ): string {
   if (tags.length === 0) return "";
 
@@ -124,8 +127,8 @@ function renderTagPills(
   for (const tag of visibleTags) {
     const isActive = activeTag === tag;
     const url = isActive
-      ? buildUrl({ category: currentCategory, q: currentQuery, mode: currentMode })
-      : buildUrl({ category: currentCategory, tag, q: currentQuery, mode: currentMode });
+      ? buildUrl({ category: currentCategory, q: currentQuery, mode: currentMode }, basePath)
+      : buildUrl({ category: currentCategory, tag, q: currentQuery, mode: currentMode }, basePath);
     html += `<a href="${escapeHtml(url)}" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors ${isActive ? "border-primary text-primary active" : "border-border text-muted-foreground hover:text-foreground hover:border-foreground"}">${escapeHtml(tag)}</a>`;
   }
 
@@ -134,8 +137,8 @@ function renderTagPills(
     for (const tag of hiddenTags) {
       const isActive = activeTag === tag;
       const url = isActive
-        ? buildUrl({ category: currentCategory, q: currentQuery, mode: currentMode })
-        : buildUrl({ category: currentCategory, tag, q: currentQuery, mode: currentMode });
+        ? buildUrl({ category: currentCategory, q: currentQuery, mode: currentMode }, basePath)
+        : buildUrl({ category: currentCategory, tag, q: currentQuery, mode: currentMode }, basePath);
       html += `<a href="${escapeHtml(url)}" class="rounded-full px-2 py-0.5 text-[10px] border transition-colors ${isActive ? "border-primary text-primary active" : "border-border text-muted-foreground hover:text-foreground hover:border-foreground"}">${escapeHtml(tag)}</a>`;
     }
     html += `</div>`;
@@ -146,14 +149,14 @@ function renderTagPills(
   return html;
 }
 
-function renderSearchBar(
+export function renderSearchBar(
   currentQuery: string | undefined,
   currentCategory: string | undefined,
   currentTag: string | undefined,
+  basePath = "/browse",
 ): string {
-  const actionUrl = "/browse";
   return `
-    <form action="${actionUrl}" method="GET" class="flex items-center gap-2">
+    <form action="${basePath}" method="GET" class="flex items-center gap-2">
       ${currentCategory ? `<input type="hidden" name="category" value="${escapeHtml(currentCategory)}">` : ""}
       ${currentTag ? `<input type="hidden" name="tag" value="${escapeHtml(currentTag)}">` : ""}
       <div class="flex items-center gap-2 flex-1 rounded-md border border-border bg-secondary px-3 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
@@ -163,14 +166,15 @@ function renderSearchBar(
     </form>`;
 }
 
-function renderEntryList(entries: EntryRow[]): string {
+export function renderEntryList(entries: EntryRow[], timeField: "updated_at" | "deleted_at" = "updated_at"): string {
   if (entries.length === 0) return "";
 
   let html = `<div class="space-y-0.5">`;
   for (const entry of entries) {
     const badgeLabel = categoryAbbr(entry.category);
     const badgeClass = categoryBadgeClass(entry.category);
-    const time = relativeTime(entry.updated_at);
+    const timeDate = timeField === "deleted_at" && entry.deleted_at ? entry.deleted_at : entry.updated_at;
+    const time = relativeTime(timeDate);
     html += `
       <a href="/entry/${escapeHtml(entry.id)}" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
         <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 ${badgeClass}">${escapeHtml(badgeLabel)}</span>
@@ -182,11 +186,11 @@ function renderEntryList(entries: EntryRow[]): string {
   return html;
 }
 
-function renderNotice(message: string): string {
+export function renderNotice(message: string): string {
   return `<div class="rounded-md border border-border bg-secondary px-3 py-2 text-xs text-muted-foreground">${escapeHtml(message)}</div>`;
 }
 
-function renderEmptyState(
+export function renderEmptyState(
   hasQuery: boolean,
   hasCategory: boolean,
 ): string {

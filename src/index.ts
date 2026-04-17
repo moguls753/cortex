@@ -12,6 +12,7 @@ import { createBrowseRoutes } from "./web/browse.js";
 import { createEntryRoutes } from "./web/entry.js";
 import { createNewNoteRoutes } from "./web/new-note.js";
 import { createSettingsRoutes } from "./web/settings.js";
+import { createTrashRoutes } from "./web/trash.js";
 import { createMcpHttpHandler } from "./mcp-tools.js";
 import { createDisplayRoutes } from "./display/index.js";
 import { createSSEBroadcaster } from "./web/sse.js";
@@ -69,6 +70,7 @@ async function main(): Promise<void> {
   app.route("/", createHealthRoute(checkers));
   app.route("/", createDashboardRoutes(sql, broadcaster));
   app.route("/", createBrowseRoutes(sql));
+  app.route("/", createTrashRoutes(sql));
   app.route("/", createEntryRoutes(sql));
   app.route("/", createNewNoteRoutes(sql));
   app.route("/", createSettingsRoutes(sql, broadcaster));

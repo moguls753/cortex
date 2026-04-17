@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   iconBrain,
   iconFolderOpen,
+  iconTrash2,
   iconSettings,
   iconSun,
   iconMoon,
@@ -161,6 +162,7 @@ export function renderLayout(
 ): string {
   const nav = [
     { href: "/browse", icon: iconFolderOpen("size-3.5"), label: "Browse" },
+    { href: "/trash", icon: iconTrash2("size-3.5"), label: "Trash" },
     { href: "/settings", icon: iconSettings("size-3.5"), label: "Settings" },
   ];
 

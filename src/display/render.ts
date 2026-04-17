@@ -48,14 +48,21 @@ export async function renderKitchenDisplay(
     resvgInitialized = true;
   }
 
+  // Render at reference width (1872px) preserving the target aspect ratio,
+  // then let Resvg scale to the actual target. This prevents Satori/Resvg
+  // WASM panics when fixed layout pixel values exceed a small canvas.
+  const REF_WIDTH = 1872;
+  const renderWidth = Math.max(width, REF_WIDTH);
+  const renderHeight = Math.round(renderWidth * (height / width));
+
   // Build the Satori element tree
-  const element = buildLayout(data, width, height);
+  const element = buildLayout(data, renderWidth, renderHeight);
 
   // Render to SVG via Satori
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const svg = await satori(element as any, {
-    width,
-    height,
+    width: renderWidth,
+    height: renderHeight,
     fonts: [
       {
         name: "JetBrains Mono",

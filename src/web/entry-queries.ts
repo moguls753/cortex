@@ -59,6 +59,16 @@ export async function restoreEntry(
   `;
 }
 
+export async function permanentDeleteEntry(
+  sql: Sql,
+  id: string,
+): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM entries WHERE id = ${id} AND deleted_at IS NOT NULL
+  `;
+  return result.count > 0;
+}
+
 export async function getAllTags(sql: Sql): Promise<string[]> {
   const rows = await sql`
     SELECT DISTINCT unnest(tags) AS tag
