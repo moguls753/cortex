@@ -10,14 +10,6 @@ import {
   weatherIcon,
 } from "./icons.js";
 
-// ─── Scale Factor ─────────────────────────────────────────────
-// Reference layout is designed for 1872×1404. Scale all pixel values
-// proportionally so the layout renders crisply at any resolution.
-
-const REF_W = 1872;
-const REF_H = 1404;
-let s: (px: number) => number = (px) => px;
-
 // ─── Satori Element Helpers ────────────────────────────────────
 
 type El = {
@@ -47,7 +39,7 @@ function text(style: Record<string, unknown>, content: string): El {
 
 function divider(color = "#1a1a1a"): El {
   return el("div", {
-    style: { height: Math.max(1, s(1)), backgroundColor: color, width: "100%" },
+    style: { height: 1, backgroundColor: color, width: "100%" },
   });
 }
 
@@ -60,7 +52,7 @@ function sectionHeader(title: string, icon: El): El {
       style: {
         display: "flex",
         flexDirection: "column",
-        marginBottom: s(24),
+        marginBottom: 24,
       },
     },
     el(
@@ -69,14 +61,14 @@ function sectionHeader(title: string, icon: El): El {
         style: {
           display: "flex",
           alignItems: "center",
-          gap: s(12),
-          marginBottom: s(8),
+          gap: 12,
+          marginBottom: 8,
         },
       },
       icon,
       text(
         {
-          fontSize: s(24),
+          fontSize: 24,
           fontWeight: 500,
           letterSpacing: "0.15em",
           textTransform: "uppercase",
@@ -91,14 +83,11 @@ function sectionHeader(title: string, icon: El): El {
 function calendarBadge(label: string): El {
   return text(
     {
-      fontSize: s(14),
+      fontSize: 14,
       color: "#888",
       border: "1px solid #888",
-      borderRadius: s(2),
-      paddingTop: Math.max(1, s(1)),
-      paddingBottom: Math.max(1, s(1)),
-      paddingLeft: s(8),
-      paddingRight: s(8),
+      borderRadius: 2,
+      padding: "1px 8px",
       letterSpacing: "0.05em",
     },
     label,
@@ -112,21 +101,21 @@ function eventRow(event: DisplayEvent, large: boolean): El {
       style: {
         display: "flex",
         alignItems: "center",
-        gap: s(24),
+        gap: 24,
       },
     },
     text(
       {
-        fontSize: s(large ? 22 : 18),
+        fontSize: large ? 22 : 18,
         color: "#888",
-        width: s(100),
+        width: 100,
         flexShrink: 0,
       },
       event.time,
     ),
     text(
       {
-        fontSize: s(large ? 26 : 20),
+        fontSize: large ? 26 : 20,
         flex: 1,
         color: large ? "#1a1a1a" : "#555",
         overflow: "hidden",
@@ -145,26 +134,26 @@ function checkbox(done: boolean): El {
       "div",
       {
         style: {
-          width: s(24),
-          height: s(24),
+          width: 24,
+          height: 24,
           backgroundColor: "#1a1a1a",
           color: "#f5f5f5",
-          borderRadius: s(2),
+          borderRadius: 2,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
         },
       },
-      iconCheck(s(14)),
+      iconCheck(14),
     );
   }
   return el("div", {
     style: {
-      width: s(24),
-      height: s(24),
-      border: `${Math.max(1, s(2))}px solid #1a1a1a`,
-      borderRadius: s(2),
+      width: 24,
+      height: 24,
+      border: "2px solid #1a1a1a",
+      borderRadius: 2,
       flexShrink: 0,
     },
   });
@@ -177,7 +166,7 @@ function taskRow(task: DisplayTask): El {
       style: {
         display: "flex",
         alignItems: "flex-start",
-        gap: s(16),
+        gap: 16,
       },
     },
     checkbox(task.done),
@@ -192,7 +181,7 @@ function taskRow(task: DisplayTask): El {
       },
       text(
         {
-          fontSize: s(22),
+          fontSize: 22,
           color: task.done ? "#888" : "#1a1a1a",
           textDecoration: task.done ? "line-through" : "none",
         },
@@ -201,9 +190,9 @@ function taskRow(task: DisplayTask): El {
       task.due
         ? text(
             {
-              fontSize: s(16),
+              fontSize: 16,
               color: "#888",
-              marginTop: s(4),
+              marginTop: 4,
               fontWeight: task.due === "overdue" ? 700 : 400,
             },
             task.due,
@@ -223,7 +212,7 @@ function buildHeader(data: KitchenData): El {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingBottom: s(24),
+        paddingBottom: 24,
         borderBottom: "1px solid #1a1a1a",
       },
     },
@@ -233,12 +222,12 @@ function buildHeader(data: KitchenData): El {
         style: {
           display: "flex",
           alignItems: "center",
-          gap: s(12),
+          gap: 12,
         },
       },
-      iconBrain(s(32)),
+      iconBrain(32),
       text(
-        { fontSize: s(32), fontWeight: 500, letterSpacing: "0.05em" },
+        { fontSize: 32, fontWeight: 500, letterSpacing: "0.05em" },
         "cortex",
       ),
     ),
@@ -248,8 +237,8 @@ function buildHeader(data: KitchenData): El {
         style: {
           display: "flex",
           alignItems: "center",
-          gap: s(32),
-          fontSize: s(24),
+          gap: 32,
+          fontSize: 24,
         },
       },
       text({}, data.date),
@@ -269,8 +258,8 @@ function buildWeatherStrip(data: KitchenData): El | false {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingTop: s(32),
-        paddingBottom: s(32),
+        paddingTop: 32,
+        paddingBottom: 32,
         borderBottom: "1px solid #1a1a1a",
       },
     },
@@ -281,7 +270,7 @@ function buildWeatherStrip(data: KitchenData): El | false {
         style: {
           display: "flex",
           alignItems: "center",
-          gap: s(40),
+          gap: 40,
         },
       },
       el(
@@ -290,10 +279,10 @@ function buildWeatherStrip(data: KitchenData): El | false {
           style: {
             display: "flex",
             alignItems: "center",
-            gap: s(24),
+            gap: 24,
           },
         },
-        weatherIcon(w.weatherCode, s(48)),
+        weatherIcon(w.weatherCode, 48),
         el(
           "div",
           {
@@ -303,10 +292,10 @@ function buildWeatherStrip(data: KitchenData): El | false {
             },
           },
           text(
-            { fontSize: s(64), fontWeight: 300, lineHeight: 1 },
+            { fontSize: 64, fontWeight: 300, lineHeight: 1 },
             `${w.current}\u00B0C`,
           ),
-          text({ fontSize: s(20), color: "#888", marginTop: s(4) }, w.condition),
+          text({ fontSize: 20, color: "#888", marginTop: 4 }, w.condition),
         ),
       ),
       el(
@@ -315,9 +304,9 @@ function buildWeatherStrip(data: KitchenData): El | false {
           style: {
             display: "flex",
             flexDirection: "column",
-            paddingLeft: s(40),
+            paddingLeft: 40,
             borderLeft: "1px solid #ccc",
-            fontSize: s(20),
+            fontSize: 20,
             color: "#888",
           },
         },
@@ -328,7 +317,7 @@ function buildWeatherStrip(data: KitchenData): El | false {
     // Right group: hourly forecasts
     el(
       "div",
-      { style: { display: "flex", gap: s(32) } },
+      { style: { display: "flex", gap: 32 } },
       ...w.hourly.map((h) =>
         el(
           "div",
@@ -339,8 +328,8 @@ function buildWeatherStrip(data: KitchenData): El | false {
               alignItems: "center",
             },
           },
-          text({ fontSize: s(18), color: "#888" }, h.time),
-          text({ fontSize: s(22), marginTop: s(4) }, `${h.temp}\u00B0`),
+          text({ fontSize: 18, color: "#888" }, h.time),
+          text({ fontSize: 22, marginTop: 4 }, `${h.temp}\u00B0`),
         ),
       ),
     ),
@@ -356,10 +345,10 @@ function buildTodaySection(data: KitchenData): El {
       ? [
           text(
             {
-              fontSize: s(22),
+              fontSize: 22,
               color: "#888",
               fontStyle: "italic",
-              marginTop: s(20),
+              marginTop: 20,
             },
             "No events today",
           ),
@@ -369,7 +358,7 @@ function buildTodaySection(data: KitchenData): El {
           ...(overflow > 0
             ? [
                 text(
-                  { fontSize: s(18), color: "#888", marginTop: s(8) },
+                  { fontSize: 18, color: "#888", marginTop: 8 },
                   `+${overflow} more`,
                 ),
               ]
@@ -385,14 +374,14 @@ function buildTodaySection(data: KitchenData): El {
         flexDirection: "column",
       },
     },
-    sectionHeader("Today", iconCalendar(s(24))),
+    sectionHeader("Today", iconCalendar(24)),
     el(
       "div",
       {
         style: {
           display: "flex",
           flexDirection: "column",
-          gap: s(20),
+          gap: 20,
         },
       },
       ...todayContent,
@@ -402,8 +391,8 @@ function buildTodaySection(data: KitchenData): El {
           "div",
           {
             style: {
-              marginTop: s(40),
-              paddingTop: s(32),
+              marginTop: 40,
+              paddingTop: 32,
               borderTop: "1px solid #ccc",
               display: "flex",
               flexDirection: "column",
@@ -411,12 +400,12 @@ function buildTodaySection(data: KitchenData): El {
           },
           text(
             {
-              fontSize: s(20),
+              fontSize: 20,
               fontWeight: 500,
               letterSpacing: "0.15em",
               textTransform: "uppercase",
               color: "#888",
-              marginBottom: s(20),
+              marginBottom: 20,
             },
             "Tomorrow",
           ),
@@ -426,7 +415,7 @@ function buildTodaySection(data: KitchenData): El {
               style: {
                 display: "flex",
                 flexDirection: "column",
-                gap: s(16),
+                gap: 16,
               },
             },
             ...data.tomorrowEvents.map((e) => eventRow(e, false)),
@@ -446,15 +435,15 @@ function buildTaskSection(data: KitchenData): El {
               style: {
                 display: "flex",
                 alignItems: "center",
-                gap: s(8),
-                marginTop: s(20),
+                gap: 8,
+                marginTop: 20,
                 color: "#888",
               },
             },
-            iconCheck(s(20)),
+            iconCheck(20),
             text(
               {
-                fontSize: s(22),
+                fontSize: 22,
                 fontStyle: "italic",
               },
               "All clear",
@@ -469,19 +458,19 @@ function buildTaskSection(data: KitchenData): El {
       style: {
         flex: 1,
         borderLeft: "1px solid #ccc",
-        paddingLeft: s(48),
+        paddingLeft: 48,
         display: "flex",
         flexDirection: "column",
       },
     },
-    sectionHeader("Don't Forget", iconCheckSquare(s(24))),
+    sectionHeader("Don't Forget", iconCheckSquare(24)),
     el(
       "div",
       {
         style: {
           display: "flex",
           flexDirection: "column",
-          gap: s(20),
+          gap: 20,
         },
       },
       ...taskContent,
@@ -496,9 +485,9 @@ function buildFooter(data: KitchenData): El {
       style: {
         display: "flex",
         justifyContent: "space-between",
-        paddingTop: s(24),
+        paddingTop: 24,
         borderTop: "1px solid #1a1a1a",
-        fontSize: s(14),
+        fontSize: 14,
         color: "#888",
       },
     },
@@ -514,9 +503,6 @@ export function buildLayout(
   width: number,
   height: number,
 ): El {
-  const factor = Math.min(width / REF_W, height / REF_H);
-  s = (px) => Math.round(px * factor);
-
   const header = buildHeader(data);
   const weatherStrip = buildWeatherStrip(data);
   const mainContent = el(
@@ -525,8 +511,8 @@ export function buildLayout(
       style: {
         flex: 1,
         display: "flex",
-        gap: s(48),
-        paddingTop: s(32),
+        gap: 48,
+        paddingTop: 32,
         overflow: "hidden",
       },
     },
@@ -543,7 +529,7 @@ export function buildLayout(
         height,
         backgroundColor: "#f5f5f5",
         color: "#1a1a1a",
-        padding: s(48),
+        padding: 48,
         display: "flex",
         flexDirection: "column",
         fontFamily: "JetBrains Mono",
