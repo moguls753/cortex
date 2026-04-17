@@ -259,23 +259,25 @@ function renderDigest(
 
 function renderCapture(): string {
   return `
-    <form id="capture-form" class="relative">
-      <div class="flex items-center gap-3 rounded-md border border-border bg-secondary px-3 py-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
-        <span class="text-primary text-sm select-none shrink-0">&gt;</span>
-        <input type="text" name="text" id="capture-input"
-          placeholder="capture a thought..."
-          autocomplete="off"
-          class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50 font-sans">
-        <button type="submit" id="capture-submit"
-          class="flex items-center text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors shrink-0">
-          ${iconCornerDownLeft("size-3.5")}
-        </button>
-      </div>
-      <div class="flex items-center justify-between mt-1 min-h-4">
-        <div id="capture-feedback" class="text-[11px] pl-3"></div>
-        <a href="/new" class="text-[10px] text-muted-foreground hover:text-primary transition-colors">full editor</a>
-      </div>
-    </form>`;
+    <div class="flex items-start gap-2">
+      <form id="capture-form" class="flex-1">
+        <div class="flex items-center gap-3 rounded-md border border-border bg-secondary px-3 py-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
+          <span class="text-primary text-sm select-none shrink-0">&gt;</span>
+          <input type="text" name="text" id="capture-input"
+            placeholder="capture a thought..."
+            autocomplete="off"
+            class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50 font-sans">
+          <button type="submit" id="capture-submit"
+            class="flex items-center text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors shrink-0">
+            ${iconCornerDownLeft("size-3.5")}
+          </button>
+        </div>
+        <div id="capture-feedback" class="text-[11px] pl-3 min-h-4 mt-1"></div>
+      </form>
+      <a href="/new" class="flex items-center gap-1 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:text-primary hover:border-primary transition-colors shrink-0">
+        <span class="text-primary">+</span><span class="hidden sm:inline"> New Note</span>
+      </a>
+    </div>`;
 }
 
 function renderStats(stats: {
