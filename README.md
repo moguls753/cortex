@@ -19,11 +19,12 @@
 ## Features
 
 - **Capture** - Telegram bot with text and voice (faster-whisper), web dashboard with quick capture and full editor, MCP server
-- **Intelligence** - LLM classification into 5 categories with confidence scoring, context-aware (uses recent + similar entries), inline Telegram buttons for low-confidence entries, `/fix` to reclassify
+- **Intelligence** - LLM classification into 5 categories with confidence scoring, context-aware (uses recent + similar entries), inline Telegram buttons for low-confidence entries, `/fix` to reclassify, automatic task completion detection
 - **Search** - semantic search via pgvector + qwen3-embedding with text fallback, filter by category/tags/date, multilingual (EN/DE)
 - **Google Calendar** - automatic event creation from classified entries, multi-calendar support with LLM-based routing
 - **Digests** - daily briefing and weekly review, delivered by email and shown on the dashboard
-- **Self-hosted** - local embeddings, local voice transcription, LLM-agnostic (Anthropic, OpenAI, or any compatible endpoint), soft delete, 7 MCP tools
+- **E-ink display** - PNG endpoint for e-ink devices (e.g. TRMNL) showing today's calendar, pending tasks, and weather
+- **Self-hosted** - local embeddings, local voice transcription, LLM-agnostic (Anthropic, OpenAI, or any compatible endpoint), 7 MCP tools
 
 ## Quick Start
 
@@ -104,7 +105,7 @@ Stack: Node.js, TypeScript, Hono, PostgreSQL + pgvector + Drizzle ORM, Ollama, g
 
 ```bash
 npm install && npm run dev    # local dev
-npm test                      # 318 tests
+npm test                      # all tests
 npm run test:unit             # fast, no Docker
 npm run test:integration      # needs Docker (testcontainers)
 ```
