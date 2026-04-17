@@ -114,4 +114,4 @@ Architecture, schema, and prompt contracts are documented in [ARCHITECTURE.md](A
 
 ## License
 
-TBD
+[AGPL-3.0](LICENSE)
