@@ -135,7 +135,7 @@ function renderViewPage(entry: {
 
   // Content
   if (renderedContent) {
-    html += `<div class="rounded-md border border-border bg-card p-4 prose-sm">${renderedContent}</div>`;
+    html += `<div class="rounded-md border border-border bg-card p-4 prose prose-sm">${renderedContent}</div>`;
   }
 
   // Category-specific fields

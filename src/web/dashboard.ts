@@ -271,7 +271,10 @@ function renderCapture(): string {
           ${iconCornerDownLeft("size-3.5")}
         </button>
       </div>
-      <div id="capture-feedback" class="text-[11px] pl-3 min-h-4 mt-1"></div>
+      <div class="flex items-center justify-between mt-1 min-h-4">
+        <div id="capture-feedback" class="text-[11px] pl-3"></div>
+        <a href="/new" class="text-[10px] text-muted-foreground hover:text-primary transition-colors">full editor</a>
+      </div>
     </form>`;
 }
 

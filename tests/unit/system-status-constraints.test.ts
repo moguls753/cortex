@@ -46,6 +46,7 @@ const ALLOWED_DEPS = new Set<string>([
 
 const ALLOWED_DEV_DEPS = new Set<string>([
   "@tailwindcss/cli",
+  "@tailwindcss/typography",
   "@testcontainers/postgresql",
   "@types/bcryptjs",
   "@types/node",
