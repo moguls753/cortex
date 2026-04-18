@@ -35,6 +35,7 @@ const ALLOWED_DEPS = new Set<string>([
   "drizzle-orm",
   "grammy",
   "hono",
+  "i18next",
   "marked",
   "node-cron",
   "nodemailer",

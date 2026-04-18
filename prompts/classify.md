@@ -36,9 +36,15 @@ Each category has a fixed set of fields. Use ONLY these field names. Set values 
 
 For tasks: infer due_date from the input if possible. "heute" / "today" = {today}. "morgen" / "tomorrow" = {tomorrow}. If no date is mentioned, set due_date to null.
 For people: put the key facts in context, and any follow-up actions in follow_ups.
-For projects: status should be one of "active", "paused", "completed", or null.
-For tasks: status should be one of "pending", "done", or null.
 For all categories: notes = additional details not captured in other fields (times, locations, context).
+
+## Enum-valued fields — English only
+
+These fields hold enum keys that power the UI. They must be emitted in English regardless of {output_language}, overriding the general "structured output in {output_language}" rule for these specific fields. Free-text fields (`notes`, `context`, `oneliner`, `next_action`, `follow_ups`) remain governed by {output_language}.
+
+- **projects.status** must be emitted as exactly one of `"active"`, `"paused"`, `"completed"`, or `null`.
+- **tasks.status** must be emitted as exactly one of `"pending"`, `"done"`, or `null`.
+- **category** (top-level) must be emitted as exactly one of `"people"`, `"projects"`, `"tasks"`, `"ideas"`, or `"reference"`.
 
 ## Output format
 

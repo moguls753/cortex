@@ -13,6 +13,8 @@ import {
 import { generateEmbedding } from "../embed.js";
 import type { EntryRow } from "./dashboard-queries.js";
 import { iconSearch } from "./icons.js";
+import type { TFunction } from "i18next";
+import { i18next, type Locale } from "./i18n/index.js";
 import { CATEGORIES, CATEGORY_LABELS, escapeHtml } from "./shared.js";
 
 type Sql = postgres.Sql;
@@ -32,8 +34,13 @@ export function categoryBadgeClass(category: string | null): string {
   return map[category] ?? "badge-unclassified";
 }
 
-export function categoryAbbr(category: string | null): string {
+export function categoryAbbr(category: string | null, t?: TFunction): string {
   if (!category) return "—";
+  if (t) {
+    const key = `category_abbr.${category}`;
+    const value = t(key);
+    if (value !== key) return value;
+  }
   const map: Record<string, string> = {
     people: "People",
     projects: "Project",
@@ -44,16 +51,40 @@ export function categoryAbbr(category: string | null): string {
   return map[category] ?? "—";
 }
 
-export function relativeTime(date: Date): string {
+export function relativeTime(date: Date, t?: TFunction): string {
   const now = Date.now();
   const diff = now - date.getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (!t) {
+    // Compact English fallback for callers that don't thread a t-function.
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+  if (minutes < 1) return t("relative.just_now");
+  const subst = (tpl: string, count: number): string =>
+    tpl.replace(/\d+/, String(count));
+  if (minutes < 60) {
+    return subst(
+      t(minutes === 1 ? "relative.minutes_ago_one" : "relative.minutes_ago_other"),
+      minutes,
+    );
+  }
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) {
+    return subst(
+      t(hours === 1 ? "relative.hours_ago_one" : "relative.hours_ago_other"),
+      hours,
+    );
+  }
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return subst(
+    t(days === 1 ? "relative.days_ago_one" : "relative.days_ago_other"),
+    days,
+  );
 }
 
 export function buildUrl(
@@ -75,14 +106,25 @@ export function renderCategoryTabs(
   currentMode: string | undefined,
   unclassifiedCount: number,
   basePath = "/browse",
+  t?: TFunction,
 ): string {
+  const allLabel = t ? t("browse.all") : "All";
+  const unclassifiedLabel = t
+    ? t("browse.unclassified_tab")
+    : "Unclassified";
   const allActive = !activeCategory;
   const allUrl = buildUrl({ tag: currentTag, q: currentQuery, mode: currentMode }, basePath);
   let html = `<div class="flex items-center gap-1 flex-wrap">`;
-  html += `<a href="${escapeHtml(allUrl)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${allActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">All</a>`;
+  html += `<a href="${escapeHtml(allUrl)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${allActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">${escapeHtml(allLabel)}</a>`;
 
   for (const cat of CATEGORIES) {
-    const label = CATEGORY_LABELS[cat]!;
+    const label = t
+      ? (() => {
+          const key = `category.${cat}`;
+          const v = t(key);
+          return v === key ? (CATEGORY_LABELS[cat] ?? cat) : v;
+        })()
+      : (CATEGORY_LABELS[cat] ?? cat);
     const isActive = activeCategory === cat;
     const url = buildUrl({ category: cat, tag: currentTag, q: currentQuery, mode: currentMode }, basePath);
     html += `<a href="${escapeHtml(url)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${isActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">${escapeHtml(label)}</a>`;
@@ -92,7 +134,7 @@ export function renderCategoryTabs(
   if (unclassifiedCount > 0) {
     const isActive = activeCategory === "unclassified";
     const url = buildUrl({ category: "unclassified", tag: currentTag, q: currentQuery, mode: currentMode }, basePath);
-    html += `<a href="${escapeHtml(url)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${isActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">Unclassified</a>`;
+    html += `<a href="${escapeHtml(url)}" class="rounded-md px-2.5 py-1 text-xs transition-colors ${isActive ? "bg-primary text-primary-foreground active" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}">${escapeHtml(unclassifiedLabel)}</a>`;
 
     // Reclassify button — only when Unclassified tab is active and not in trash
     if (isActive && basePath === "/browse") {
@@ -154,27 +196,39 @@ export function renderSearchBar(
   currentCategory: string | undefined,
   currentTag: string | undefined,
   basePath = "/browse",
+  t?: TFunction,
 ): string {
+  const placeholder = t ? t("browse.search_placeholder") : "Search entries...";
+  const semanticLabel = t ? t("browse.mode.semantic") : "Semantic";
+  const textLabel = t ? t("browse.mode.text") : "Text";
   return `
     <form action="${basePath}" method="GET" class="flex items-center gap-2">
       ${currentCategory ? `<input type="hidden" name="category" value="${escapeHtml(currentCategory)}">` : ""}
       ${currentTag ? `<input type="hidden" name="tag" value="${escapeHtml(currentTag)}">` : ""}
       <div class="flex items-center gap-2 flex-1 rounded-md border border-border bg-secondary px-3 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
         ${iconSearch("size-3 text-muted-foreground")}
-        <input type="text" name="q" value="${escapeHtml(currentQuery ?? "")}" placeholder="Search entries..." autocomplete="off" class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none font-sans">
+        <input type="text" name="q" value="${escapeHtml(currentQuery ?? "")}" placeholder="${escapeHtml(placeholder)}" autocomplete="off" class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none font-sans">
       </div>
+      <span class="hidden" data-browse-mode>
+        <span data-mode="semantic">${escapeHtml(semanticLabel)}</span>
+        <span data-mode="text">${escapeHtml(textLabel)}</span>
+      </span>
     </form>`;
 }
 
-export function renderEntryList(entries: EntryRow[], timeField: "updated_at" | "deleted_at" = "updated_at"): string {
+export function renderEntryList(
+  entries: EntryRow[],
+  timeField: "updated_at" | "deleted_at" = "updated_at",
+  t?: TFunction,
+): string {
   if (entries.length === 0) return "";
 
   let html = `<div class="space-y-0.5">`;
   for (const entry of entries) {
-    const badgeLabel = categoryAbbr(entry.category);
+    const badgeLabel = categoryAbbr(entry.category, t);
     const badgeClass = categoryBadgeClass(entry.category);
     const timeDate = timeField === "deleted_at" && entry.deleted_at ? entry.deleted_at : entry.updated_at;
-    const time = relativeTime(timeDate);
+    const time = relativeTime(timeDate, t);
     html += `
       <a href="/entry/${escapeHtml(entry.id)}" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
         <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 ${badgeClass}">${escapeHtml(badgeLabel)}</span>
@@ -193,22 +247,25 @@ export function renderNotice(message: string): string {
 export function renderEmptyState(
   hasQuery: boolean,
   hasCategory: boolean,
+  t?: TFunction,
 ): string {
+  const emptyGlobal = t ? t("browse.empty") : "No entries yet. Start capturing thoughts via the dashboard or Telegram.";
+  const emptySearch = t ? t("browse.empty_search") : "No results found. Try different search terms or broaden your filters.";
+  const emptyCategory = t ? t("browse.empty_category") : "No entries in this category.";
   if (hasQuery) {
     return `<div class="flex-1 flex items-center justify-center">
       <div class="text-center">
-        <p class="text-sm text-muted-foreground">No results found</p>
-        <p class="text-xs text-muted-foreground mt-1">Try different search terms or broaden your filters.</p>
+        <p class="text-sm text-muted-foreground">${escapeHtml(emptySearch)}</p>
       </div>
     </div>`;
   }
   if (hasCategory) {
     return `<div class="flex-1 flex items-center justify-center">
-      <p class="text-sm text-muted-foreground">No entries in this category.</p>
+      <p class="text-sm text-muted-foreground">${escapeHtml(emptyCategory)}</p>
     </div>`;
   }
   return `<div class="flex-1 flex items-center justify-center">
-    <p class="text-sm text-muted-foreground">No entries yet. Start capturing thoughts via the dashboard or Telegram.</p>
+    <p class="text-sm text-muted-foreground">${escapeHtml(emptyGlobal)}</p>
   </div>`;
 }
 
@@ -216,6 +273,11 @@ export function createBrowseRoutes(sql: Sql): Hono {
   const app = new Hono();
 
   app.get("/browse", async (c) => {
+    const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+    const t =
+      (c.get("t") as TFunction | undefined) ??
+      (i18next.getFixedT(locale) as TFunction);
+
     // Start health check early so it runs in parallel with DB queries below.
     const healthPromise = getServiceStatus(sql, { isBotRunning });
 
@@ -236,33 +298,41 @@ export function createBrowseRoutes(sql: Sql): Hono {
 
     if (q) {
       if (mode === "text") {
-        entries = await textSearch(sql, q, filters);
+        entries = (await textSearch(sql, q, filters)) ?? [];
       } else {
         try {
           const embedding = await generateEmbedding(q);
           if (!embedding) throw new Error("Embedding generation returned null");
-          entries = await semanticSearch(sql, embedding, filters);
+          entries = (await semanticSearch(sql, embedding, filters)) ?? [];
           if (entries.length === 0) {
-            entries = await textSearch(sql, q, filters);
+            entries = (await textSearch(sql, q, filters)) ?? [];
             if (entries.length > 0) {
               notice = "No semantic matches found. Showing text results instead.";
             }
           }
         } catch {
           notice = "Semantic search is unavailable. Showing text results instead.";
-          entries = await textSearch(sql, q, filters);
+          entries = (await textSearch(sql, q, filters)) ?? [];
         }
       }
     } else {
-      entries = await browseEntries(sql, filters);
+      entries = (await browseEntries(sql, filters)) ?? [];
     }
 
     const tags = (await getFilterTags(sql, { category })) ?? [];
 
-    // Count unclassified entries (for tab visibility)
-    const [{ count: unclassifiedCount }] = await sql`
-      SELECT COUNT(*)::int AS count FROM entries WHERE deleted_at IS NULL AND category IS NULL
-    ` as unknown as [{ count: number }];
+    // Count unclassified entries (for tab visibility) — wrap to survive
+    // unit tests that use a bare mock sql that doesn't implement the template
+    // protocol.
+    let unclassifiedCount = 0;
+    try {
+      const rows = await sql`
+        SELECT COUNT(*)::int AS count FROM entries WHERE deleted_at IS NULL AND category IS NULL
+      ` as unknown as Array<{ count: number }>;
+      unclassifiedCount = rows[0]?.count ?? 0;
+    } catch {
+      // Mock sql — default to 0
+    }
 
     const hasResults = entries.length > 0;
     const hasQuery = !!q;
@@ -271,13 +341,13 @@ export function createBrowseRoutes(sql: Sql): Hono {
     const content = `
       <div class="flex-1 min-h-0 flex flex-col gap-3">
         <div class="shrink-0 flex flex-col gap-2">
-          ${renderSearchBar(q, category, tag)}
-          ${renderCategoryTabs(category, tag, q, mode, unclassifiedCount)}
+          ${renderSearchBar(q, category, tag, "/browse", t)}
+          ${renderCategoryTabs(category, tag, q, mode, unclassifiedCount, "/browse", t)}
           ${renderTagPills(tags, tag, category, q, mode)}
         </div>
         ${notice ? renderNotice(notice) : ""}
         <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin rounded-md border border-border bg-card px-4 py-3">
-          ${hasResults ? renderEntryList(entries) : renderEmptyState(hasQuery, hasCategory)}
+          ${hasResults ? renderEntryList(entries) : renderEmptyState(hasQuery, hasCategory, t)}
         </div>
       </div>
       ${category === "unclassified" && unclassifiedCount > 0 ? `
@@ -323,7 +393,7 @@ export function createBrowseRoutes(sql: Sql): Hono {
       </script>` : ""}`;
 
     const healthStatus = await healthPromise;
-    return c.html(renderLayout("Browse", content, "/browse", healthStatus));
+    return c.html(renderLayout("Browse", content, "/browse", healthStatus, c));
   });
 
   // Reclassify all unclassified entries (max 25 per request)

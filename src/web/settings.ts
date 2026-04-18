@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import type postgres from "postgres";
+import type { TFunction } from "i18next";
 import { CronExpressionParser } from "cron-parser";
 import { renderLayout } from "./layout.js";
 import { getServiceStatus } from "./service-checkers.js";
 import { getAllSettings, saveAllSettings } from "./settings-queries.js";
 import { escapeHtml } from "./shared.js";
+import { i18next, type Locale } from "./i18n/index.js";
 import { getLLMConfig, saveLLMConfig } from "../llm/config.js";
 import type { LLMConfig } from "../llm/config.js";
 import { restartBot, isBotRunning } from "../telegram.js";
@@ -195,6 +197,11 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
   const app = new Hono();
 
   app.get("/settings", async (c) => {
+    const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+    const t =
+      (c.get("t") as TFunction | undefined) ??
+      (i18next.getFixedT(locale) as TFunction);
+
     const healthPromise = getServiceStatus(sql, { isBotRunning });
     const dbSettings = (await getAllSettings(sql)) ?? {};
 
@@ -210,6 +217,12 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     const email = resolveEffective(dbSettings, "digest_email_to", DEFAULTS.digest_email_to);
     const chatIds = resolveChatIds(dbSettings);
     const outputLanguage = resolveEffective(dbSettings, "output_language", DEFAULTS.output_language);
+    // ui_language — user's interface language preference. Empty string =
+    // "Auto (browser)", meaning fall through to Accept-Language on each request.
+    // Unrecognized values (e.g. "fr" from a hand edit) are treated as unset in
+    // the dropdown but preserved in the DB until the user explicitly changes it.
+    const uiLanguageRaw = dbSettings.ui_language ?? "";
+    const uiLanguage = ["en", "de"].includes(uiLanguageRaw) ? uiLanguageRaw : "";
 
     // Telegram bot token
     const telegramBotToken = dbSettings.telegram_bot_token || "";
@@ -299,23 +312,38 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     const error = c.req.query("error") || "";
     const warning = c.req.query("warning") || "";
 
+    // Map well-known flash keys through t(). Unknown strings (e.g. free-form
+    // errors from validation) display as-is. "saved" → t("settings.flash.saved"),
+    // "error" → t("settings.flash.error"), "warning" → t("settings.flash.warning").
+    function localizeFlash(value: string, defaultKey: string): string {
+      const key = `settings.flash.${value}`;
+      const translated = t(key);
+      if (translated !== key) return translated;
+      // Fall back to default key or raw value
+      const fallback = t(defaultKey);
+      return fallback !== defaultKey ? fallback : value;
+    }
+    const successText = success ? localizeFlash(success, "settings.flash.saved") : "";
+    const errorText = error ? localizeFlash(error, "settings.flash.error") : "";
+    const warningText = warning ? localizeFlash(warning, "settings.flash.warning") : "";
+
     const flashHtml = [
-      success
+      successText
         ? `<div class="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
             ${iconCheck("size-3 text-primary")}
-            <span>${escapeHtml(success)}</span>
+            <span>${escapeHtml(successText)}</span>
           </div>`
         : "",
-      error
+      errorText
         ? `<div class="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             ${iconX("size-3 text-destructive")}
-            <span>${escapeHtml(error)}</span>
+            <span>${escapeHtml(errorText)}</span>
           </div>`
         : "",
-      warning
+      warningText
         ? `<div class="flex items-center gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-600 dark:text-yellow-400">
             ${iconAlertTriangle("size-3")}
-            <span>${escapeHtml(warning)}</span>
+            <span>${escapeHtml(warningText)}</span>
           </div>`
         : "",
     ]
@@ -341,16 +369,49 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       <form method="POST" action="/settings" class="space-y-3 pb-4">
 
         <div class="flex items-center justify-between">
-          <h1 class="text-lg font-medium tracking-tight">Settings</h1>
+          <h1 class="text-lg font-medium tracking-tight">${escapeHtml(t("settings.heading"))}</h1>
         </div>
 
         ${flashHtml}
+
+        <!-- ═══ Language ═══ -->
+        <div class="rounded-md border border-border bg-card p-4">
+          <div class="flex items-center gap-2 mb-3">
+            ${iconShield("size-3 text-primary")}
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">${escapeHtml(t("settings.section.language"))}</span>
+            <span class="flex-1 h-px bg-border"></span>
+          </div>
+          <p class="text-[11px] text-muted-foreground mb-3">${escapeHtml(t("settings.language.description"))}</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label for="ui_language" class="text-xs text-muted-foreground">${escapeHtml(t("settings.language.interface_label"))}</label>
+              <select id="ui_language" name="ui_language"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                <option value=""${uiLanguage === "" ? " selected" : ""}>${escapeHtml(t("settings.language.auto"))}</option>
+                <option value="en"${uiLanguage === "en" ? " selected" : ""}>English</option>
+                <option value="de"${uiLanguage === "de" ? " selected" : ""}>Deutsch</option>
+              </select>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label for="output_language" class="text-xs text-muted-foreground">${escapeHtml(t("settings.language.output_label"))}</label>
+              <select id="output_language" name="output_language"
+                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                ${LANGUAGE_OPTIONS.map(lang =>
+                  `<option value="${lang}"${outputLanguage === lang ? " selected" : ""}>${lang}</option>`
+                ).join("")}
+                ${!LANGUAGE_OPTIONS.includes(outputLanguage)
+                  ? `<option value="${escapeHtml(outputLanguage)}" selected>${escapeHtml(outputLanguage)}</option>`
+                  : ""}
+              </select>
+            </div>
+          </div>
+        </div>
 
         <!-- ═══ Telegram ═══ -->
         <div class="rounded-md border border-border bg-card p-4">
           <div class="flex items-center gap-2 mb-3">
             ${iconShield("size-3 text-primary")}
-            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Telegram</span>
+            <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">${escapeHtml(t("settings.section.telegram"))}</span>
             <span class="flex-1 h-px bg-border"></span>
           </div>
           <div class="space-y-3">
@@ -593,21 +654,6 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
                 class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-4 mt-3">
-            <div class="flex flex-col gap-1.5">
-              <label for="output_language" class="text-xs text-muted-foreground">Output Language</label>
-              <select id="output_language" name="output_language"
-                class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
-                ${LANGUAGE_OPTIONS.map(lang =>
-                  `<option value="${lang}"${outputLanguage === lang ? " selected" : ""}>${lang}</option>`
-                ).join("")}
-                ${!LANGUAGE_OPTIONS.includes(outputLanguage)
-                  ? `<option value="${escapeHtml(outputLanguage)}" selected>${escapeHtml(outputLanguage)}</option>`
-                  : ""}
-              </select>
-              <span class="text-[10px] text-muted-foreground">Digests, classification names, and tags</span>
-            </div>
-          </div>
           <div class="mt-3 flex items-center gap-2">
             <span class="text-xs text-muted-foreground">Generate now</span>
             <button type="button" id="trigger-daily"
@@ -824,7 +870,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
           <button type="submit"
             class="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
             ${iconCheck("size-3")}
-            Save All
+            ${escapeHtml(t("button.save"))}
           </button>
         </div>
       </form>
@@ -1349,7 +1395,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
     </script>`;
 
     const healthStatus = await healthPromise;
-    return c.html(renderLayout("Settings", content, "/settings", healthStatus));
+    return c.html(renderLayout("Settings", content, "/settings", healthStatus, c));
   });
 
   app.post("/settings", async (c) => {
@@ -1379,6 +1425,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       google_calendar_id: (body.google_calendar_id as string) || "",
       google_calendar_default_duration: (body.google_calendar_default_duration as string) || "",
       output_language: (body.output_language as string) || DEFAULTS.output_language,
+      ui_language: (body.ui_language as string | undefined) ?? "",
       google_calendars: Object.keys(calendars).length > 0 ? JSON.stringify(calendars) : "",
       google_calendar_default: (body.google_calendar_default as string) || "",
       display_enabled: (body.display_enabled as string) || "",
@@ -1437,6 +1484,14 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       google_calendar_id: form.google_calendar_id,
       google_calendar_default_duration: form.google_calendar_default_duration,
       output_language: form.output_language,
+      // Allow-list ui_language values: "" (Auto), "en", "de". Anything else
+      // is coerced to empty string ("Auto") — defense-in-depth in case a
+      // crafted form submission or DB edit sends something unexpected.
+      ui_language: (["", "en", "de"] as const).includes(
+        form.ui_language as "" | "en" | "de",
+      )
+        ? form.ui_language
+        : "",
       google_calendars: form.google_calendars,
       google_calendar_default: form.google_calendar_default,
       display_enabled: form.display_enabled,
@@ -1472,7 +1527,7 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
       warning = "Could not connect to the configured Ollama endpoint. Embedding generation may fail.";
     }
 
-    const params = new URLSearchParams({ success: "Settings saved" });
+    const params = new URLSearchParams({ success: "saved" });
     if (warning) params.set("warning", warning);
 
     return c.redirect(`/settings?${params.toString()}`, 302);

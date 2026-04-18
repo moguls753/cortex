@@ -5,6 +5,12 @@ export async function sendDigestEmail(options: {
   body: string;
   to: string;
   from: string;
+  /**
+   * Optional display name prepended to the `from` address for the SMTP
+   * envelope (e.g. `"Cortex <noreply@example.com>"`). Already-formatted
+   * `from` values (those containing `<`) are passed through unchanged.
+   */
+  fromName?: string;
   smtp: { host: string; port: number; user: string; pass: string };
 }): Promise<void> {
   const transport = nodemailer.createTransport({
@@ -16,8 +22,13 @@ export async function sendDigestEmail(options: {
     },
   });
 
+  const envelopeFrom =
+    options.fromName && options.from && !options.from.includes("<")
+      ? `${options.fromName} <${options.from}>`
+      : options.from;
+
   await transport.sendMail({
-    from: options.from,
+    from: envelopeFrom,
     to: options.to,
     subject: options.subject,
     text: options.body,

@@ -13,6 +13,15 @@ import { createLogger } from "./logger.js";
 import { processCalendarEvent, getCalendarNames } from "./google-calendar.js";
 import { getAllSettings } from "./web/settings-queries.js";
 import { detectTaskCompletion, formatCompletionReply } from "./task-completion.js";
+import { i18next, type Locale } from "./web/i18n/index.js";
+import type { TFunction } from "i18next";
+
+async function resolveTelegramT(sql: postgres.Sql): Promise<TFunction> {
+  const raw = await resolveConfigValue("ui_language", sql).catch(() => undefined);
+  const locale: Locale =
+    raw === "en" || raw === "de" ? (raw as Locale) : "en";
+  return i18next.getFixedT(locale) as TFunction;
+}
 
 const log = createLogger("telegram");
 
@@ -65,12 +74,14 @@ function formatConfidence(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
 }
 
-function buildInlineKeyboard(entryId: string) {
+function buildInlineKeyboard(entryId: string, t?: TFunction) {
+  // callback_data stays English — the category key is used by the correction
+  // handler to update the DB. Only the displayed `text` is localized.
   return {
     inline_keyboard: [
-      CATEGORIES.map((label, i) => ({
-        text: label,
-        callback_data: `correct:${entryId}:${CATEGORY_VALUES[i]}`,
+      CATEGORY_VALUES.map((key, i) => ({
+        text: t ? t(`category.${key}`) : CATEGORIES[i]!,
+        callback_data: `correct:${entryId}:${key}`,
       })),
     ],
   };
@@ -199,19 +210,22 @@ export async function handleTextMessage(
 
     // Reply
     const reply = (ctx.reply as Function).bind(ctx) as (text: string, options?: unknown) => Promise<unknown>;
+    const t = await resolveTelegramT(sql);
     const actualCategory = completionResult?.reclassifiedCategory
       ? capitalize(completionResult.reclassifiedCategory)
       : capitalize(classResult.category!);
     const nameStr = classResult.name;
     const pct = formatConfidence(classResult.confidence!);
+    const savedAs = t("telegram.saved_as");
+    const bestGuess = t("telegram.saved_as_low_confidence");
 
     const hasCompletions = completionResult &&
       (completionResult.autoCompleted.length > 0 || completionResult.needsConfirmation.length > 0);
 
     if (hasCompletions) {
       const classText = confident
-        ? `✅ Filed as ${actualCategory} → ${nameStr} (${pct})`
-        : `❓ Best guess: ${actualCategory} → ${nameStr} (${pct})`;
+        ? `✅ ${savedAs} ${actualCategory} → ${nameStr} (${pct})`
+        : `❓ ${bestGuess}: ${actualCategory} → ${nameStr} (${pct})`;
       const formatted = formatCompletionReply({
         classificationText: classText,
         autoCompleted: completionResult!.autoCompleted,
@@ -220,7 +234,7 @@ export async function handleTextMessage(
       const replyOptions: Record<string, unknown> = { parse_mode: undefined };
       // Merge completion buttons with category correction buttons if both exist
       const categoryButtons = !confident
-        ? (buildInlineKeyboard(entryId) as { inline_keyboard: unknown[][] }).inline_keyboard
+        ? (buildInlineKeyboard(entryId, t) as { inline_keyboard: unknown[][] }).inline_keyboard
         : [];
       const completionButtons = formatted.inlineKeyboard ?? [];
       if (categoryButtons.length > 0 || completionButtons.length > 0) {
@@ -231,13 +245,13 @@ export async function handleTextMessage(
       await reply(formatted.text, replyOptions);
     } else if (confident) {
       await reply(
-        `✅ Filed as ${actualCategory} → ${nameStr} (${pct}) — reply /fix to correct`,
+        `✅ ${savedAs} ${actualCategory} → ${nameStr} (${pct}) — reply /fix to correct`,
         { parse_mode: undefined },
       );
     } else {
       await reply(
-        `❓ Best guess: ${actualCategory} → ${nameStr} (${pct})`,
-        { reply_markup: buildInlineKeyboard(entryId) },
+        `❓ ${bestGuess}: ${actualCategory} → ${nameStr} (${pct})`,
+        { reply_markup: buildInlineKeyboard(entryId, t) },
       );
     }
 
@@ -384,10 +398,13 @@ export async function handleVoiceMessage(
     const hasCompletions = completionResult &&
       (completionResult.autoCompleted.length > 0 || completionResult.needsConfirmation.length > 0);
 
+    const t = await resolveTelegramT(sql);
+    const savedAs = t("telegram.saved_as");
+    const bestGuess = t("telegram.saved_as_low_confidence");
     if (hasCompletions) {
       const classText = confident
-        ? `🎤 '${transcript}'\n✅ Filed as ${actualCategory} → ${nameStr} (${pct})`
-        : `🎤 '${transcript}'\n❓ Best guess: ${actualCategory} → ${nameStr} (${pct})`;
+        ? `🎤 '${transcript}'\n✅ ${savedAs} ${actualCategory} → ${nameStr} (${pct})`
+        : `🎤 '${transcript}'\n❓ ${bestGuess}: ${actualCategory} → ${nameStr} (${pct})`;
       const formatted = formatCompletionReply({
         classificationText: classText,
         autoCompleted: completionResult!.autoCompleted,
@@ -396,24 +413,24 @@ export async function handleVoiceMessage(
       const replyOptions: Record<string, unknown> = { parse_mode: undefined };
       if (formatted.inlineKeyboard) {
         const existingButtons = !confident
-          ? (buildInlineKeyboard(entryId) as { inline_keyboard: unknown[][] }).inline_keyboard
+          ? (buildInlineKeyboard(entryId, t) as { inline_keyboard: unknown[][] }).inline_keyboard
           : [];
         replyOptions.reply_markup = {
           inline_keyboard: [...existingButtons, ...formatted.inlineKeyboard],
         };
       } else if (!confident) {
-        replyOptions.reply_markup = buildInlineKeyboard(entryId);
+        replyOptions.reply_markup = buildInlineKeyboard(entryId, t);
       }
       await reply(formatted.text, replyOptions);
     } else if (confident) {
       await reply(
-        `🎤 '${transcript}'\n✅ Filed as ${actualCategory} → ${nameStr} (${pct})`,
+        `🎤 '${transcript}'\n✅ ${savedAs} ${actualCategory} → ${nameStr} (${pct})`,
         { parse_mode: undefined },
       );
     } else {
       await reply(
-        `🎤 '${transcript}'\n❓ Best guess: ${actualCategory} → ${nameStr} (${pct})`,
-        { reply_markup: buildInlineKeyboard(entryId) },
+        `🎤 '${transcript}'\n❓ ${bestGuess}: ${actualCategory} → ${nameStr} (${pct})`,
+        { reply_markup: buildInlineKeyboard(entryId, t) },
       );
     }
 

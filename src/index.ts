@@ -7,6 +7,8 @@ import { createDbConnection, runMigrations } from "./db/index.js";
 import { createHealthRoute } from "./web/health.js";
 import { createServiceCheckers } from "./web/service-checkers.js";
 import { createSetupMiddleware, createSetupRoutes } from "./web/setup.js";
+import { createLocaleMiddleware } from "./web/i18n/middleware.js";
+import { initI18n } from "./web/i18n/index.js";
 import { createDashboardRoutes } from "./web/dashboard.js";
 import { createBrowseRoutes } from "./web/browse.js";
 import { createEntryRoutes } from "./web/entry.js";
@@ -56,11 +58,18 @@ async function main(): Promise<void> {
   // Build the app
   const app = new Hono();
 
+  // Initialize i18next catalogs (idempotent)
+  await initI18n();
+
   // Static files (CSS, etc.) — before auth so they load on the login page
   app.use("/public/*", serveStatic({ root: "./" }));
 
   // Display routes — before auth middleware (they handle their own token-based auth)
   app.route("/", createDisplayRoutes(sql));
+
+  // Locale middleware — runs before everything else so pre-auth pages
+  // (login, setup wizard) also see the resolved locale in c.get("t").
+  app.use("*", createLocaleMiddleware(sql));
 
   // Setup middleware handles both setup-mode detection and authentication
   app.use("*", createSetupMiddleware(sql, sessionSecret));

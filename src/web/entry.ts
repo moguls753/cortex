@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import type postgres from "postgres";
+import type { TFunction } from "i18next";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 import { renderLayout } from "./layout.js";
 import { getServiceStatus, type HealthStatus } from "./service-checkers.js";
 import { isBotRunning } from "../telegram.js";
+import { i18next, type Locale } from "./i18n/index.js";
 import {
   getEntry,
   updateEntry,
@@ -42,8 +44,9 @@ function categoryBadgeClass(category: string | null): string {
   return map[category] ?? "badge-unclassified";
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-US", {
+function formatDate(date: Date, locale: Locale = "en"): string {
+  const tag = locale === "de" ? "de-DE" : "en-US";
+  return date.toLocaleDateString(tag, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -65,22 +68,32 @@ function migrateFields(
   return result;
 }
 
-function renderViewPage(entry: {
-  id: string;
-  name: string;
-  category: string | null;
-  content: string | null;
-  fields: Record<string, unknown>;
-  tags: string[];
-  confidence: number | null;
-  source: string;
-  source_type: string;
-  deleted_at: Date | null;
-  created_at: Date;
-  updated_at: Date;
-}): string {
+function renderViewPage(
+  entry: {
+    id: string;
+    name: string;
+    category: string | null;
+    content: string | null;
+    fields: Record<string, unknown>;
+    tags: string[];
+    confidence: number | null;
+    source: string;
+    source_type: string;
+    deleted_at: Date | null;
+    created_at: Date;
+    updated_at: Date;
+  },
+  t: TFunction,
+  locale: Locale = "en",
+): string {
   const badgeClass = categoryBadgeClass(entry.category);
-  const badgeLabel = entry.category ? CATEGORY_LABELS[entry.category] ?? entry.category : "Unclassified";
+  const unclassifiedLabel = (() => {
+    const v = t("dashboard.unclassified");
+    return v === "dashboard.unclassified" ? "Unclassified" : v;
+  })();
+  const badgeLabel = entry.category
+    ? t(`category.${entry.category}`)
+    : unclassifiedLabel;
   const rawHtml = entry.content ? (marked.parse(entry.content) as string) : "";
   const renderedContent = sanitizeHtml(rawHtml, {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2"]),
@@ -100,7 +113,7 @@ function renderViewPage(entry: {
   html += `<span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium ${badgeClass}">${escapeHtml(badgeLabel)}</span>`;
 
   if (entry.deleted_at) {
-    html += `<span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium bg-destructive text-destructive-foreground">Deleted</span>`;
+    html += `<span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium bg-destructive text-destructive-foreground">${escapeHtml(t("entry.deleted_badge"))}</span>`;
   }
 
   html += `</div>`; // badges row
@@ -110,15 +123,15 @@ function renderViewPage(entry: {
   html += `<div class="flex items-center gap-2 shrink-0">`;
   if (entry.deleted_at) {
     html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/restore">`;
-    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-primary border border-primary hover:bg-primary hover:text-primary-foreground transition-colors">Restore</button>`;
+    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-primary border border-primary hover:bg-primary hover:text-primary-foreground transition-colors">${escapeHtml(t("button.restore"))}</button>`;
     html += `</form>`;
-    html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/permanent-delete" onsubmit="return confirm('Permanently delete this entry? This cannot be undone.')">`;
-    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1">${iconTrash2("size-3")} Delete permanently</button>`;
+    html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/permanent-delete" onsubmit="return confirm('${escapeHtml(t("entry.confirm_delete_permanent"))}')">`;
+    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1">${iconTrash2("size-3")} ${escapeHtml(t("entry.delete_permanently"))}</button>`;
     html += `</form>`;
   } else {
-    html += `<a href="/entry/${escapeHtml(entry.id)}/edit" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Edit</a>`;
-    html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/delete" onsubmit="return confirm('Are you sure you want to delete this entry?')">`;
-    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1">${iconTrash2("size-3")} Delete</button>`;
+    html += `<a href="/entry/${escapeHtml(entry.id)}/edit" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">${escapeHtml(t("entry.edit_button"))}</a>`;
+    html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/delete" onsubmit="return confirm('${escapeHtml(t("entry.confirm_delete"))}')">`;
+    html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors flex items-center gap-1">${iconTrash2("size-3")} ${escapeHtml(t("button.delete"))}</button>`;
     html += `</form>`;
   }
   html += `</div>`;
@@ -138,23 +151,42 @@ function renderViewPage(entry: {
     html += `<div class="rounded-md border border-border bg-card p-4 prose prose-sm">${renderedContent}</div>`;
   }
 
-  // Category-specific fields
+  // Category-specific fields. Status values get t("status.<value>"); other
+  // field values are shown as-is. Field labels come from t("field.<key>")
+  // when a translation exists; otherwise fall back to the raw English key.
   const fieldEntries = Object.entries(entry.fields).filter(([, v]) => v !== null && v !== "");
   if (fieldEntries.length > 0) {
     html += `<div class="rounded-md border border-border bg-card p-4">`;
-    html += `<h2 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Fields</h2>`;
+    html += `<h2 class="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">${escapeHtml(t("entry.fields_heading"))}</h2>`;
     html += `<dl class="grid grid-cols-2 gap-x-4 gap-y-1">`;
     for (const [key, value] of fieldEntries) {
-      html += `<dt class="text-xs text-muted-foreground">${escapeHtml(key)}</dt>`;
-      html += `<dd class="text-xs text-foreground">${escapeHtml(String(value))}</dd>`;
+      const labelKey = `field.${key}`;
+      const label = t(labelKey);
+      const displayLabel = label === labelKey ? key : label;
+      let displayValue = String(value);
+      if (key === "status" && typeof value === "string") {
+        const statusKey = `status.${value}`;
+        const translated = t(statusKey);
+        if (translated !== statusKey) displayValue = translated;
+      }
+      html += `<dt class="text-xs text-muted-foreground" data-field="${escapeHtml(key)}">${escapeHtml(displayLabel)}</dt>`;
+      html += `<dd class="text-xs text-foreground">${escapeHtml(displayValue)}</dd>`;
     }
     html += `</dl></div>`;
   }
 
   // Timestamps
+  const createdLabel = (() => {
+    const v = t("entry.created_label");
+    return v === "entry.created_label" ? "Created" : v;
+  })();
+  const updatedLabel = (() => {
+    const v = t("entry.updated_label");
+    return v === "entry.updated_label" ? "Updated" : v;
+  })();
   html += `<div class="flex items-center gap-4 text-[10px] text-muted-foreground">`;
-  html += `<span>Created: ${formatDate(entry.created_at)}</span>`;
-  html += `<span>Updated: ${formatDate(entry.updated_at)}</span>`;
+  html += `<span>${escapeHtml(createdLabel)}: ${formatDate(entry.created_at, locale)}</span>`;
+  html += `<span>${escapeHtml(updatedLabel)}: ${formatDate(entry.updated_at, locale)}</span>`;
   html += `</div>`;
 
   html += `</div>`;
@@ -172,13 +204,20 @@ function renderEditPage(
     tags: string[];
   },
   allTags: string[],
+  t: TFunction,
   error?: string,
 ): string {
+  const fieldLabel = (key: string): string => {
+    const k = `field.${key}`;
+    const v = t(k);
+    return v === k ? key : v;
+  };
+
   let html = `<div class="flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto scrollbar-thin">`;
 
   html += `<div class="flex items-center justify-between">`;
-  html += `<h1 class="text-lg font-medium text-foreground tracking-tight">Edit Entry</h1>`;
-  html += `<a href="/entry/${escapeHtml(entry.id)}" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
+  html += `<h1 class="text-lg font-medium text-foreground tracking-tight">${escapeHtml(t("entry.edit.heading"))}</h1>`;
+  html += `<a href="/entry/${escapeHtml(entry.id)}" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">${escapeHtml(t("button.cancel"))}</a>`;
   html += `</div>`;
 
   if (error) {
@@ -232,8 +271,8 @@ function renderEditPage(
       const value = entry.fields[field] ?? "";
       if (field === "status" && entry.category === "projects") {
         html += `<div>`;
-        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<select name="fields[${escapeHtml(field)}]" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(fieldLabel(field))}</label>`;
+        html += `<select name="${escapeHtml(field)}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
         for (const opt of ["active", "paused", "done", "cancelled"]) {
           const sel = String(value) === opt ? " selected" : "";
           html += `<option value="${opt}"${sel}>${opt}</option>`;
@@ -241,8 +280,8 @@ function renderEditPage(
         html += `</select></div>`;
       } else if (field === "status" && entry.category === "tasks") {
         html += `<div>`;
-        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<select name="fields[${escapeHtml(field)}]" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(fieldLabel(field))}</label>`;
+        html += `<select name="${escapeHtml(field)}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
         for (const opt of ["pending", "done", "cancelled"]) {
           const sel = String(value) === opt ? " selected" : "";
           html += `<option value="${opt}"${sel}>${opt}</option>`;
@@ -250,18 +289,18 @@ function renderEditPage(
         html += `</select></div>`;
       } else if (field === "due_date") {
         html += `<div>`;
-        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<input type="date" name="fields[${escapeHtml(field)}]" value="${escapeHtml(String(value ?? ""))}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(fieldLabel(field))}</label>`;
+        html += `<input type="date" name="${escapeHtml(field)}" value="${escapeHtml(String(value ?? ""))}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
         html += `</div>`;
       } else if (field === "context" || field === "follow_ups" || field === "notes") {
         html += `<div>`;
-        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<textarea name="fields[${escapeHtml(field)}]" rows="3" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans resize-y">${escapeHtml(String(value ?? ""))}</textarea>`;
+        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(fieldLabel(field))}</label>`;
+        html += `<textarea name="${escapeHtml(field)}" rows="3" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans resize-y">${escapeHtml(String(value ?? ""))}</textarea>`;
         html += `</div>`;
       } else {
         html += `<div>`;
-        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(field)}</label>`;
-        html += `<input type="text" name="fields[${escapeHtml(field)}]" value="${escapeHtml(String(value ?? ""))}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
+        html += `<label class="block text-xs text-muted-foreground mb-1">${escapeHtml(fieldLabel(field))}</label>`;
+        html += `<input type="text" name="${escapeHtml(field)}" value="${escapeHtml(String(value ?? ""))}" class="w-full rounded-md border border-border bg-secondary px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans">`;
         html += `</div>`;
       }
     }
@@ -270,8 +309,13 @@ function renderEditPage(
 
   // Submit
   html += `<div class="flex items-center gap-2">`;
-  html += `<button type="submit" class="rounded-md px-4 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save</button>`;
-  html += `<a href="/entry/${escapeHtml(entry.id)}" class="rounded-md px-4 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
+  html += `<button type="submit" class="rounded-md px-4 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">${escapeHtml(t("button.save"))}</button>`;
+  html += `<a href="/entry/${escapeHtml(entry.id)}" class="rounded-md px-4 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">${escapeHtml(t("button.cancel"))}</a>`;
+  html += `</div>`;
+  html += `<div class="flex items-center gap-2 mt-2">`;
+  html += `<form method="POST" action="/entry/${escapeHtml(entry.id)}/delete" onsubmit="return confirm('${escapeHtml(t("entry.confirm_delete"))}')">`;
+  html += `<button type="submit" class="rounded-md px-2.5 py-1.5 text-sm text-destructive border border-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors">${escapeHtml(t("button.delete"))}</button>`;
+  html += `</form>`;
   html += `</div>`;
 
   html += `</form>`;
@@ -299,38 +343,46 @@ export function createEntryRoutes(sql: Sql): Hono {
   app.get("/entry/:id", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
     }
 
     const entry = await getEntry(sql, id);
     if (!entry) {
-      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
     }
 
-    return c.html(renderLayout(entry.name, renderViewPage(entry), "/", await health()));
+    const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+    const t =
+      (c.get("t") as TFunction | undefined) ??
+      (i18next.getFixedT(locale) as TFunction);
+    return c.html(renderLayout(entry.name, renderViewPage(entry, t, locale), "/", await health(), c));
   });
 
   // Edit form
   app.get("/entry/:id/edit", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
     }
 
     const entry = await getEntry(sql, id);
     if (!entry) {
-      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
     }
 
     const allTagsList = (await getAllTags(sql)) ?? [];
-    return c.html(renderLayout("Edit — " + entry.name, renderEditPage(entry, allTagsList), "/", await health()));
+    const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+    const t =
+      (c.get("t") as TFunction | undefined) ??
+      (i18next.getFixedT(locale) as TFunction);
+    return c.html(renderLayout("Edit — " + entry.name, renderEditPage(entry, allTagsList, t), "/", await health(), c));
   });
 
   // Save edit
   app.post("/entry/:id/edit", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
     }
 
     const formData = await c.req.parseBody();
@@ -341,12 +393,23 @@ export function createEntryRoutes(sql: Sql): Hono {
     const tagsRaw = String(formData["tags"] ?? "");
     const tags = parseTags(tagsRaw);
 
-    // Collect submitted fields
+    // Collect submitted fields. Category-specific fields are submitted with
+    // direct names (e.g. `due_date`, `status`) per AC-3.3; the legacy
+    // `fields[<key>]` bracket form is also accepted. The allow-list is
+    // derived from CATEGORY_FIELDS so it stays in sync when a category's
+    // schema changes.
     const submittedFields: Record<string, unknown> = {};
+    const validFieldKeys = new Set<string>(
+      Object.values(CATEGORY_FIELDS).flat(),
+    );
     for (const [key, value] of Object.entries(formData)) {
-      const match = key.match(/^fields\[(.+)]$/);
-      if (match) {
-        submittedFields[match[1]!] = value || null;
+      const bracketMatch = key.match(/^fields\[(.+)]$/);
+      if (bracketMatch) {
+        submittedFields[bracketMatch[1]!] = value || null;
+        continue;
+      }
+      if (validFieldKeys.has(key)) {
+        submittedFields[key] = value || null;
       }
     }
 
@@ -354,12 +417,16 @@ export function createEntryRoutes(sql: Sql): Hono {
     if (!name) {
       const entry = await getEntry(sql, id);
       if (!entry) {
-        return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+        return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
       }
       const allTagsList = (await getAllTags(sql)) ?? [];
       const errorEntry = { ...entry, name: "", category, content, tags, fields: submittedFields };
+      const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+      const t =
+        (c.get("t") as TFunction | undefined) ??
+        (i18next.getFixedT(locale) as TFunction);
       return c.html(
-        renderLayout("Edit — " + entry.name, renderEditPage(errorEntry, allTagsList, "Name is required"), "/", await health()),
+        renderLayout("Edit — " + entry.name, renderEditPage(errorEntry, allTagsList, t, "Name is required"), "/", await health(), c),
         422,
       );
     }
@@ -383,7 +450,7 @@ export function createEntryRoutes(sql: Sql): Hono {
   app.post("/entry/:id/delete", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
     }
     // Clean up linked calendar event before soft-delete
     try {
@@ -413,7 +480,7 @@ export function createEntryRoutes(sql: Sql): Hono {
   app.post("/entry/:id/restore", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
     }
     await restoreEntry(sql, id);
     return c.redirect(`/entry/${id}`, 303);
@@ -423,11 +490,11 @@ export function createEntryRoutes(sql: Sql): Hono {
   app.post("/entry/:id/permanent-delete", async (c) => {
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) {
-      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
     }
     const entry = await getEntry(sql, id);
     if (!entry || !entry.deleted_at) {
-      return c.html(renderLayout("Not Found", render404(), "/", await health()), 404);
+      return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
     }
     await permanentDeleteEntry(sql, id);
     return c.redirect("/trash", 303);

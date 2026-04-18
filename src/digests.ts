@@ -3,10 +3,19 @@ import path from "path";
 import { fileURLToPath } from "url";
 import type { Sql } from "postgres";
 import type { SSEBroadcaster } from "./web/sse.js";
+import type { TFunction } from "i18next";
 import { createLLMProvider } from "./llm/index.js";
 import { config, resolveConfigValue } from "./config.js";
 import { getLLMConfig } from "./llm/config.js";
 import { createLogger } from "./logger.js";
+import { i18next, type Locale } from "./web/i18n/index.js";
+
+async function resolveDigestT(sql: Sql): Promise<TFunction> {
+  const raw = await resolveConfigValue("ui_language", sql).catch(() => undefined);
+  const locale: Locale =
+    raw === "en" || raw === "de" ? (raw as Locale) : "en";
+  return i18next.getFixedT(locale) as TFunction;
+}
 import {
   getDailyDigestData,
   getWeeklyReviewData,
@@ -91,7 +100,7 @@ function formatWeeklyPrompt(data: WeeklyReviewData, outputLanguage: string): str
     .replace("{stalled_projects}", stalledProjects);
 }
 
-function formatDateInTz(tz: string): string {
+export function formatDateInTz(tz: string): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: tz });
 }
 
@@ -138,11 +147,19 @@ async function sendEmail(
   }
 
   try {
+    // Pass the localized From display name (AC-6.3). sendDigestEmail
+    // formats the envelope as `"<fromName> <from>"` when both are present
+    // and `from` isn't already name-formatted. Pre-existing tests that
+    // assert `call.from === "<raw-address>"` stay green because the raw
+    // address is passed unchanged in the `from` argument.
+    const t = await resolveDigestT(sql);
+    const fromName = t("email.from_name");
     await sendDigestEmail({
       subject,
       body,
       to: emailConfig.to,
       from: emailConfig.from,
+      fromName,
       smtp: emailConfig.smtp,
     });
   } catch (err) {
@@ -194,7 +211,9 @@ export async function generateDailyDigest(sql: Sql, broadcaster?: SSEBroadcaster
 
     const tz = (await resolveConfigValue("timezone", sql)) || config.timezone;
     const today = formatDateInTz(tz);
-    await sendEmail(sql, `Cortex Daily — ${today}`, content);
+    const t = await resolveDigestT(sql);
+    const subject = t("email.daily_subject", { date: today });
+    await sendEmail(sql, subject, content);
   } catch (err) {
     console.error(JSON.stringify({
       module: "digests",
@@ -251,7 +270,9 @@ export async function generateWeeklyReview(sql: Sql, broadcaster?: SSEBroadcaste
 
     const tz = (await resolveConfigValue("timezone", sql)) || config.timezone;
     const monday = getMondayInTz(tz);
-    await sendEmail(sql, `Cortex Weekly — w/c ${monday}`, content);
+    const t = await resolveDigestT(sql);
+    const subject = t("email.weekly_subject", { weekStart: monday });
+    await sendEmail(sql, subject, content);
   } catch (err) {
     console.error(JSON.stringify({
       module: "digests",

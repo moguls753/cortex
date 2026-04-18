@@ -2,8 +2,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import type postgres from "postgres";
+import type { TFunction } from "i18next";
 import bcrypt from "bcryptjs";
 import { escapeHtml } from "./shared.js";
+import { i18next, type Locale } from "./i18n/index.js";
 import { getUserCount, getUserPasswordHash, createUser, getSetupSummary } from "./setup-queries.js";
 import { saveAllSettings } from "./settings-queries.js";
 import { getLLMConfig, saveLLMConfig } from "../llm/config.js";
@@ -144,9 +146,9 @@ function setSessionCookie(c: any, secret: string): void {
 
 // ─── Setup Layout ──────────────────────────────────────────────────
 
-function renderSetupLayout(title: string, content: string): string {
+function renderSetupLayout(title: string, content: string, locale: Locale = "en"): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -287,7 +289,9 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
       return c.redirect("/", 302);
     }
 
-    return c.html(renderLoginPage());
+    const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+    const t = c.get("t") as TFunction | undefined;
+    return c.html(renderLoginPage(undefined, locale, t));
   });
 
   // POST /login
@@ -302,7 +306,9 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
 
     const isValid = await bcrypt.compare(submittedPassword, passwordHash);
     if (!isValid) {
-      return c.html(renderLoginPage("Invalid password"), 200);
+      const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+      const t = c.get("t") as TFunction | undefined;
+      return c.html(renderLoginPage("Invalid password", locale, t), 200);
     }
 
     // Create session
@@ -334,7 +340,9 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
       }
       return c.redirect("/login", 302);
     }
-    return c.html(renderStep1());
+    const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+    const t = c.get("t") as TFunction | undefined;
+    return c.html(renderStep1(undefined, undefined, locale, t));
   });
 
   // GET /setup/step/1
@@ -347,7 +355,9 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
       }
       return c.redirect("/login", 302);
     }
-    return c.html(renderStep1());
+    const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+    const t = c.get("t") as TFunction | undefined;
+    return c.html(renderStep1(undefined, undefined, locale, t));
   });
 
   // POST /setup/step/1
@@ -544,7 +554,13 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
 
 // ─── Render Functions ─────────────────────────────────────────────
 
-function renderStep1(error?: string, displayName?: string): string {
+function renderStep1(
+  error?: string,
+  displayName?: string,
+  locale: Locale = "en",
+  t?: TFunction,
+): string {
+  const tr = t ?? (i18next.getFixedT(locale) as TFunction);
   const errorHtml = error
     ? `<div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">${escapeHtml(error)}</div>`
     : "";
@@ -554,7 +570,7 @@ function renderStep1(error?: string, displayName?: string): string {
     <div class="rounded-md border border-border bg-card p-4">
       <div class="flex items-center gap-2 mb-3">
         ${iconShield("size-3 text-primary")}
-        <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Account</span>
+        <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">${escapeHtml(tr("setup.step1.heading"))}</span>
         <span class="flex-1 h-px bg-border"></span>
       </div>
       <form method="POST" action="/setup/step/1" class="space-y-3">
@@ -567,7 +583,7 @@ function renderStep1(error?: string, displayName?: string): string {
             class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
         </div>
         <div class="flex flex-col gap-1.5">
-          <label for="password" class="text-xs text-muted-foreground">Password</label>
+          <label for="password" class="text-xs text-muted-foreground">${escapeHtml(tr("setup.step1.password_label"))}</label>
           <input type="password" id="password" name="password" required minlength="8"
             placeholder="Minimum 8 characters"
             class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
@@ -581,12 +597,12 @@ function renderStep1(error?: string, displayName?: string): string {
         <div class="flex justify-end pt-1">
           <button type="submit"
             class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-            Create Account
+            ${escapeHtml(tr("setup.step1.cta"))}
           </button>
         </div>
       </form>
     </div>
-  `);
+  `, locale);
 }
 
 const OLLAMA_RECOMMENDED = [
@@ -990,17 +1006,19 @@ function renderStep4(summary: { hasUser: boolean; hasLLM: boolean; hasTelegram: 
   `);
 }
 
-function renderLoginPage(error?: string): string {
-  const errorHtml = error
-    ? `<div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">${escapeHtml(error)}</div>`
+function renderLoginPage(error?: string, locale: Locale = "en", t?: TFunction): string {
+  const tr = t ?? (i18next.getFixedT(locale) as TFunction);
+  const errorText = error ? (error === "Invalid password" ? tr("login.error") : error) : "";
+  const errorHtml = errorText
+    ? `<div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">${escapeHtml(errorText)}</div>`
     : "";
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — Cortex</title>
+  <title>${escapeHtml(tr("login.heading"))} — Cortex</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1027,20 +1045,20 @@ function renderLoginPage(error?: string): string {
     <div class="rounded-md border border-border bg-card p-4">
       <div class="flex items-center gap-2 mb-3">
         ${iconShield("size-3 text-primary")}
-        <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Log In</span>
+        <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">${escapeHtml(tr("login.heading"))}</span>
         <span class="flex-1 h-px bg-border"></span>
       </div>
       <form method="POST" class="space-y-3">
         ${errorHtml}
         <div class="flex flex-col gap-1.5">
-          <label for="password" class="text-xs text-muted-foreground">Password</label>
+          <label for="password" class="text-xs text-muted-foreground">${escapeHtml(tr("login.password_label"))}</label>
           <input type="password" id="password" name="password" required
             class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
         </div>
         <div class="flex justify-end pt-1">
           <button type="submit"
             class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-            Log in
+            ${escapeHtml(tr("login.submit"))}
           </button>
         </div>
       </form>

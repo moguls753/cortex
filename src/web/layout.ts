@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Context } from "hono";
+import type { TFunction } from "i18next";
 import {
   iconBrain,
   iconFolderOpen,
@@ -12,6 +14,7 @@ import {
   iconX,
 } from "./icons.js";
 import { escapeHtml } from "./shared.js";
+import { i18next, type Locale } from "./i18n/index.js";
 import type { HealthStatus, ServiceStatus } from "./service-checkers.js";
 
 // ─── Client-side polling script ─────────────────────────────────────
@@ -42,7 +45,10 @@ function renderFooterDot(service: ServiceKey, status: ServiceStatus): string {
   return `<span class="flex items-center gap-1"><span data-status-dot="${service}" id="status-dot-${service}" class="${dotClass}"></span> ${service}</span>`;
 }
 
-function renderFooter(healthStatus: HealthStatus | undefined): string {
+function renderFooter(
+  healthStatus: HealthStatus | undefined,
+  t?: TFunction,
+): string {
   // When no health status is available yet (should not happen in production
   // because route handlers call getServiceStatus first), render a footer
   // with indicators defaulting to not-ready so the client script can flip
@@ -68,7 +74,7 @@ function renderFooter(healthStatus: HealthStatus | undefined): string {
       ${dots}
     </div>
     <div class="flex items-center gap-3">
-      <span>SSE connected</span>
+      <span>${t ? escapeHtml(t("layout.sse_connected")) : "SSE connected"}</span>
     </div>
   </footer>`;
 }
@@ -159,11 +165,18 @@ export function renderLayout(
   content: string,
   activePage = "/",
   healthStatus?: HealthStatus,
+  c?: Context,
 ): string {
+  const locale: Locale =
+    ((c?.get("locale") as Locale | undefined) ?? "en") as Locale;
+  const t: TFunction =
+    (c?.get("t") as TFunction | undefined) ??
+    (i18next.getFixedT(locale) as TFunction);
+
   const nav = [
-    { href: "/browse", icon: iconFolderOpen("size-3.5"), label: "Browse" },
-    { href: "/trash", icon: iconTrash2("size-3.5"), label: "Trash" },
-    { href: "/settings", icon: iconSettings("size-3.5"), label: "Settings" },
+    { href: "/browse", icon: iconFolderOpen("size-3.5"), label: t("nav.browse") },
+    { href: "/trash", icon: iconTrash2("size-3.5"), label: t("nav.trash") },
+    { href: "/settings", icon: iconSettings("size-3.5"), label: t("nav.settings") },
   ];
 
   const navHtml = nav
@@ -171,10 +184,10 @@ export function renderLayout(
     .join("");
 
   const banner = renderBanner(healthStatus);
-  const footer = renderFooter(healthStatus);
+  const footer = renderFooter(healthStatus, t);
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -213,9 +226,9 @@ export function renderLayout(
           <span id="theme-icon-moon">${iconMoon("size-3.5")}</span>
         </button>
         <form method="POST" action="/logout" class="inline">
-          <button type="submit" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Log out">
+          <button type="submit" class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="${escapeHtml(t("nav.logout"))}">
             ${iconLogOut("size-3.5")}
-            <span class="hidden sm:inline">Log out</span>
+            <span class="hidden sm:inline">${escapeHtml(t("nav.logout"))}</span>
           </button>
         </form>
       </nav>

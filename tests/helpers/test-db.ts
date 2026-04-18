@@ -51,11 +51,31 @@ export async function startTestDb(
 /**
  * Runs Drizzle migrations against the provided database URL.
  * Imports the migration runner from the source code.
- * Will fail until src/db/ is implemented — expected in Phase 4.
+ * Also seeds a default test user with password "test-password" (bcrypt cost 10)
+ * so integration tests that go through the setup-wizard-based login route can
+ * authenticate without an explicit seed step. Integration tests that need a
+ * clean user table can TRUNCATE it in their own beforeEach.
  */
 export async function runMigrations(url: string): Promise<void> {
-  // Dynamic import so the test file compiles even before src/db exists.
-  // This will throw "module not found" until the source code is implemented.
   const { runMigrations: migrate } = await import("../../src/db/index.js");
   await migrate(url);
+
+  const sql = postgres(url);
+  try {
+    const rows =
+      (await sql`SELECT COUNT(*)::int AS count FROM "user"`) as unknown as [
+        { count: number },
+      ];
+    if ((rows[0]?.count ?? 0) === 0) {
+      // bcrypt hash of "test-password" (cost 10). The user table CHECKs
+      // id = 1 (single-row table by design), so we pin the id explicitly.
+      const hash =
+        "$2b$10$fT48FucaYsd.UewWh8yHfeSSuDImEjthP.X2wLVChUyMOGwVtm6..";
+      await sql`INSERT INTO "user" (id, password_hash) VALUES (1, ${hash})`;
+    }
+  } catch {
+    // User table may not exist in every migration set — safe to skip.
+  } finally {
+    await sql.end();
+  }
 }

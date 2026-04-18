@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type postgres from "postgres";
+import type { TFunction } from "i18next";
 import { renderLayout } from "./layout.js";
 import { getServiceStatus } from "./service-checkers.js";
 import { isBotRunning } from "../telegram.js";
@@ -8,6 +9,7 @@ import { getAllTags } from "./entry-queries.js";
 import { classifyText, assembleContext } from "../classify.js";
 import { getCalendarNames } from "../google-calendar.js";
 import { embedEntry } from "../embed.js";
+import { i18next, type Locale } from "./i18n/index.js";
 import {
   CATEGORIES,
   CATEGORY_LABELS,
@@ -27,12 +29,16 @@ function defaultFields(category: string | null): Record<string, unknown> {
   return result;
 }
 
-function renderNewNotePage(allTags: string[], error?: string): string {
+function renderNewNotePage(
+  allTags: string[],
+  t: TFunction,
+  error?: string,
+): string {
   let html = `<div class="flex-1 min-h-0 flex flex-col gap-4 overflow-y-auto scrollbar-thin">`;
 
   html += `<div class="flex items-center justify-between">`;
-  html += `<h1 class="text-lg font-medium text-foreground tracking-tight">New Note</h1>`;
-  html += `<a href="/" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">Cancel</a>`;
+  html += `<h1 class="text-lg font-medium text-foreground tracking-tight">${escapeHtml(t("new_note.heading"))}</h1>`;
+  html += `<a href="/" class="rounded-md px-2.5 py-1.5 text-sm text-foreground border border-border hover:bg-secondary transition-colors">${escapeHtml(t("button.cancel"))}</a>`;
   html += `</div>`;
 
   if (error) {
@@ -77,15 +83,24 @@ function renderNewNotePage(allTags: string[], error?: string): string {
 
   // Buttons
   html += `<div class="flex items-center gap-2">`;
-  html += `<button type="submit" class="rounded-md px-4 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save</button>`;
-  html += `<button type="button" id="ai-suggest-btn" class="rounded-md px-4 py-1.5 text-sm text-primary border border-primary hover:bg-primary hover:text-primary-foreground transition-colors">AI Suggest</button>`;
+  html += `<button type="submit" class="rounded-md px-4 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">${escapeHtml(t("button.save"))}</button>`;
+  html += `<button type="button" id="ai-suggest-btn" class="rounded-md px-4 py-1.5 text-sm text-muted-foreground border border-border hover:text-primary hover:border-primary transition-colors">${escapeHtml(t("new_note.ai_suggest"))}</button>`;
   html += `</div>`;
 
   html += `</form>`;
 
   // Client-side scripts
+  const i18nBlob = {
+    unsaved_changes: t("new_note.unsaved_changes"),
+    ai_suggest: t("new_note.ai_suggest"),
+    suggesting: "Suggesting...",
+  };
+  // Escape `<` as \u003c to avoid a `</script>` breakout via catalog values.
+  const newNoteBlobJson = JSON.stringify(i18nBlob).replace(/</g, "\\u003c");
   html += `<script>
+window.__NEW_NOTE_I18N__ = ${newNoteBlobJson};
 (function() {
+  var I = window.__NEW_NOTE_I18N__;
   var form = document.getElementById('new-note-form');
   var suggestBtn = document.getElementById('ai-suggest-btn');
   var categorySelect = document.getElementById('note-category');
@@ -99,7 +114,7 @@ function renderNewNotePage(allTags: string[], error?: string): string {
   window.addEventListener('beforeunload', function(e) {
     if (dirty) {
       e.preventDefault();
-      e.returnValue = '';
+      e.returnValue = I.unsaved_changes;
     }
   });
 
@@ -110,7 +125,7 @@ function renderNewNotePage(allTags: string[], error?: string): string {
       if (!name && !content) return;
 
       suggestBtn.disabled = true;
-      suggestBtn.textContent = 'Classifying...';
+      suggestBtn.textContent = I.suggesting;
 
       fetch('/api/classify', {
         method: 'POST',
@@ -120,7 +135,7 @@ function renderNewNotePage(allTags: string[], error?: string): string {
       .then(function(r) { return r.json(); })
       .then(function(data) {
         suggestBtn.disabled = false;
-        suggestBtn.textContent = 'AI Suggest';
+        suggestBtn.textContent = I.ai_suggest;
         if (data.error) return;
         if (data.category && categorySelect) {
           categorySelect.value = data.category;
@@ -134,7 +149,7 @@ function renderNewNotePage(allTags: string[], error?: string): string {
       })
       .catch(function() {
         suggestBtn.disabled = false;
-        suggestBtn.textContent = 'AI Suggest';
+        suggestBtn.textContent = I.ai_suggest;
       });
     });
   }
@@ -150,12 +165,17 @@ export function createNewNoteRoutes(sql: Sql): Hono {
 
   // GET /new - render form
   app.get("/new", async (c) => {
+    const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+    const t =
+      (c.get("t") as TFunction | undefined) ??
+      (i18next.getFixedT(locale) as TFunction);
+
     const [rawTags, healthStatus] = await Promise.all([
       getAllTags(sql),
       getServiceStatus(sql, { isBotRunning }),
     ]);
     const allTags = rawTags ?? [];
-    return c.html(renderLayout("New Note", renderNewNotePage(allTags), "/", healthStatus));
+    return c.html(renderLayout("New Note", renderNewNotePage(allTags, t), "/", healthStatus, c));
   });
 
   // POST /new - save note
@@ -176,12 +196,17 @@ export function createNewNoteRoutes(sql: Sql): Hono {
         getServiceStatus(sql, { isBotRunning }),
       ]);
       const allTags = rawTags ?? [];
+      const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
+      const t =
+        (c.get("t") as TFunction | undefined) ??
+        (i18next.getFixedT(locale) as TFunction);
       return c.html(
         renderLayout(
           "New Note",
-          renderNewNotePage(allTags, "Name is required"),
+          renderNewNotePage(allTags, t, "Name is required"),
           "/",
           healthStatus,
+          c,
         ),
         422,
       );
