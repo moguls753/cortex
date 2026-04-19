@@ -271,13 +271,13 @@ async function createTestApp(): Promise<{ app: Hono }> {
   const broadcaster = createSSEBroadcaster();
 
   const app = new Hono();
-  app.use("*", createLocaleMiddleware(mockSql));
-  app.use("*", createSetupMiddleware(mockSql, TEST_SECRET));
-  app.route("/", createSetupRoutes(mockSql, TEST_SECRET));
-  app.route("/", createAuthRoutes(TEST_PASSWORD, TEST_SECRET));
+  app.use("*", createLocaleMiddleware(TEST_SECRET));
+  app.use("*", createSetupMiddleware(mockSql));
   app.use("*", createAuthMiddleware(TEST_SECRET));
+  app.route("/", createAuthRoutes(mockSql, TEST_SECRET));
+  app.route("/", createSetupRoutes(mockSql, TEST_SECRET));
   app.route("/", createDashboardRoutes(mockSql, broadcaster));
-  app.route("/", createSettingsRoutes(mockSql));
+  app.route("/", createSettingsRoutes(mockSql, broadcaster, TEST_SECRET));
   app.route("/", createBrowseRoutes(mockSql));
   app.route("/", createEntryRoutes(mockSql));
   app.route("/", createNewNoteRoutes(mockSql, broadcaster));
@@ -289,17 +289,28 @@ async function createTestApp(): Promise<{ app: Hono }> {
 async function loginAndGetCookie(
   app: Hono,
   password = TEST_PASSWORD,
+  acceptLanguage?: string,
 ): Promise<string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  if (acceptLanguage) headers["Accept-Language"] = acceptLanguage;
   const res = await app.request("/login", {
     method: "POST",
     body: new URLSearchParams({ password }),
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers,
   });
   const setCookie = res.headers.get("set-cookie");
   if (!setCookie) {
     throw new Error("No Set-Cookie header in login response");
   }
   return setCookie.split(";")[0]!;
+}
+
+function extractSessionCookieFromHeader(header: string | null): string | null {
+  if (!header) return null;
+  const match = header.match(/cortex_session=[^;]+/);
+  return match ? match[0] : null;
 }
 
 async function getWithLocale(
@@ -395,12 +406,16 @@ describe("UI Language", () => {
       vi.mocked(getAllSettings).mockResolvedValue({});
 
       const { app } = await createTestApp();
-      const cookie = await loginAndGetCookie(app);
+      // Post-refactor: the cookie's locale is seeded at login time from
+      // Accept-Language when no DB setting is present. Subsequent requests
+      // use the cookie, not Accept-Language.
+      const cookie = await loginAndGetCookie(
+        app,
+        TEST_PASSWORD,
+        "de-DE,de;q=0.9,en;q=0.5",
+      );
 
-      const res = await getWithLocale(app, "/", {
-        cookie,
-        acceptLanguage: "de-DE,de;q=0.9,en;q=0.5",
-      });
+      const res = await getWithLocale(app, "/", { cookie });
 
       expect(res.status).toBe(200);
       const body = await res.text();
@@ -427,12 +442,9 @@ describe("UI Language", () => {
       vi.mocked(getAllSettings).mockResolvedValue({ ui_language: "" });
 
       const { app } = await createTestApp();
-      const cookie = await loginAndGetCookie(app);
+      const cookie = await loginAndGetCookie(app, TEST_PASSWORD, "de");
 
-      const res = await getWithLocale(app, "/", {
-        cookie,
-        acceptLanguage: "de",
-      });
+      const res = await getWithLocale(app, "/", { cookie });
 
       const body = await res.text();
       expect(body).toContain('<html lang="de"');
@@ -482,12 +494,13 @@ describe("UI Language", () => {
       vi.mocked(getAllSettings).mockResolvedValue({});
 
       const { app } = await createTestApp();
-      const cookie = await loginAndGetCookie(app);
+      const cookie = await loginAndGetCookie(
+        app,
+        TEST_PASSWORD,
+        "fr;q=0.9,de;q=0.8,en;q=0.5",
+      );
 
-      const res = await getWithLocale(app, "/", {
-        cookie,
-        acceptLanguage: "fr;q=0.9,de;q=0.8,en;q=0.5",
-      });
+      const res = await getWithLocale(app, "/", { cookie });
 
       const body = await res.text();
       expect(body).toContain('<html lang="de"');
@@ -501,12 +514,9 @@ describe("UI Language", () => {
       vi.mocked(getAllSettings).mockResolvedValue({});
 
       const { app } = await createTestApp();
-      const cookie = await loginAndGetCookie(app);
+      const cookie = await loginAndGetCookie(app, TEST_PASSWORD, "de-AT");
 
-      const res = await getWithLocale(app, "/", {
-        cookie,
-        acceptLanguage: "de-AT",
-      });
+      const res = await getWithLocale(app, "/", { cookie });
 
       const body = await res.text();
       expect(body).toContain('<html lang="de"');
@@ -645,10 +655,14 @@ describe("UI Language", () => {
         expect.objectContaining({ ui_language: "de" }),
       );
 
-      // Follow redirect; expect German in subsequent GET body
+      // Post-refactor: the POST response re-issues the session cookie with
+      // the new locale. Follow-up requests must use the re-issued cookie.
+      const reissued =
+        extractSessionCookieFromHeader(res.headers.get("set-cookie")) ?? cookie;
+
       vi.mocked(getAllSettings).mockResolvedValue({ ui_language: "de" });
       const getRes = await app.request("/settings", {
-        headers: { Cookie: cookie },
+        headers: { Cookie: reissued },
       });
       const body = await getRes.text();
       expect(body).toContain(cat((de as any).nav?.browse, "nav.browse"));
@@ -662,7 +676,9 @@ describe("UI Language", () => {
       vi.mocked(getAllSettings).mockResolvedValue({ ui_language: "de" });
 
       const { app } = await createTestApp();
-      const cookie = await loginAndGetCookie(app);
+      // Cookie is seeded with locale "de" from login Accept-Language so we
+      // can observe the transition to "en" after the save + re-issue.
+      const cookie = await loginAndGetCookie(app, TEST_PASSWORD, "de");
 
       const res = await app.request("/settings", {
         method: "POST",
@@ -670,6 +686,7 @@ describe("UI Language", () => {
         headers: {
           Cookie: cookie,
           "Content-Type": "application/x-www-form-urlencoded",
+          "Accept-Language": "en",
         },
       });
 
@@ -679,11 +696,14 @@ describe("UI Language", () => {
         expect.objectContaining({ ui_language: "" }),
       );
 
-      // After Auto, Accept-Language=en should render en
+      // The re-issue derives locale from Accept-Language ("en") when
+      // ui_language is empty.
+      const reissued =
+        extractSessionCookieFromHeader(res.headers.get("set-cookie")) ?? cookie;
+
       vi.mocked(getAllSettings).mockResolvedValue({ ui_language: "" });
-      const getRes = await getWithLocale(app, "/", {
-        cookie,
-        acceptLanguage: "en",
+      const getRes = await app.request("/", {
+        headers: { Cookie: reissued },
       });
       const body = await getRes.text();
       expect(body).toContain('<html lang="en"');
@@ -759,7 +779,7 @@ describe("UI Language", () => {
       const { app } = await createTestApp();
       const cookie = await loginAndGetCookie(app);
 
-      await app.request("/settings", {
+      const postRes = await app.request("/settings", {
         method: "POST",
         body: buildFormData({ ui_language: "de" }),
         headers: {
@@ -768,8 +788,15 @@ describe("UI Language", () => {
         },
       });
 
+      // Use the cookie re-issued by the POST handler (now carrying locale=de)
+      // for the follow-up GET — the middleware sources locale from the
+      // cookie, not from Accept-Language.
+      const reissued =
+        extractSessionCookieFromHeader(postRes.headers.get("set-cookie")) ??
+        cookie;
+
       const getRes = await app.request("/settings?success=saved", {
-        headers: { Cookie: cookie },
+        headers: { Cookie: reissued },
       });
       const body = await getRes.text();
       expect(body).toContain(
@@ -1996,12 +2023,12 @@ describe("UI Language", () => {
       vi.mocked(getAllSettings).mockResolvedValue({ ui_language: "fr" });
 
       const { app } = await createTestApp();
-      const cookie = await loginAndGetCookie(app);
+      // The auth-refactor moves ui_language resolution to login time. An
+      // unrecognized DB value falls through resolveLoginLocale to
+      // Accept-Language, so the cookie is seeded with "de" here.
+      const cookie = await loginAndGetCookie(app, TEST_PASSWORD, "de");
 
-      const res = await getWithLocale(app, "/", {
-        cookie,
-        acceptLanguage: "de",
-      });
+      const res = await getWithLocale(app, "/", { cookie });
 
       const body = await res.text();
       expect(body).toContain('<html lang="de"');
@@ -2186,6 +2213,98 @@ describe("UI Language", () => {
       expect(loginBody).not.toMatch(/<input[^>]*name="ui_language"/);
       // No generic language-switcher UI
       expect(loginBody).not.toMatch(/flag-icon|lang-switch|locale-picker/i);
+    });
+  });
+
+  // =========================================================================
+  // Auth-refactor Group 1 — Locale middleware, zero DB queries
+  // Scenarios: TS-1.1, TS-1.2, TS-1.3
+  // =========================================================================
+  describe("Locale middleware after auth-refactor (Group 1)", () => {
+    // TS-1.1
+    it("resolves locale from session cookie without querying settings on authenticated requests", async () => {
+      const { createLocaleMiddleware } = await import(
+        "../../src/web/i18n/middleware.js"
+      );
+      const { sign } = await import("../../src/web/session.js");
+      const { getAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+
+      (getAllSettings as ReturnType<typeof vi.fn>).mockClear();
+
+      const payload = JSON.stringify({
+        issued_at: Date.now(),
+        locale: "de",
+      });
+      const token = sign(payload, TEST_SECRET);
+      const cookie = `cortex_session=${encodeURIComponent(token)}`;
+
+      const app = new Hono();
+      // New signature: createLocaleMiddleware(secret) — no sql arg.
+      app.use("*", createLocaleMiddleware(TEST_SECRET));
+      app.get("/browse", (c) => c.json({ locale: c.get("locale") }));
+
+      const res = await app.request("/browse", {
+        headers: { Cookie: cookie },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { locale: string };
+      expect(body.locale).toBe("de");
+      expect(getAllSettings).not.toHaveBeenCalled();
+    });
+
+    // TS-1.2
+    it("resolves locale from Accept-Language without querying settings on /login", async () => {
+      const { createLocaleMiddleware } = await import(
+        "../../src/web/i18n/middleware.js"
+      );
+      const { getAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+
+      (getAllSettings as ReturnType<typeof vi.fn>).mockClear();
+
+      const app = new Hono();
+      app.use("*", createLocaleMiddleware(TEST_SECRET));
+      app.get("/login", (c) => c.json({ locale: c.get("locale") }));
+
+      const res = await app.request("/login", {
+        headers: { "Accept-Language": "de-DE,de;q=0.9,en;q=0.5" },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { locale: string };
+      expect(body.locale).toBe("de");
+      expect(getAllSettings).not.toHaveBeenCalled();
+    });
+
+    // TS-1.3
+    it("resolves locale from Accept-Language without querying settings on /setup/step/1", async () => {
+      const { createLocaleMiddleware } = await import(
+        "../../src/web/i18n/middleware.js"
+      );
+      const { getAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+
+      (getAllSettings as ReturnType<typeof vi.fn>).mockClear();
+
+      const app = new Hono();
+      app.use("*", createLocaleMiddleware(TEST_SECRET));
+      app.get("/setup/step/1", (c) =>
+        c.json({ locale: c.get("locale") }),
+      );
+
+      const res = await app.request("/setup/step/1", {
+        headers: { "Accept-Language": "de" },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { locale: string };
+      expect(body.locale).toBe("de");
+      expect(getAllSettings).not.toHaveBeenCalled();
     });
   });
 });

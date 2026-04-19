@@ -15,20 +15,28 @@ describe("REQ-NFR-007 — responsive design fit criteria", () => {
     });
 
     it("setup wizard pages emit the viewport meta tag", async () => {
-      // Setup pages inline their own <head>. Read the source to verify the
-      // meta tag is emitted by renderSetupLayout and renderLoginPage.
+      // Setup and login pages inline their own <head>. After the
+      // auth-refactor, renderLoginPage lives in src/web/auth.ts while
+      // renderSetupLayout stays in src/web/setup.ts. Verify both files emit
+      // the viewport meta tag.
       const { readFileSync } = await import("node:fs");
       const { fileURLToPath } = await import("node:url");
       const { dirname, resolve } = await import("node:path");
       const here = dirname(fileURLToPath(import.meta.url));
-      const setupPath = resolve(here, "../../src/web/setup.ts");
-      const setupSource = readFileSync(setupPath, "utf-8");
-      const viewportMatches = setupSource.match(
-        /<meta name="viewport" content="width=device-width, initial-scale=1\.0">/g,
+      const viewportRe =
+        /<meta name="viewport" content="width=device-width, initial-scale=1\.0">/g;
+
+      const setupSource = readFileSync(
+        resolve(here, "../../src/web/setup.ts"),
+        "utf-8",
       );
-      // Expect at least two — one for renderSetupLayout and one for renderLoginPage.
-      expect(viewportMatches).not.toBeNull();
-      expect(viewportMatches!.length).toBeGreaterThanOrEqual(2);
+      const authSource = readFileSync(
+        resolve(here, "../../src/web/auth.ts"),
+        "utf-8",
+      );
+
+      expect(setupSource.match(viewportRe)).not.toBeNull();
+      expect(authSource.match(viewportRe)).not.toBeNull();
     });
   });
 

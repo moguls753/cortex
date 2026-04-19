@@ -120,8 +120,14 @@ async function createSetupApp(
 
   const mockSql = {} as any;
 
+  const { createAuthMiddleware, createAuthRoutes } = await import(
+    "../../src/web/auth.js"
+  );
+
   const app = new Hono();
-  app.use("*", createSetupMiddleware(mockSql, TEST_SECRET));
+  app.use("*", createSetupMiddleware(mockSql));
+  app.use("*", createAuthMiddleware(TEST_SECRET));
+  app.route("/", createAuthRoutes(mockSql, TEST_SECRET));
   app.route("/", createSetupRoutes(mockSql, TEST_SECRET));
 
   // Stub protected routes for testing redirects
@@ -847,6 +853,120 @@ describe("Onboarding Wizard", () => {
           displayName: null,
         }),
       );
+    });
+  });
+
+  // =========================================================================
+  // Auth-refactor Group 6 — Setup wizard after session.ts refactor
+  // Scenarios: TS-6.1 (auto-login cookie carries Accept-Language locale)
+  // =========================================================================
+  describe("Setup wizard after auth-refactor (Group 6)", () => {
+    function extractSessionToken(setCookie: string | null): string | null {
+      if (!setCookie) return null;
+      const match = setCookie.match(/cortex_session=([^;]+)/);
+      if (!match || !match[1]) return null;
+      return decodeURIComponent(match[1]);
+    }
+
+    function decodePayload(
+      token: string,
+    ): Record<string, unknown> | null {
+      const dotIdx = token.lastIndexOf(".");
+      if (dotIdx === -1) return null;
+      try {
+        return JSON.parse(token.substring(0, dotIdx)) as Record<
+          string,
+          unknown
+        >;
+      } catch {
+        return null;
+      }
+    }
+
+    // TS-6.1
+    it("auto-issues a session cookie with Accept-Language locale after step-1 user creation", async () => {
+      const app = await createSetupApp({ getUserCount: 0 });
+
+      const res = await app.request("/setup/step/1", {
+        method: "POST",
+        body: new URLSearchParams({
+          display_name: "Tester",
+          password: "a-password-at-least-8",
+          confirm_password: "a-password-at-least-8",
+        }),
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Accept-Language": "de-DE,de;q=0.9,en;q=0.5",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("/setup/step/2");
+
+      const setCookie = res.headers.get("set-cookie");
+      expect(setCookie).toMatch(/cortex_session=/);
+
+      const token = extractSessionToken(setCookie);
+      expect(token).not.toBeNull();
+      const payload = decodePayload(token!);
+      expect(payload).not.toBeNull();
+      expect(payload!.locale).toBe("de");
+      expect(typeof payload!.issued_at).toBe("number");
+    });
+
+    // TS-6.3 — Step 1 same-session double-submit silently advances
+    it("advances step-1 double-submit when the caller already holds a valid session", async () => {
+      const { getUserCount } = await import(
+        "../../src/web/setup-queries.js"
+      );
+
+      // First: create a user and obtain a valid session cookie.
+      (getUserCount as ReturnType<typeof vi.fn>).mockResolvedValue(0);
+      const app = await createSetupApp();
+      const initialRes = await app.request("/setup/step/1", {
+        method: "POST",
+        body: new URLSearchParams({
+          display_name: "Tester",
+          password: "a-password-at-least-8",
+          confirm_password: "a-password-at-least-8",
+        }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+      expect(initialRes.status).toBe(302);
+      const sessionCookie =
+        initialRes.headers.get("set-cookie")?.split(";")[0] ?? "";
+      expect(sessionCookie).toMatch(/^cortex_session=/);
+
+      // Second submit: user now exists and the caller presents the cookie.
+      (getUserCount as ReturnType<typeof vi.fn>).mockResolvedValue(1);
+      const res = await app.request("/setup/step/1", {
+        method: "POST",
+        body: new URLSearchParams({
+          display_name: "Tester",
+          password: "a-password-at-least-8",
+          confirm_password: "a-password-at-least-8",
+        }),
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: sessionCookie,
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("/setup/step/2");
+      // No new cookie is minted on the silent-advance path.
+      const setCookieOnAdvance = res.headers.get("set-cookie");
+      expect(setCookieOnAdvance).toBeNull();
+    });
+
+    // TS-6.5 — Steps 2-4 require a valid session
+    it("redirects /setup/step/2 to /setup when no session is present", async () => {
+      const app = await createSetupApp({ getUserCount: 1 });
+
+      const res = await app.request("/setup/step/2");
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("/setup");
     });
   });
 });

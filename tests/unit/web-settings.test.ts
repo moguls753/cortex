@@ -1134,4 +1134,216 @@ describe("Web Settings", () => {
       }
     });
   });
+
+  // =========================================================================
+  // Auth-refactor Group 8 — Settings re-issue on ui_language change
+  // Scenarios: TS-8.1, TS-8.2, TS-8.3, TS-8.4
+  // =========================================================================
+  describe("Settings re-issue after auth-refactor (Group 8)", () => {
+    function extractSessionFromSetCookie(
+      setCookie: string | null,
+    ): string | null {
+      if (!setCookie) return null;
+      const match = setCookie.match(/cortex_session=([^;]+)/);
+      if (!match || !match[1]) return null;
+      return decodeURIComponent(match[1]);
+    }
+
+    function decodePayload(
+      token: string,
+    ): Record<string, unknown> | null {
+      const dotIdx = token.lastIndexOf(".");
+      if (dotIdx === -1) return null;
+      try {
+        return JSON.parse(token.substring(0, dotIdx)) as Record<
+          string,
+          unknown
+        >;
+      } catch {
+        return null;
+      }
+    }
+
+    function decodeSessionPayload(
+      setCookie: string | null,
+    ): Record<string, unknown> | null {
+      const token = extractSessionFromSetCookie(setCookie);
+      if (!token) return null;
+      return decodePayload(token);
+    }
+
+    async function createTestSettingsWithSecret(): Promise<{ app: Hono }> {
+      const { createAuthMiddleware, createAuthRoutes } = await import(
+        "../../src/web/auth.js"
+      );
+      const { createSettingsRoutes } = await import(
+        "../../src/web/settings.js"
+      );
+
+      const mockSql = {} as any;
+      const mockBroadcaster = { broadcast: vi.fn() } as any;
+
+      const app = new Hono();
+      app.use("*", createAuthMiddleware(TEST_SECRET));
+      // Legacy auth mode — tests that only need a signed session cookie and
+      // don't care about bcrypt + user-table wiring use the string form.
+      app.route("/", createAuthRoutes(TEST_PASSWORD, TEST_SECRET));
+      // Settings routes get the real secret so the re-issue path runs.
+      app.route(
+        "/",
+        createSettingsRoutes(mockSql, mockBroadcaster, TEST_SECRET),
+      );
+
+      return { app };
+    }
+
+    // TS-8.1
+    it("re-issues the session cookie when ui_language changes", async () => {
+      const { getAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ui_language: "en",
+      });
+
+      // Default fetch mock (Ollama check returns ok).
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("", { status: 200 }),
+      );
+
+      const { app } = await createTestSettingsWithSecret();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ ui_language: "de" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      const setCookie = res.headers.get("set-cookie");
+      expect(setCookie).toMatch(/cortex_session=/);
+
+      const payload = decodeSessionPayload(setCookie);
+      expect(payload).not.toBeNull();
+      expect(payload!.locale).toBe("de");
+    });
+
+    // TS-8.2
+    it("preserves the original issued_at when re-issuing the cookie", async () => {
+      const { getAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ui_language: "en",
+      });
+
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("", { status: 200 }),
+      );
+
+      const { app } = await createTestSettingsWithSecret();
+      const loginRes = await app.request("/login", {
+        method: "POST",
+        body: new URLSearchParams({ password: TEST_PASSWORD }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      });
+      const loginSetCookie = loginRes.headers.get("set-cookie");
+      const loginPayload = decodeSessionPayload(loginSetCookie)!;
+      const originalIssuedAt = loginPayload.issued_at as number;
+
+      const cookieValue = extractSessionFromSetCookie(loginSetCookie)!;
+      const cookie = `cortex_session=${encodeURIComponent(cookieValue)}`;
+
+      // Wait at least 10ms so Date.now() is guaranteed to have moved on.
+      await new Promise((r) => setTimeout(r, 15));
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ ui_language: "de" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      const reissuedSetCookie = res.headers.get("set-cookie");
+      const reissuedPayload = decodeSessionPayload(reissuedSetCookie);
+      expect(reissuedPayload).not.toBeNull();
+      expect(reissuedPayload!.issued_at).toBe(originalIssuedAt);
+    });
+
+    // TS-8.3
+    it("does not re-issue the session cookie when ui_language is unchanged", async () => {
+      const { getAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ui_language: "en",
+      });
+
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("", { status: 200 }),
+      );
+
+      const { app } = await createTestSettingsWithSecret();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ ui_language: "en" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      const setCookie = res.headers.get("set-cookie") ?? "";
+      expect(setCookie).not.toMatch(/cortex_session=[^;]/);
+    });
+
+    // TS-8.4
+    it("keeps the user authenticated after re-issuing with a new locale", async () => {
+      const { getAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ui_language: "en",
+      });
+
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("", { status: 200 }),
+      );
+
+      const { app } = await createTestSettingsWithSecret();
+      const cookie = await loginAndGetCookie(app);
+
+      const postRes = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ ui_language: "de" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      const newCookie =
+        postRes.headers.get("set-cookie")?.split(";")[0] ?? cookie;
+
+      // Update the mock to reflect the now-persisted new locale so the
+      // follow-up GET renders in German.
+      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ui_language: "de",
+      });
+
+      const getRes = await app.request("/settings", {
+        headers: { Cookie: newCookie },
+      });
+
+      expect(getRes.status).toBe(200);
+    });
+  });
 });

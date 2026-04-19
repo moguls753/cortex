@@ -7,6 +7,8 @@ import { getServiceStatus } from "./service-checkers.js";
 import { getAllSettings, saveAllSettings } from "./settings-queries.js";
 import { escapeHtml } from "./shared.js";
 import { i18next, type Locale } from "./i18n/index.js";
+import { resolveLoginLocale } from "./i18n/resolve.js";
+import { getSessionData, issueSessionCookie } from "./session.js";
 import { getLLMConfig, saveLLMConfig } from "../llm/config.js";
 import type { LLMConfig } from "../llm/config.js";
 import { restartBot, isBotRunning } from "../telegram.js";
@@ -193,7 +195,11 @@ function validateSettings(form: Record<string, string>): string | null {
   return null;
 }
 
-export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Hono {
+export function createSettingsRoutes(
+  sql: Sql,
+  broadcaster?: SSEBroadcaster,
+  secret?: string,
+): Hono {
   const app = new Hono();
 
   app.get("/settings", async (c) => {
@@ -1508,6 +1514,28 @@ export function createSettingsRoutes(sql: Sql, broadcaster?: SSEBroadcaster): Ho
 
     await saveAllSettings(sql, toSave);
     await saveLLMConfig(sql, llmConfig);
+
+    // Re-issue the session cookie if the user's effective locale changed. The
+    // re-issue preserves the original `issued_at` so the 30-day session clock
+    // is not reset — the user only gets a cookie swap, not a fresh session.
+    // Skipped when no secret is configured (e.g., legacy test harness that
+    // mounts settings in isolation without auth).
+    if (secret) {
+      const cookieHeader = c.req.header("cookie") ?? null;
+      const existing = getSessionData(cookieHeader, secret);
+      if (existing) {
+        const newLocale = resolveLoginLocale(
+          toSave.ui_language || undefined,
+          c.req.header("Accept-Language"),
+        );
+        if (newLocale !== existing.locale) {
+          issueSessionCookie(c, secret, {
+            locale: newLocale,
+            issuedAt: existing.issuedAt,
+          });
+        }
+      }
+    }
 
     // Restart Telegram bot if token was saved (stops old instance if running, starts new)
     if (form.telegram_bot_token) {

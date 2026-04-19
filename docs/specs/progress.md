@@ -1,6 +1,6 @@
 # Spec-DD Progress Tracker
 
-Last updated: 2026-04-18 (ui-language complete)
+Last updated: 2026-04-19 (auth-refactor complete)
 
 ## Feature Status
 
@@ -23,6 +23,7 @@ Last updated: 2026-04-18 (ui-language complete)
 | onboarding (registration wizard) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | kitchen-display (TRMNL) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ui-language | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| auth-refactor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
@@ -178,6 +179,8 @@ Remaining known trade-offs (documented for Phase 6 review; tests green):
 
 All 17 features now complete through all 6 spec-dd phases.
 
+**Auth Refactor complete (2026-04-19).** All 6 phases done. 787 / 787 unit + 169 / 169 integration (zero regressions; +20 net new unit tests). Review report at `docs/specs/auth-refactor-implementation-review.md`. PASS verdict after a doublecheck / ultrathink review pass that closed 7 findings (F-1 coverage gap, F-2 redundant type casts, F-3 magic number, F-4 preserved-behavior audit, F-5 locale-injection audit, F-6 re-issue semantics, F-7 legacy-mode cookie shape). Structural cleanup with one performance improvement: `src/web/session.ts` extracted as the single source of truth for cookie sign/verify/parse/issue; `src/web/auth.ts` is now the real, wired auth path (middleware + `/login` + `/logout`); `src/web/setup.ts` owns only the wizard and no longer duplicates session helpers; `src/web/i18n/middleware.ts` changes signature from `(sql)` to `(secret)` and reads locale from the session cookie — zero DB queries per authenticated request. Session payload is exactly `{ issued_at: number, locale: string }` (no `user_id` — we stay single-user). Settings POST re-issues the cookie on `ui_language` change, preserving the original `issued_at` so the 30-day expiry is not reset. Two tech-debt items documented: `createAuthRoutes` accepts a string password for legacy test harnesses, `createSettingsRoutes` keeps `secret` optional so existing isolation tests continue to mount settings without auth. Both are non-blocking follow-ups.
+
 ## Spec Files
 
 | Feature | Files |
@@ -195,6 +198,7 @@ All 17 features now complete through all 6 spec-dd phases.
 | mcp-server | `mcp-server-specification.md`, `mcp-server-test-specification.md`, `mcp-server-test-implementation-specification.md`, `mcp-server-implementation-review.md` |
 | digests | `digests-specification.md`, `digests-test-specification.md`, `digests-test-implementation-specification.md`, `digests-implementation-review.md` |
 | ui-language | `ui-language-specification.md`, `ui-language-test-specification.md`, `ui-language-test-implementation-specification.md`, `ui-language-implementation-review.md` |
+| auth-refactor | `auth-refactor-specification.md`, `auth-refactor-test-specification.md`, `auth-refactor-test-implementation-specification.md`, `auth-refactor-implementation-review.md` |
 
 ## Other Documents
 

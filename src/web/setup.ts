@@ -1,12 +1,21 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+/**
+ * Setup wizard: first-run onboarding flow and the setup-mode middleware.
+ *
+ * This module owns ONLY the wizard. After the auth refactor, login and
+ * logout live in `./auth.js`, and session cookie primitives live in
+ * `./session.js`. No session-crypto helpers are defined here.
+ */
+
 import { Hono } from "hono";
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type postgres from "postgres";
 import type { TFunction } from "i18next";
 import bcrypt from "bcryptjs";
+import { getSessionData, issueSessionCookie } from "./session.js";
 import { escapeHtml } from "./shared.js";
 import { i18next, type Locale } from "./i18n/index.js";
-import { getUserCount, getUserPasswordHash, createUser, getSetupSummary } from "./setup-queries.js";
+import { parseAcceptLanguage } from "./i18n/resolve.js";
+import { getUserCount, createUser, getSetupSummary } from "./setup-queries.js";
 import { saveAllSettings } from "./settings-queries.js";
 import { getLLMConfig, saveLLMConfig } from "../llm/config.js";
 import type { LLMConfig } from "../llm/config.js";
@@ -23,10 +32,6 @@ import {
 } from "./icons.js";
 
 type Sql = postgres.Sql;
-
-const COOKIE_NAME = "cortex_session";
-const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
-const THIRTY_DAYS_MS = THIRTY_DAYS_SECONDS * 1000;
 
 const PROVIDER_PRESETS: Record<string, { label: string; baseUrl: string; needsKey: boolean }> = {
   anthropic: { label: "Anthropic", baseUrl: "https://api.anthropic.com/v1", needsKey: true },
@@ -59,89 +64,6 @@ async function fetchProviderModels(provider: string, apiKey: string, baseUrl: st
   } catch {
     return [];
   }
-}
-
-// ─── Session Helpers ───────────────────────────────────────────────
-
-function sign(payload: string, secret: string): string {
-  const signature = createHmac("sha256", secret)
-    .update(payload)
-    .digest("base64url");
-  return `${payload}.${signature}`;
-}
-
-function verify(token: string, secret: string): string | null {
-  const dotIndex = token.lastIndexOf(".");
-  if (dotIndex === -1) return null;
-
-  const payload = token.substring(0, dotIndex);
-  const signature = token.substring(dotIndex + 1);
-
-  const expected = createHmac("sha256", secret)
-    .update(payload)
-    .digest("base64url");
-
-  try {
-    const sigBuf = Buffer.from(signature, "base64url");
-    const expBuf = Buffer.from(expected, "base64url");
-    if (sigBuf.length !== expBuf.length) return null;
-    if (!timingSafeEqual(sigBuf, expBuf)) return null;
-  } catch {
-    return null;
-  }
-
-  return payload;
-}
-
-function parseCookies(header: string): Record<string, string> {
-  const cookies: Record<string, string> = {};
-  for (const pair of header.split(";")) {
-    const eqIndex = pair.indexOf("=");
-    if (eqIndex === -1) continue;
-    const key = pair.substring(0, eqIndex).trim();
-    const value = pair.substring(eqIndex + 1).trim();
-    cookies[key] = value;
-  }
-  return cookies;
-}
-
-function getSessionPayload(
-  cookieHeader: string | null,
-  secret: string,
-): { issuedAt: number } | null {
-  if (!cookieHeader) return null;
-
-  const cookies = parseCookies(cookieHeader);
-  const token = cookies[COOKIE_NAME];
-  if (!token) return null;
-
-  const decoded = decodeURIComponent(token);
-  const payload = verify(decoded, secret);
-  if (!payload) return null;
-
-  try {
-    const data = JSON.parse(payload);
-    if (typeof data.issued_at !== "number") return null;
-    return { issuedAt: data.issued_at };
-  } catch {
-    return null;
-  }
-}
-
-function isAuthenticated(cookieHeader: string | null, secret: string): boolean {
-  const session = getSessionPayload(cookieHeader, secret);
-  if (!session) return false;
-  const elapsed = Date.now() - session.issuedAt;
-  return elapsed < THIRTY_DAYS_MS;
-}
-
-function setSessionCookie(c: any, secret: string): void {
-  const payload = JSON.stringify({ issued_at: Date.now() });
-  const token = sign(payload, secret);
-  const cookieValue = encodeURIComponent(token);
-  const setCookie =
-    `${COOKIE_NAME}=${cookieValue}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${THIRTY_DAYS_SECONDS}`;
-  c.header("Set-Cookie", setCookie);
 }
 
 // ─── Setup Layout ──────────────────────────────────────────────────
@@ -200,17 +122,16 @@ function stepIndicator(current: number): string {
 }
 
 // ─── Setup Middleware ──────────────────────────────────────────────
+// Handles wizard-mode detection only. When no user exists, redirect
+// everything (except the wizard itself and a small allowlist) to `/setup`.
+// When a user exists, pass through — `createAuthMiddleware` from `./auth.js`
+// takes over.
 
-export function createSetupMiddleware(sql: Sql, secret: string): MiddlewareHandler {
-  if (!secret) {
-    throw new Error("createSetupMiddleware requires a non-empty session secret");
-  }
-  const sessionSecret = secret;
-
+export function createSetupMiddleware(sql: Sql): MiddlewareHandler {
   return async (c, next) => {
     const path = c.req.path;
 
-    // Always allow health, public assets, display endpoints
+    // Always allow: health, static assets, display endpoints.
     if (
       path === "/health" ||
       path.startsWith("/public/") ||
@@ -224,7 +145,7 @@ export function createSetupMiddleware(sql: Sql, secret: string): MiddlewareHandl
     const count = await getUserCount(sql);
 
     if (count === 0) {
-      // Setup mode: allow /setup* routes, redirect everything else to /setup
+      // Wizard mode: allow /setup*, redirect everything else to /setup.
       if (path.startsWith("/setup")) {
         await next();
         return;
@@ -232,35 +153,8 @@ export function createSetupMiddleware(sql: Sql, secret: string): MiddlewareHandl
       return c.redirect("/setup", 302);
     }
 
-    // Normal mode (user exists)
-
-    // /setup* routes: let through to route handlers (they handle redirect logic)
-    // The route handlers will redirect /setup to /login or / as appropriate
-    if (path.startsWith("/setup")) {
-      await next();
-      return;
-    }
-
-    // Allow /login and /logout through
-    if (path === "/login" || path === "/logout") {
-      await next();
-      return;
-    }
-
-    // For all other routes: check authentication
-    const cookieHeader = c.req.header("cookie") ?? null;
-    if (isAuthenticated(cookieHeader, sessionSecret)) {
-      await next();
-      return;
-    }
-
-    // Not authenticated — redirect to /login
-    if (path.startsWith("/api/") || path.startsWith("/mcp")) {
-      return c.text("Unauthorized", 401);
-    }
-
-    const redirect = encodeURIComponent(path);
-    return c.redirect(`/login?redirect=${redirect}`, 302);
+    // Normal mode — auth middleware (registered next) handles everything.
+    await next();
   };
 }
 
@@ -273,60 +167,13 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
   const app = new Hono();
   const sessionSecret = secret;
 
-  // ── Login Routes ──────────────────────────────────────────────
-
-  // GET /login
-  app.get("/login", async (c) => {
-    // If no user exists, redirect to /setup
-    const count = await getUserCount(sql);
-    if (count === 0) {
-      return c.redirect("/setup", 302);
-    }
-
-    // If already authenticated, redirect to /
+  function isAuthenticated(c: Context): boolean {
     const cookieHeader = c.req.header("cookie") ?? null;
-    if (isAuthenticated(cookieHeader, sessionSecret)) {
-      return c.redirect("/", 302);
-    }
-
-    const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
-    const t = c.get("t") as TFunction | undefined;
-    return c.html(renderLoginPage(undefined, locale, t));
-  });
-
-  // POST /login
-  app.post("/login", async (c) => {
-    const body = await c.req.parseBody();
-    const submittedPassword = (body["password"] as string) || "";
-
-    const passwordHash = await getUserPasswordHash(sql);
-    if (!passwordHash) {
-      return c.redirect("/setup", 302);
-    }
-
-    const isValid = await bcrypt.compare(submittedPassword, passwordHash);
-    if (!isValid) {
-      const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
-      const t = c.get("t") as TFunction | undefined;
-      return c.html(renderLoginPage("Invalid password", locale, t), 200);
-    }
-
-    // Create session
-    setSessionCookie(c, sessionSecret);
-
-    // Redirect to original URL or /
-    const url = new URL(c.req.url);
-    const redirectTo = url.searchParams.get("redirect") || "/";
-    return c.redirect(redirectTo, 302);
-  });
-
-  // POST /logout
-  app.post("/logout", (c) => {
-    const setCookie =
-      `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
-    c.header("Set-Cookie", setCookie);
-    return c.redirect("/login", 302);
-  });
+    const session = getSessionData(cookieHeader, sessionSecret);
+    if (!session) return false;
+    const elapsed = Date.now() - session.issuedAt;
+    return elapsed < 30 * 24 * 60 * 60 * 1000;
+  }
 
   // ── Setup Wizard Routes ──────────────────────────────────────
 
@@ -334,8 +181,7 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
   app.get("/setup", async (c) => {
     const count = await getUserCount(sql);
     if (count > 0) {
-      const cookieHeader = c.req.header("cookie") ?? null;
-      if (isAuthenticated(cookieHeader, sessionSecret)) {
+      if (isAuthenticated(c)) {
         return c.redirect("/", 302);
       }
       return c.redirect("/login", 302);
@@ -349,8 +195,7 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
   app.get("/setup/step/1", async (c) => {
     const count = await getUserCount(sql);
     if (count > 0) {
-      const cookieHeader = c.req.header("cookie") ?? null;
-      if (isAuthenticated(cookieHeader, sessionSecret)) {
+      if (isAuthenticated(c)) {
         return c.redirect("/", 302);
       }
       return c.redirect("/login", 302);
@@ -368,8 +213,7 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
     // a session cookie for the real user.
     const preCount = await getUserCount(sql);
     if (preCount > 0) {
-      const cookieHeader = c.req.header("cookie") ?? null;
-      if (isAuthenticated(cookieHeader, sessionSecret)) {
+      if (isAuthenticated(c)) {
         // Same-session double-submit — silently advance.
         return c.redirect("/setup/step/2", 302);
       }
@@ -416,16 +260,19 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
       return c.html(renderStep1("Could not create account. Please try again.", displayName));
     }
 
-    // Auto-login — first successful creation only.
-    setSessionCookie(c, sessionSecret);
+    // Auto-login — first successful creation only. Seed locale from
+    // Accept-Language since `ui_language` cannot have been set yet.
+    const locale = parseAcceptLanguage(
+      c.req.header("Accept-Language") ?? null,
+    );
+    issueSessionCookie(c, sessionSecret, { locale });
 
     return c.redirect("/setup/step/2", 302);
   });
 
   // Helper: require authentication for steps 2-4
   function requireSetupAuth(c: any): Response | null {
-    const cookieHeader = c.req.header("cookie") ?? null;
-    if (!isAuthenticated(cookieHeader, sessionSecret)) {
+    if (!isAuthenticated(c)) {
       return c.redirect("/setup", 302);
     }
     return null;
@@ -481,8 +328,9 @@ export function createSetupRoutes(sql: Sql, secret: string): Hono {
   app.post("/setup/api/models", async (c) => {
     const count = await getUserCount(sql);
     if (count > 0) {
-      const authRedirect = requireSetupAuth(c);
-      if (authRedirect) return c.json({ error: "unauthorized" }, 401);
+      if (!isAuthenticated(c)) {
+        return c.json({ error: "unauthorized" }, 401);
+      }
     }
     const body = await c.req.json().catch(() => ({})) as Record<string, string>;
     const provider = body.provider || "";
@@ -1004,66 +852,4 @@ function renderStep4(summary: { hasUser: boolean; hasLLM: boolean; hasTelegram: 
       </div>
     </div>
   `);
-}
-
-function renderLoginPage(error?: string, locale: Locale = "en", t?: TFunction): string {
-  const tr = t ?? (i18next.getFixedT(locale) as TFunction);
-  const errorText = error ? (error === "Invalid password" ? tr("login.error") : error) : "";
-  const errorHtml = errorText
-    ? `<div class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">${escapeHtml(errorText)}</div>`
-    : "";
-
-  return `<!DOCTYPE html>
-<html lang="${locale}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(tr("login.heading"))} — Cortex</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
-  <link rel="stylesheet" href="/public/style.css">
-  <script>
-    (function(){
-      try {
-        var t = localStorage.getItem("cortex-theme");
-        var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        if (t === "dark" || (!t && prefersDark)) {
-          document.documentElement.classList.add("dark");
-        }
-      } catch(e) {}
-    })();
-  </script>
-</head>
-<body class="font-sans antialiased">
-  <div class="h-dvh flex flex-col px-6 py-4 gap-4 max-w-lg mx-auto w-full justify-center">
-    <div class="flex items-center justify-center gap-2 mb-4">
-      ${iconBrain("size-4 text-primary")}
-      <span class="text-sm font-medium text-foreground tracking-tight">cortex</span>
-    </div>
-    <div class="rounded-md border border-border bg-card p-4">
-      <div class="flex items-center gap-2 mb-3">
-        ${iconShield("size-3 text-primary")}
-        <span class="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">${escapeHtml(tr("login.heading"))}</span>
-        <span class="flex-1 h-px bg-border"></span>
-      </div>
-      <form method="POST" class="space-y-3">
-        ${errorHtml}
-        <div class="flex flex-col gap-1.5">
-          <label for="password" class="text-xs text-muted-foreground">${escapeHtml(tr("login.password_label"))}</label>
-          <input type="password" id="password" name="password" required
-            class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-        </div>
-        <div class="flex justify-end pt-1">
-          <button type="submit"
-            class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-            ${escapeHtml(tr("login.submit"))}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</body>
-</html>`;
 }

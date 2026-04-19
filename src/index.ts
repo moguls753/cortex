@@ -7,6 +7,7 @@ import { createDbConnection, runMigrations } from "./db/index.js";
 import { createHealthRoute } from "./web/health.js";
 import { createServiceCheckers } from "./web/service-checkers.js";
 import { createSetupMiddleware, createSetupRoutes } from "./web/setup.js";
+import { createAuthMiddleware, createAuthRoutes } from "./web/auth.js";
 import { createLocaleMiddleware } from "./web/i18n/middleware.js";
 import { initI18n } from "./web/i18n/index.js";
 import { createDashboardRoutes } from "./web/dashboard.js";
@@ -69,12 +70,18 @@ async function main(): Promise<void> {
 
   // Locale middleware — runs before everything else so pre-auth pages
   // (login, setup wizard) also see the resolved locale in c.get("t").
-  app.use("*", createLocaleMiddleware(sql));
+  // Reads locale from the session cookie (zero DB queries).
+  app.use("*", createLocaleMiddleware(sessionSecret));
 
-  // Setup middleware handles both setup-mode detection and authentication
-  app.use("*", createSetupMiddleware(sql, sessionSecret));
+  // Setup middleware — wizard-mode detection only. When no user exists,
+  // redirect non-setup traffic to /setup.
+  app.use("*", createSetupMiddleware(sql));
 
-  // Mount routes (setup routes include login/logout + wizard)
+  // Auth middleware — session-cookie gate for all other routes.
+  app.use("*", createAuthMiddleware(sessionSecret));
+
+  // Mount routes
+  app.route("/", createAuthRoutes(sql, sessionSecret));
   app.route("/", createSetupRoutes(sql, sessionSecret));
   app.route("/", createHealthRoute(checkers));
   app.route("/", createDashboardRoutes(sql, broadcaster));
@@ -82,7 +89,7 @@ async function main(): Promise<void> {
   app.route("/", createTrashRoutes(sql));
   app.route("/", createEntryRoutes(sql));
   app.route("/", createNewNoteRoutes(sql));
-  app.route("/", createSettingsRoutes(sql, broadcaster));
+  app.route("/", createSettingsRoutes(sql, broadcaster, sessionSecret));
 
   // MCP HTTP endpoint (JSON-RPC)
   const mcpHandler = createMcpHttpHandler(sql);

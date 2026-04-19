@@ -3,13 +3,18 @@
  *
  * `parseAcceptLanguage` parses per RFC 9110 §12.5.4 quality-value ordering
  * and returns the first supported primary subtag, or "en" fallback.
- * `resolveLocale` layers the DB setting on top for authenticated requests.
+ *
+ * After the auth refactor, the authenticated request path no longer reads
+ * `ui_language` from the database on every request — the locale lives in
+ * the session cookie and is seeded at login time. `resolveLocale` therefore
+ * takes no `sql` argument; the login handler uses `resolveLoginLocale` once
+ * per login to decide what to encode into the new cookie.
  */
 
-import type { Sql } from "postgres";
 import type { Context } from "hono";
+import type { SessionData } from "../session.js";
+import { getSessionData } from "../session.js";
 import { SUPPORTED_LOCALES, type Locale } from "./index.js";
-import { getAllSettings } from "../settings-queries.js";
 
 const SUPPORTED_SET = new Set<string>(SUPPORTED_LOCALES);
 
@@ -61,34 +66,52 @@ export function parseAcceptLanguage(
 }
 
 /**
- * Resolve the locale for a request.
+ * Resolve the locale for a request at middleware time.
  *
  * - Pre-auth (login, setup wizard): Accept-Language only.
- * - Authenticated: DB `ui_language` setting first, then Accept-Language,
- *   then "en". Unrecognized DB values (e.g. "fr") fall through to
- *   Accept-Language as if unset.
+ * - Authenticated: cookie locale if valid and supported, otherwise Accept-
+ *   Language fallback, otherwise "en".
+ *
+ * Zero database queries.
  */
-export async function resolveLocale(
+export function resolveLocale(
   c: Context,
-  sql: Sql,
+  secret: string,
   isPreAuth: boolean,
-): Promise<Locale> {
-  const header = c.req.header("Accept-Language");
+): Locale {
+  const acceptLanguage = c.req.header("Accept-Language");
 
   if (isPreAuth) {
-    return parseAcceptLanguage(header);
+    return parseAcceptLanguage(acceptLanguage);
   }
 
-  let dbValue: string | undefined;
-  try {
-    const settings = await getAllSettings(sql);
-    const raw = settings?.ui_language;
-    dbValue = typeof raw === "string" ? raw : undefined;
-  } catch {
-    dbValue = undefined;
+  // Authenticated path — read the cookie.
+  const cookieHeader = c.req.header("cookie") ?? null;
+  const session: SessionData | null = getSessionData(cookieHeader, secret);
+  if (session && SUPPORTED_SET.has(session.locale)) {
+    return session.locale as Locale;
   }
+  // Unsupported or missing locale in a structurally-valid cookie: "en" fallback.
+  if (session) return "en";
+  // Cookie absent / invalid — auth middleware will redirect; meanwhile we
+  // supply a sensible default so the context's `t()` never blows up.
+  return parseAcceptLanguage(acceptLanguage);
+}
+
+/**
+ * Resolve the locale to encode into a freshly issued session cookie at login
+ * time. Order: DB `ui_language` setting (when supported) > Accept-Language
+ * header > "en".
+ *
+ * This is the only path that still honours the `ui_language` setting; the
+ * per-request middleware no longer touches the database.
+ */
+export function resolveLoginLocale(
+  dbValue: string | undefined,
+  acceptLanguage: string | undefined | null,
+): Locale {
   if (dbValue && SUPPORTED_SET.has(dbValue)) {
     return dbValue as Locale;
   }
-  return parseAcceptLanguage(header);
+  return parseAcceptLanguage(acceptLanguage ?? null);
 }

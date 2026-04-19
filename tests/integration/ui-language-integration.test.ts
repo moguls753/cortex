@@ -85,13 +85,13 @@ async function createIntegrationApp(
   const broadcaster = createSSEBroadcaster();
 
   const app = new Hono();
-  app.use("*", createLocaleMiddleware(sql));
-  app.use("*", createSetupMiddleware(sql, TEST_SECRET));
-  app.route("/", createSetupRoutes(sql, TEST_SECRET));
-  app.route("/", createAuthRoutes(TEST_PASSWORD, TEST_SECRET));
+  app.use("*", createLocaleMiddleware(TEST_SECRET));
+  app.use("*", createSetupMiddleware(sql));
   app.use("*", createAuthMiddleware(TEST_SECRET));
+  app.route("/", createAuthRoutes(sql, TEST_SECRET));
+  app.route("/", createSetupRoutes(sql, TEST_SECRET));
   app.route("/", createDashboardRoutes(sql, broadcaster));
-  app.route("/", createSettingsRoutes(sql));
+  app.route("/", createSettingsRoutes(sql, broadcaster, TEST_SECRET));
 
   return { app };
 }
@@ -99,17 +99,28 @@ async function createIntegrationApp(
 async function loginAndGetCookie(
   app: Hono,
   password = TEST_PASSWORD,
+  acceptLanguage?: string,
 ): Promise<string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  if (acceptLanguage) headers["Accept-Language"] = acceptLanguage;
   const res = await app.request("/login", {
     method: "POST",
     body: new URLSearchParams({ password }),
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers,
   });
   const setCookie = res.headers.get("set-cookie");
   if (!setCookie) {
     throw new Error("No Set-Cookie header in login response");
   }
   return setCookie.split(";")[0]!;
+}
+
+function extractSessionCookieFromHeader(header: string | null): string | null {
+  if (!header) return null;
+  const match = header.match(/cortex_session=[^;]+/);
+  return match ? match[0] : null;
 }
 
 // ─── Test Suite ──────────────────────────────────────────────────────
@@ -170,9 +181,14 @@ describe("UI Language Integration", () => {
       expect(rows.length).toBe(1);
       expect(rows[0].value).toBe("de");
 
-      // Follow redirect — dashboard GET renders German nav labels
+      // Post-refactor: the POST handler re-issues the session cookie with the
+      // new locale. Use the re-issued cookie for the follow-up dashboard GET.
+      const reissued =
+        extractSessionCookieFromHeader(postRes.headers.get("set-cookie")) ??
+        cookie;
+
       const getRes = await app.request("/", {
-        headers: { Cookie: cookie },
+        headers: { Cookie: reissued },
       });
       const body = await getRes.text();
       expect(body).toContain('<html lang="de"');
@@ -188,15 +204,18 @@ describe("UI Language Integration", () => {
   describe("Accept-Language fallback from real DB", () => {
     it("empty ui_language row falls back to Accept-Language with real DB", async () => {
       const { app } = await createIntegrationApp(db.sql);
-      const cookie = await loginAndGetCookie(app);
 
       // No ui_language row in the settings table (beforeEach truncates)
       const rowsBefore =
         await db.sql`SELECT value FROM settings WHERE key = 'ui_language'`;
       expect(rowsBefore.length).toBe(0);
 
+      // Post-refactor: Accept-Language is consumed at login time to seed the
+      // cookie. Subsequent requests use the cookie.
+      const cookie = await loginAndGetCookie(app, TEST_PASSWORD, "de");
+
       const res = await app.request("/", {
-        headers: { Cookie: cookie, "Accept-Language": "de" },
+        headers: { Cookie: cookie },
       });
 
       const body = await res.text();
