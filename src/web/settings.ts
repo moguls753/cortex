@@ -209,9 +209,11 @@ export function createSettingsRoutes(
       (i18next.getFixedT(locale) as TFunction);
 
     const healthPromise = getServiceStatus(sql, { isBotRunning });
-    const dbSettings = (await getAllSettings(sql)) ?? {};
-
-    const llmConfig = await getLLMConfig(sql);
+    const [dbSettingsRaw, llmConfig] = await Promise.all([
+      getAllSettings(sql),
+      getLLMConfig(sql),
+    ]);
+    const dbSettings = dbSettingsRaw ?? {};
     const llmProvider = llmConfig.provider;
     const llmModel = llmConfig.model;
     const llmBaseUrl = llmConfig.baseUrl;
@@ -274,45 +276,9 @@ export function createSettingsRoutes(
     }
     const gcalConnected = !!gcalRefreshToken;
 
-    // If tokens exist, try to validate them
-    let gcalValidated = gcalConnected;
-    if (gcalConnected && gcalClientId) {
-      try {
-        const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            grant_type: "refresh_token",
-            refresh_token: gcalRefreshToken,
-            client_id: gcalClientId,
-            client_secret: gcalClientSecret,
-          }),
-          signal: AbortSignal.timeout(3000),
-        });
-        if (!tokenRes.ok) gcalValidated = false;
-      } catch {
-        gcalValidated = false;
-      }
-    }
-
-    // Fetch models for the currently selected provider
-    let providerModels: string[] = [];
-    const activePreset = PROVIDER_PRESETS[llmProvider];
-    if (activePreset?.needsKey) {
-      const key = llmConfig.apiKeys[llmProvider] ?? "";
-      const effectiveBaseUrl = llmBaseUrl || activePreset.baseUrl || "";
-      providerModels = await fetchProviderModels(llmProvider, key, effectiveBaseUrl);
-    }
-
-    // Fetch available Ollama models
-    let ollamaModels: string[] = [];
-    try {
-      const tagsRes = await fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(2000) });
-      if (tagsRes.ok) {
-        const tagsData = await tagsRes.json() as { models?: { name: string }[] };
-        ollamaModels = (tagsData.models ?? []).map((m) => m.name);
-      }
-    } catch { /* Ollama unreachable — show empty list */ }
+    const gcalValidated = gcalConnected;
+    const providerModels: string[] = [];
+    const ollamaModels: string[] = [];
 
     const success = c.req.query("success") || "";
     const error = c.req.query("error") || "";
@@ -470,33 +436,16 @@ export function createSettingsRoutes(
               <label class="text-xs text-muted-foreground">Model</label>
               ${(() => {
                 const isTextProvider = llmProvider === "local" || llmProvider === "ollama";
-                if (isTextProvider) {
-                  return `<input type="text" id="llm_model_text"
-                    value="${escapeHtml(llmModel)}"
-                    placeholder="e.g. qwen2.5:7b"
-                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-                  <input type="hidden" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" />`;
-                }
-                if (providerModels.length > 0) {
-                  const otherSel = !providerModels.includes(llmModel) ? " selected" : "";
-                  const opts = providerModels.map(m =>
-                    `<option value="${escapeHtml(m)}"${llmModel === m ? " selected" : ""}>${escapeHtml(m)}</option>`
-                  ).join("") + `<option value="__other__"${otherSel}>Other...</option>`;
-                  return `<select id="llm_model_select"
-                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary">
-                    ${opts}
-                  </select>
+                const needsKey = PROVIDER_PRESETS[llmProvider]?.needsKey ?? false;
+                const savedKey = llmConfig.apiKeys[llmProvider as keyof typeof llmConfig.apiKeys] ?? "";
+                const showHint = needsKey && !isTextProvider && !savedKey;
+                return `
+                  <select id="llm_model_select" class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary hidden"></select>
                   <input type="text" id="llm_model_text"
                     value="${escapeHtml(llmModel)}"
-                    placeholder="Model name..."
-                    class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary hidden" />
-                  <input type="hidden" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" />`;
-                }
-                return `<input type="text" id="llm_model_text"
-                    value="${escapeHtml(llmModel)}"
-                    placeholder="Type model name..."
+                    placeholder="${isTextProvider ? "e.g. qwen2.5:7b" : "Type model name..."}"
                     class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
-                  <span id="model-key-hint" class="text-[10px] text-muted-foreground italic">Enter an API key to see available models</span>
+                  <span id="model-key-hint" class="text-[10px] text-muted-foreground italic${showHint ? "" : " hidden"}">Enter an API key to see available models</span>
                   <input type="hidden" id="llm_model" name="llm_model" value="${escapeHtml(llmModel)}" />`;
               })()}
             </div>
@@ -556,10 +505,7 @@ export function createSettingsRoutes(
                     <span id="no-models-hint" class="text-[10px] text-muted-foreground">No models pulled yet — click Pull Model or type a name below.</span>
                   </div>`
               }
-              ${llmProvider === "ollama" && llmModel && !ollamaModels.includes(llmModel)
-                ? `<div class="mt-1.5 text-[10px] text-yellow-600 dark:text-yellow-400">${iconAlertTriangle("size-3 inline")} Model <span class="font-mono">${escapeHtml(llmModel)}</span> not available yet — a download may still be in progress. Click Pull Model to start or resume.</div>`
-                : ""
-              }
+              <div id="ollama-model-missing" class="hidden mt-1.5 text-[10px] text-yellow-600 dark:text-yellow-400"></div>
               <!-- Pull progress -->
               <div id="ollama-pull-progress" class="hidden mt-2">
                 <div class="flex items-center justify-between mb-1">
@@ -1397,6 +1343,72 @@ export function createSettingsRoutes(
           }
         });
       }
+
+      /* ── Lazy model loading ── */
+      function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      }
+
+      function loadModels() {
+        fetch('/api/models')
+          .then(function(res) { if (!res.ok) throw new Error('failed'); return res.json(); })
+          .then(function(data) {
+            var isTextProvider = currentKeyProvider === 'local' || currentKeyProvider === 'ollama';
+            var currentModel = modelHidden ? modelHidden.value : '';
+
+            // Populate Ollama chips
+            if (data.ollamaModels && data.ollamaModels.length > 0) {
+              OLLAMA_MODELS = data.ollamaModels;
+              data.ollamaModels.forEach(function(m) { addModelChip(m); });
+              // Re-highlight active chip
+              document.querySelectorAll('.ollama-model-chip').forEach(function(c) {
+                if (c.getAttribute('data-ollama-model') === currentModel) {
+                  c.classList.add('border-primary', 'text-primary');
+                }
+              });
+              // Show warning if configured model is not in the list
+              var missingEl = document.getElementById('ollama-model-missing');
+              if (missingEl && currentKeyProvider === 'ollama' && currentModel && OLLAMA_MODELS.indexOf(currentModel) === -1) {
+                missingEl.innerHTML = '${iconAlertTriangle("size-3 inline")} Model <span class="font-mono">' + escHtml(currentModel) + '</span> not available yet \u2014 a download may still be in progress. Click Pull Model to start or resume.';
+                missingEl.classList.remove('hidden');
+              }
+            }
+
+            // Populate provider model select (cloud providers only)
+            // Only switch to select mode if the current model is in the list — otherwise
+            // keep the text input visible so the user can still see their custom model name.
+            if (!isTextProvider && data.providerModels && data.providerModels.length > 0) {
+              var models = data.providerModels;
+              var hasMatch = models.indexOf(currentModel) !== -1;
+              if (modelSelect) {
+                modelSelect.innerHTML = '';
+                models.forEach(function(m) {
+                  var opt = document.createElement('option');
+                  opt.value = m;
+                  opt.textContent = m;
+                  if (m === currentModel) opt.selected = true;
+                  modelSelect.appendChild(opt);
+                });
+                var otherOpt = document.createElement('option');
+                otherOpt.value = '__other__';
+                otherOpt.textContent = 'Other...';
+                if (!hasMatch) otherOpt.selected = true;
+                modelSelect.appendChild(otherOpt);
+                if (hasMatch) {
+                  // Standard model matched — show select, hide text
+                  modelSelect.classList.remove('hidden');
+                  if (modelText) modelText.classList.add('hidden');
+                }
+                // Custom model (!hasMatch): leave text input visible, select stays hidden.
+                // The user keeps seeing their model name; the populated select is ready
+                // for when they switch providers via applyProvider.
+                if (modelKeyHint) modelKeyHint.classList.add('hidden');
+              }
+            }
+          })
+          .catch(function() { /* ignore — text input remains usable */ });
+      }
+      loadModels();
     })();
     </script>`;
 
@@ -1546,14 +1558,31 @@ export function createSettingsRoutes(
       });
     }
 
-    // Ollama connectivity check
+    // Post-save connectivity checks (parallel)
     let warning = "";
-    try {
-      const ollamaCheckUrl = resolveEffective((await getAllSettings(sql)) ?? {}, "ollama_url", DEFAULTS.ollama_url);
-      await fetch(ollamaCheckUrl, { signal: AbortSignal.timeout(3000) });
-    } catch {
-      warning = "Could not connect to the configured Ollama endpoint. Embedding generation may fail.";
-    }
+    const savedSettings = (await getAllSettings(sql)) ?? {};
+    const ollamaCheckUrl = resolveEffective(savedSettings, "ollama_url", DEFAULTS.ollama_url);
+    const gcalRefreshToken = savedSettings.google_refresh_token || "";
+    const gcalClientId = savedSettings.google_client_id || "";
+    const gcalClientSecret = savedSettings.google_client_secret || "";
+    const [ollamaOk, gcalOk] = await Promise.all([
+      fetch(ollamaCheckUrl, { signal: AbortSignal.timeout(3000) }).then(() => true).catch(() => false),
+      (gcalRefreshToken && gcalClientId && gcalClientSecret)
+        ? fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              grant_type: "refresh_token",
+              refresh_token: gcalRefreshToken,
+              client_id: gcalClientId,
+              client_secret: gcalClientSecret,
+            }),
+            signal: AbortSignal.timeout(3000),
+          }).then((r) => r.ok).catch(() => true)
+        : Promise.resolve(true),
+    ]);
+    if (!ollamaOk) warning = "Could not connect to the configured Ollama endpoint. Embedding generation may fail.";
+    if (!gcalOk && !warning) warning = "Saved — but Google Calendar credentials appear invalid.";
 
     const params = new URLSearchParams({ success: "saved" });
     if (warning) params.set("warning", warning);
@@ -1605,6 +1634,30 @@ export function createSettingsRoutes(
     } catch (err) {
       return c.json({ ok: false, error: err instanceof Error ? err.message : "Generation failed" }, 500);
     }
+  });
+
+  // Model list for the settings page (loaded client-side after render)
+  app.get("/api/models", async (c) => {
+    const [dbSettingsRaw, llmConfig] = await Promise.all([
+      getAllSettings(sql),
+      getLLMConfig(sql),
+    ]);
+    const dbSettings = dbSettingsRaw ?? {};
+    const ollamaUrl = resolveEffective(dbSettings, "ollama_url", DEFAULTS.ollama_url);
+    const llmProvider = llmConfig.provider;
+    const activePreset = PROVIDER_PRESETS[llmProvider];
+
+    const [providerModels, ollamaModels] = await Promise.all([
+      activePreset?.needsKey
+        ? fetchProviderModels(llmProvider, llmConfig.apiKeys[llmProvider] ?? "", llmConfig.baseUrl || activePreset.baseUrl || "")
+        : Promise.resolve([] as string[]),
+      fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(2000) })
+        .then((r) => r.ok ? r.json() as Promise<{ models?: { name: string }[] }> : { models: [] as { name: string }[] })
+        .then((data) => (data.models ?? []).map((m) => m.name))
+        .catch(() => [] as string[]),
+    ]);
+
+    return c.json({ providerModels, ollamaModels });
   });
 
   // Ollama model pull — streams progress as SSE
