@@ -3,7 +3,7 @@ import type { WeatherData } from "./types.js";
 // ─── Weather Code Mapping ───────────────────────────────────────
 
 // WMO weather code → display condition label + icon.
-// Source: kitchen-display-specification.md AC-7.6.
+// Source: docs/specs/kitchen-display-specification.md AC-7.6 (historical spec name — the feature is now called "display").
 const weatherCodeMap: Record<number, { condition: string; icon: string }> = {
   0: { condition: "Clear", icon: "sun" },
   1: { condition: "Mainly Clear", icon: "cloud" },

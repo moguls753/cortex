@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { buildLayout } from "../../src/display/layout.js";
-import type { KitchenData } from "../../src/display/types.js";
+import type { DisplayData } from "../../src/display/types.js";
 import {
-  makeKitchenData,
+  makeDisplayData,
   makeEvent,
   makeTask,
   makeWeather,
 } from "../helpers/display-fixtures.js";
 
-const sampleData: KitchenData = {
+const sampleData: DisplayData = {
   date: "Monday, March 31",
   time: "07:30",
   weather: {
@@ -155,7 +155,7 @@ describe("buildLayout", () => {
   // ─── Explicit TS-labeled scenarios ──────────────────────────
 
   it("TS-5.5 — event row contains time, name, and calendar badge", () => {
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: [makeEvent({ time: "09:30", name: "Standup", calendar: "WORK" })],
       tomorrowEvents: [],
       tasks: [],
@@ -176,7 +176,7 @@ describe("buildLayout", () => {
     const events = Array.from({ length: 12 }, (_, i) =>
       makeEvent({ time: `${String(8 + i).padStart(2, "0")}:00`, name: `E${i + 1}` }),
     );
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: events,
       maxTodayEvents: 5,
       tomorrowEvents: [],
@@ -194,7 +194,7 @@ describe("buildLayout", () => {
     const events = Array.from({ length: 8 }, (_, i) =>
       makeEvent({ time: `${String(8 + i).padStart(2, "0")}:00`, name: `E${i + 1}` }),
     );
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: events,
       maxTodayEvents: 5,
       tomorrowEvents: [],
@@ -211,7 +211,7 @@ describe("buildLayout", () => {
     );
     // Layer contract: route passes the already-sliced array (see calendar-data).
     // Emulate the handoff here by slicing to 3.
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       tomorrowEvents: tomorrow.slice(0, 3),
       tasks: [],
       weather: null,
@@ -224,7 +224,7 @@ describe("buildLayout", () => {
   });
 
   it("TS-5.9 — 'No events today' empty state when todayEvents is empty", () => {
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: [],
       tomorrowEvents: [],
       tasks: [],
@@ -235,7 +235,7 @@ describe("buildLayout", () => {
   });
 
   it("TS-5.10 — tomorrow subsection omitted entirely when empty", () => {
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       tomorrowEvents: [],
       tasks: [],
       weather: null,
@@ -246,7 +246,7 @@ describe("buildLayout", () => {
   });
 
   it("TS-6.5 — task row contains name, due label, and a checkbox element", () => {
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: [],
       tomorrowEvents: [],
       tasks: [makeTask({ name: "Buy milk", due: "due Apr 3", done: false })],
@@ -260,7 +260,7 @@ describe("buildLayout", () => {
   });
 
   it("TS-6.7 — done task has line-through on the name", () => {
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: [],
       tomorrowEvents: [],
       tasks: [makeTask({ name: "Done thing", due: null, done: true })],
@@ -271,7 +271,7 @@ describe("buildLayout", () => {
   });
 
   it("TS-6.8 — overdue task renders the due label in bold (fontWeight 700)", () => {
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: [],
       tomorrowEvents: [],
       tasks: [makeTask({ name: "Overdue thing", due: "overdue", done: false })],
@@ -282,7 +282,7 @@ describe("buildLayout", () => {
   });
 
   it("TS-6.9 — 'All clear' empty state when tasks is empty", () => {
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: [],
       tomorrowEvents: [],
       tasks: [],
@@ -293,7 +293,7 @@ describe("buildLayout", () => {
   });
 
   it("TS-7.8 — weather strip shows rounded temp, condition, high/low, and 4 hourly slots", () => {
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       weather: makeWeather({
         current: 13, // already rounded for display
         condition: "Partly Cloudy",
@@ -319,7 +319,7 @@ describe("buildLayout", () => {
   });
 
   it("TS-8.1 — header and footer always render even with no data", () => {
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: [],
       tomorrowEvents: [],
       tasks: [],
@@ -334,7 +334,7 @@ describe("buildLayout", () => {
 
   it("TS-E-3 — very long event name applies overflow/ellipsis/nowrap, layout dimensions preserved", () => {
     const longName = "A".repeat(200);
-    const data = makeKitchenData({
+    const data = makeDisplayData({
       todayEvents: [makeEvent({ name: longName })],
       tomorrowEvents: [],
       tasks: [],

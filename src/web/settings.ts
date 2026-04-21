@@ -172,7 +172,7 @@ function validateSettings(form: Record<string, string>): string | null {
     }
   }
 
-  // Kitchen display — max today events
+  // Display — max today events
   if (form.display_max_today_events) {
     const n = parseInt(form.display_max_today_events, 10);
     if (isNaN(n) || n < 1 || n > 30) {
@@ -180,7 +180,7 @@ function validateSettings(form: Record<string, string>): string | null {
     }
   }
 
-  // Kitchen display — base URL override
+  // Display — base URL override
   if (form.display_base_url) {
     try {
       const u = new URL(form.display_base_url);
@@ -251,7 +251,7 @@ export function createSettingsRoutes(
     const gcalClientId = dbSettings.google_client_id || "";
     const gcalClientSecret = dbSettings.google_client_secret || "";
 
-    // Kitchen Display config
+    // Display config
     const displayEnabled = dbSettings.display_enabled || "";
     const displayToken = dbSettings.display_token || "";
     const displayWeatherLat = dbSettings.display_weather_lat || "";
@@ -864,7 +864,7 @@ export function createSettingsRoutes(
             </div>
             ${displayEnabled === "true" ? `
             <div class="flex items-center gap-2">
-              <a href="/api/kitchen.png" target="_blank" rel="noopener"
+              <a href="/api/display.png" target="_blank" rel="noopener"
                 class="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20 hover:border-primary/50 transition-colors">Preview display →</a>
             </div>` : ""}
           </div>

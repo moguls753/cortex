@@ -1,5 +1,5 @@
 import type {
-  KitchenData,
+  DisplayData,
   DisplayEvent,
   DisplayTask,
   WeatherData,
@@ -40,9 +40,9 @@ export function makeWeather(overrides: Partial<WeatherData> = {}): WeatherData {
   };
 }
 
-export function makeKitchenData(
-  overrides: Partial<KitchenData> = {},
-): KitchenData {
+export function makeDisplayData(
+  overrides: Partial<DisplayData> = {},
+): DisplayData {
   return {
     date: "Monday, March 31",
     time: "07:30",

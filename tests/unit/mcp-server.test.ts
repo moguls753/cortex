@@ -1007,4 +1007,212 @@ describe("MCP Server", () => {
       await server.close();
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Entry Visibility — MCP tool exposure
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Entry Visibility", () => {
+    // TS-5.1
+    it("search_brain payload includes visibility for each result", async () => {
+      const { generateEmbedding } = await import("../../src/embed.js");
+      const { searchBySimilarity } = await import("../../src/mcp-queries.js");
+      const { handleSearchBrain } = await import("../../src/mcp-tools.js");
+
+      vi.mocked(generateEmbedding).mockResolvedValue(createFakeEmbedding());
+      vi.mocked(searchBySimilarity).mockResolvedValue([
+        { ...createMockEntry({ name: "Shared hit" }), similarity: 0.9, visibility: "shared" },
+        { ...createMockEntry({ name: "Private hit" }), similarity: 0.8, visibility: "private" },
+      ] as any);
+
+      const result = await handleSearchBrain(mockSql, { query: "anything" });
+
+      expect(result.isError).toBeFalsy();
+      const data = JSON.parse(result.content[0].text);
+      expect(data).toHaveLength(2);
+      expect(data[0].visibility).toBe("shared");
+      expect(data[1].visibility).toBe("private");
+    });
+
+    // TS-5.2
+    it("list_recent payload includes visibility for each entry", async () => {
+      const { listRecentEntries } = await import("../../src/mcp-queries.js");
+      const { handleListRecent } = await import("../../src/mcp-tools.js");
+
+      vi.mocked(listRecentEntries).mockResolvedValue([
+        { ...createMockEntry({ name: "Shared" }), visibility: "shared" },
+        { ...createMockEntry({ name: "Private" }), visibility: "private" },
+      ] as any);
+
+      const result = await handleListRecent(mockSql, { days: 7 });
+
+      expect(result.isError).toBeFalsy();
+      const data = JSON.parse(result.content[0].text);
+      expect(data).toHaveLength(2);
+      expect(data[0].visibility).toBe("shared");
+      expect(data[1].visibility).toBe("private");
+    });
+
+    // TS-5.3
+    it("get_entry payload includes visibility", async () => {
+      const { getEntryById } = await import("../../src/mcp-queries.js");
+      const { handleGetEntry } = await import("../../src/mcp-tools.js");
+
+      vi.mocked(getEntryById).mockResolvedValue({
+        ...createMockEntry(),
+        visibility: "private",
+      } as any);
+
+      const result = await handleGetEntry(mockSql, { id: VALID_UUID });
+
+      expect(result.isError).toBeFalsy();
+      const data = JSON.parse(result.content[0].text);
+      expect(data.visibility).toBe("private");
+    });
+
+    // TS-5.4
+    it("add_thought with explicit visibility='private' stores as private even when LLM infers 'shared'", async () => {
+      const { classifyText } = await import("../../src/classify.js");
+      const { generateEmbedding } = await import("../../src/embed.js");
+      const { insertMcpEntry } = await import("../../src/mcp-queries.js");
+      const { handleAddThought } = await import("../../src/mcp-tools.js");
+
+      vi.mocked(classifyText).mockResolvedValue({
+        category: "tasks",
+        name: "Test",
+        confidence: 0.9,
+        fields: {},
+        tags: [],
+        content: "text",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      // Phase-4 contract: classifyText result carries visibility in Phase 5.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (vi.mocked(classifyText).mock.results[0] as any) = undefined;
+
+      vi.mocked(generateEmbedding).mockResolvedValue(null);
+      vi.mocked(insertMcpEntry).mockResolvedValue({
+        ...createMockEntry(),
+        visibility: "private",
+      } as any);
+
+      await handleAddThought(mockSql, {
+        text: "capture me",
+        // @ts-expect-error — Phase-4 contract: visibility on add_thought added in Phase 5
+        visibility: "private",
+      });
+
+      expect(vi.mocked(insertMcpEntry)).toHaveBeenCalledTimes(1);
+      const callArgs = vi.mocked(insertMcpEntry).mock.calls[0];
+      const dataArg = callArgs?.[1] as { visibility?: string };
+      expect(dataArg.visibility).toBe("private");
+    });
+
+    // TS-5.5
+    it("add_thought with explicit visibility override bypasses the confidence fail-safe", async () => {
+      const { classifyText } = await import("../../src/classify.js");
+      const { generateEmbedding } = await import("../../src/embed.js");
+      const { insertMcpEntry } = await import("../../src/mcp-queries.js");
+      const { handleAddThought } = await import("../../src/mcp-tools.js");
+
+      // LLM returns low confidence — fail-safe would normally force 'private'.
+      vi.mocked(classifyText).mockResolvedValue({
+        category: "tasks",
+        name: "Low conf",
+        confidence: 0.45,
+        fields: {},
+        tags: [],
+        content: "text",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+
+      vi.mocked(generateEmbedding).mockResolvedValue(null);
+      vi.mocked(insertMcpEntry).mockResolvedValue({
+        ...createMockEntry(),
+        visibility: "shared",
+      } as any);
+
+      await handleAddThought(mockSql, {
+        text: "capture",
+        // @ts-expect-error — Phase-4 contract: visibility on add_thought added in Phase 5
+        visibility: "shared",
+      });
+
+      const callArgs = vi.mocked(insertMcpEntry).mock.calls[0];
+      const dataArg = callArgs?.[1] as { visibility?: string };
+      expect(dataArg.visibility).toBe("shared");
+    });
+
+    // TS-5.6
+    it("add_thought with invalid visibility returns an error and does not insert", async () => {
+      const { insertMcpEntry } = await import("../../src/mcp-queries.js");
+      const { handleAddThought } = await import("../../src/mcp-tools.js");
+
+      const result = await handleAddThought(mockSql, {
+        text: "capture",
+        // @ts-expect-error — Phase-4 contract: visibility on add_thought added in Phase 5
+        visibility: "public",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(vi.mocked(insertMcpEntry)).not.toHaveBeenCalled();
+    });
+
+    // TS-5.7
+    it("update_entry with only visibility updates that field, leaving name/category untouched", async () => {
+      const { getEntryById, updateEntryFields } = await import(
+        "../../src/mcp-queries.js"
+      );
+      const { handleUpdateEntry } = await import("../../src/mcp-tools.js");
+
+      vi.mocked(getEntryById).mockResolvedValue({
+        ...createMockEntry({ name: "Original name", category: "ideas" }),
+        visibility: "private",
+      } as any);
+      vi.mocked(updateEntryFields).mockResolvedValue({
+        ...createMockEntry({ name: "Original name", category: "ideas" }),
+        visibility: "shared",
+      } as any);
+
+      const result = await handleUpdateEntry(mockSql, {
+        id: VALID_UUID,
+        // @ts-expect-error — Phase-4 contract: visibility on update_entry added in Phase 5
+        visibility: "shared",
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(vi.mocked(updateEntryFields)).toHaveBeenCalledTimes(1);
+      const [, , updates] = vi.mocked(updateEntryFields).mock.calls[0] ?? [];
+      expect(updates).toEqual(expect.objectContaining({ visibility: "shared" }));
+      // Must NOT include untouched fields.
+      expect((updates as Record<string, unknown>).name).toBeUndefined();
+      expect((updates as Record<string, unknown>).category).toBeUndefined();
+
+      const data = JSON.parse(result.content[0].text);
+      expect(data.visibility).toBe("shared");
+      expect(data.name).toBe("Original name");
+      expect(data.category).toBe("ideas");
+    });
+
+    // TS-5.8
+    it("update_entry with invalid visibility returns an error without writing", async () => {
+      const { getEntryById, updateEntryFields } = await import(
+        "../../src/mcp-queries.js"
+      );
+      const { handleUpdateEntry } = await import("../../src/mcp-tools.js");
+
+      vi.mocked(getEntryById).mockResolvedValue(
+        createMockEntry({ name: "Unchanged" }) as any,
+      );
+
+      const result = await handleUpdateEntry(mockSql, {
+        id: VALID_UUID,
+        name: "New name",
+        // @ts-expect-error — Phase-4 contract: visibility on update_entry added in Phase 5
+        visibility: "public",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(vi.mocked(updateEntryFields)).not.toHaveBeenCalled();
+    });
+  });
 });

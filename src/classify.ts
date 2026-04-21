@@ -49,6 +49,7 @@ export function validateClassificationResponse(raw: string): {
   confidence: number;
   fields: Record<string, unknown>;
   tags: string[];
+  visibility: "private" | "shared";
   is_task_completion: boolean;
   create_calendar_event: boolean;
   calendar_date: string | null;
@@ -73,7 +74,7 @@ export function validateClassificationResponse(raw: string): {
     return null;
   }
 
-  const { category, name, confidence, fields, tags, is_task_completion, create_calendar_event, calendar_date, calendar_time, calendar_name } = parsed;
+  const { category, name, confidence, fields, tags, visibility, is_task_completion, create_calendar_event, calendar_date, calendar_time, calendar_name } = parsed;
 
   // category
   if (typeof category !== "string" || !(VALID_CATEGORIES as readonly string[]).includes(category)) {
@@ -103,6 +104,12 @@ export function validateClassificationResponse(raw: string): {
   // tags
   if (!Array.isArray(tags)) return null;
 
+  // visibility — fail-safe on missing/invalid/null → "private".
+  // Missing key, null value, wrong type, or unrecognized enum all default to
+  // "private" per the behavioral spec (AC-1.5, AC-1.6).
+  const vis: "private" | "shared" =
+    visibility === "shared" ? "shared" : "private";
+
   // is_task_completion
   const taskCompletion = typeof is_task_completion === "boolean" ? is_task_completion : false;
 
@@ -124,6 +131,7 @@ export function validateClassificationResponse(raw: string): {
     confidence: conf,
     fields: fields as Record<string, unknown>,
     tags: tags as string[],
+    visibility: vis,
     is_task_completion: taskCompletion,
     create_calendar_event: calEvent,
     calendar_date: calDate,
@@ -301,6 +309,7 @@ export async function classifyText(
   confidence: number | null;
   fields: Record<string, unknown>;
   tags: string[];
+  visibility: "private" | "shared";
   is_task_completion?: boolean;
   create_calendar_event?: boolean;
   calendar_date?: string | null;
@@ -320,6 +329,7 @@ export async function classifyText(
       confidence: null,
       fields: {},
       tags: [],
+      visibility: "private",
       content: text,
       error: "LLM not configured",
     };
@@ -371,6 +381,7 @@ export async function classifyText(
       confidence: null,
       fields: {},
       tags: [],
+      visibility: "private",
       content: text,
       error: err.message,
     };
@@ -381,9 +392,21 @@ export async function classifyText(
     return null;
   }
 
+  // Apply the confidence fail-safe for visibility. If overall confidence is
+  // below the configured threshold, force visibility to "private" regardless
+  // of what the LLM returned. A leaked-private entry ruins surprises; a
+  // missed-shared entry is an annoyance. Fail in the safer direction.
+  const thresholdRaw = options?.sql
+    ? await resolveConfigValue("confidence_threshold", options.sql).catch(() => undefined)
+    : undefined;
+  const threshold = resolveConfidenceThreshold(thresholdRaw ?? undefined);
+  const visibility: "private" | "shared" =
+    validated.confidence < threshold ? "private" : validated.visibility;
+
   log.debug("Classification result", {
     category: validated.category,
     confidence: validated.confidence,
+    visibility,
     is_task_completion: validated.is_task_completion,
     entryId: options?.entryId ?? null,
   });
@@ -394,6 +417,7 @@ export async function classifyText(
     confidence: validated.confidence,
     fields: validated.fields,
     tags: validated.tags,
+    visibility,
     is_task_completion: validated.is_task_completion,
     create_calendar_event: validated.create_calendar_event,
     calendar_date: validated.calendar_date,
@@ -442,7 +466,8 @@ export async function classifyEntry(
       name = ${result.name},
       confidence = ${result.confidence},
       fields = ${JSON.stringify(result.fields)}::jsonb,
-      tags = ${result.tags}
+      tags = ${result.tags},
+      visibility = ${result.visibility}
     WHERE id = ${entryId}
   `;
 
@@ -475,7 +500,8 @@ export async function classifyEntry(
             name = ${result.name},
             confidence = ${result.confidence},
             fields = ${JSON.stringify(result.fields)}::jsonb,
-            tags = ${result.tags}
+            tags = ${result.tags},
+            visibility = ${result.visibility}
           WHERE id = ${other.id}
         `;
       }
@@ -501,6 +527,7 @@ export async function reclassifyEntry(
   confidence: number;
   fields: Record<string, unknown>;
   tags: string[];
+  visibility: "private" | "shared";
 } | null> {
   const provider = createLLMProvider(await resolveLLMConfig(sql));
 
@@ -531,11 +558,22 @@ export async function reclassifyEntry(
   const validated = validateClassificationResponse(response);
   if (!validated) return null;
 
+  // Re-classification also respects the confidence fail-safe — if the LLM's
+  // corrected classification falls below threshold, force visibility='private'
+  // (same semantics as initial classifyText).
+  const thresholdRaw = sql
+    ? await resolveConfigValue("confidence_threshold", sql).catch(() => undefined)
+    : undefined;
+  const threshold = resolveConfidenceThreshold(thresholdRaw ?? undefined);
+  const visibility: "private" | "shared" =
+    validated.confidence < threshold ? "private" : validated.visibility;
+
   return {
     category: validated.category,
     name: validated.name,
     confidence: validated.confidence,
     fields: validated.fields,
     tags: validated.tags,
+    visibility,
   };
 }

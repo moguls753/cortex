@@ -29,6 +29,7 @@ import {
   iconGlobe,
   iconCpu,
   iconMic,
+  iconEye,
 } from "./icons.js";
 import type postgres from "postgres";
 import { escapeHtml } from "./shared.js";
@@ -345,6 +346,7 @@ function renderEntries(
     category: string | null;
     source?: string;
     source_type?: string;
+    visibility?: "private" | "shared";
     created_at: Date;
   }>,
   t: TFunction,
@@ -365,9 +367,14 @@ function renderEntries(
     const badgeLabel = categoryAbbr(entry.category, t);
     const badgeClass = categoryBadgeClass(entry.category);
     const time = relativeTime(entry.created_at, t);
+    const visibilityMark =
+      entry.visibility === "shared"
+        ? `<span data-visibility="shared" class="shrink-0 inline-flex items-center text-muted-foreground" title="Shared">${iconEye("size-3")}</span>`
+        : "";
     html += `
       <a href="/entry/${escapeHtml(entry.id)}" data-entry-id="${escapeHtml(entry.id)}" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group">
         <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 ${badgeClass}">${escapeHtml(badgeLabel)}</span>
+        ${visibilityMark}
         <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors entry-name">${escapeHtml(entry.name)}</span>
         <span class="shrink-0">${sourceIcon(entry.source, entry.source_type)}</span>
         <span class="text-[10px] text-muted-foreground shrink-0">${time}</span>
@@ -495,9 +502,19 @@ window.__I18N__ = ${blobJson};
       return d.innerHTML;
     }
 
+    function visibilityMarkHtml(v) {
+      // Lucide "eye" SVG — must mirror the server-side iconEye("size-3") output
+      // so SSE-inserted rows match the server-rendered markers pixel-for-pixel.
+      if (v !== 'shared') return '';
+      return '<span data-visibility="shared" class="shrink-0 inline-flex items-center text-muted-foreground" title="Shared">'
+        + '<svg class="size-3" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>'
+        + '</span>';
+    }
+
     function entryRowHtml(d) {
       return '<a href="/entry/' + esc(d.id) + '" data-entry-id="' + esc(d.id) + '" class="w-full flex items-center gap-2 rounded px-2 py-1 hover:bg-secondary transition-colors group opacity-0 transition-opacity duration-300">'
         + badgeHtml(d.category)
+        + visibilityMarkHtml(d.visibility)
         + '<span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors entry-name">' + esc(d.name || 'Untitled') + '</span>'
         + '<span class="text-[10px] text-muted-foreground shrink-0">' + I18N.relative.just_now + '</span></a>';
     }
@@ -554,6 +571,18 @@ window.__I18N__ = ${blobJson};
             if (oldCat === 'tasks') incrementStat('open-tasks', -1);
             if (d.category === 'tasks') incrementStat('open-tasks', 1);
           }
+        }
+        // Reconcile the visibility marker — TS-6.4 fires entry:updated for
+        // visibility-only UPDATEs, and category corrections can flip visibility
+        // via the fail-safe.
+        var existingMark = row.querySelector('[data-visibility="shared"]');
+        if (d.visibility === 'shared' && !existingMark) {
+          // Insert marker after the category badge.
+          if (badge && badge.insertAdjacentHTML) {
+            badge.insertAdjacentHTML('afterend', visibilityMarkHtml('shared'));
+          }
+        } else if (d.visibility !== 'shared' && existingMark) {
+          existingMark.remove();
         }
         setTimeout(function() { row.classList.remove('bg-secondary'); }, 500);
       } catch(err) { console.error('SSE entry:updated error', err); }
@@ -714,6 +743,7 @@ export function createDashboardRoutes(
       tags,
       source: "webapp",
       source_type: "text",
+      visibility: classification?.visibility ?? "private",
     });
 
     try {
@@ -790,6 +820,7 @@ export function createDashboardRoutes(
       tags: classification?.tags ?? [],
       source: "webapp",
       source_type: "text",
+      visibility: classification?.visibility ?? "private",
     });
 
     try {

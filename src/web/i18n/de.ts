@@ -117,7 +117,7 @@ export const de: Widen<typeof en> = {
       llm: "LLM",
       digests: "Zusammenfassungen",
       preferences: "Einstellungen",
-      display: "Küchen-Display",
+      display: "Display",
     },
     language: {
       description:

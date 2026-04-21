@@ -135,7 +135,7 @@ export function createSetupMiddleware(sql: Sql): MiddlewareHandler {
     if (
       path === "/health" ||
       path.startsWith("/public/") ||
-      path === "/api/kitchen.png" ||
+      path === "/api/display.png" ||
       path === "/api/display"
     ) {
       await next();

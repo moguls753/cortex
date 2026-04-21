@@ -36,6 +36,7 @@ export async function getDisplayTasks(
     FROM entries
     WHERE category = 'tasks'
       AND deleted_at IS NULL
+      AND visibility = 'shared'
       AND (
         fields->>'status' = 'pending'
         OR (fields->>'status' = 'done' AND updated_at > now() - interval '24 hours')

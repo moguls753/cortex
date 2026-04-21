@@ -45,18 +45,38 @@ These fields hold enum keys that power the UI. They must be emitted in English r
 - **projects.status** must be emitted as exactly one of `"active"`, `"paused"`, `"completed"`, or `null`.
 - **tasks.status** must be emitted as exactly one of `"pending"`, `"done"`, or `null`.
 - **category** (top-level) must be emitted as exactly one of `"people"`, `"projects"`, `"tasks"`, `"ideas"`, or `"reference"`.
+- **visibility** (top-level) must be emitted as exactly one of `"private"` or `"shared"`.
+
+## Visibility
+
+Decide whether this entry is safe to surface on a household-facing display / calendar that other family members can see, or whether it should stay in the user's private view.
+
+- **`"private"`** when the content involves any of:
+  - a surprise or gift for a named recipient (birthdays, anniversaries, proposals)
+  - personal reflection, emotional content, relationship observations
+  - health or medical notes
+  - financial anxieties or sensitive money matters
+  - work-sensitive material (confidential projects, compensation, HR, client secrets)
+  - anything the user appears to want to keep personal
+- **`"shared"`** when the content is:
+  - a household or logistical task ("buy bread", "pick up kids Friday")
+  - a joint plan or group activity ("dinner with the Schmidts Saturday")
+  - public information or a reference the user wants to remember
+  - something that would be fine to read aloud in front of the whole family
+
+When uncertain, return `"private"`. A missed-shared entry is mildly annoying; a leaked-private entry ruins a surprise or exposes sensitive material.
 
 ## Output format
 
 Return ONLY a single valid JSON object. No explanation, no extra text, no wrapping.
 
-Use exactly this structure — one flat object with all 9 keys at the top level:
+Use exactly this structure — one flat object with all 10 keys at the top level:
 
 ```
-{"category":"...","name":"...","confidence":0.0,"fields":{...},"tags":[...],"is_task_completion":false,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
+{"category":"...","name":"...","confidence":0.0,"fields":{...},"tags":[...],"visibility":"private","is_task_completion":false,"create_calendar_event":false,"calendar_date":null,"calendar_time":null}
 ```
 
-All 9 keys must appear in one object. Do NOT split into multiple objects.
+All 10 keys must appear in one object. Do NOT split into multiple objects.
 
 - **name**: Short descriptive name, max 6 words, in {output_language}.
 - **confidence**: 0.0–1.0, how certain you are about the category.
@@ -102,6 +122,6 @@ These are recent and related entries from the knowledge base. Use them to mainta
 
 ## Input to classify
 
-Respond with a single JSON object containing all 9 keys: category, name, confidence, fields, tags, is_task_completion, create_calendar_event, calendar_date, calendar_time.
+Respond with a single JSON object containing all 10 keys: category, name, confidence, fields, tags, visibility, is_task_completion, create_calendar_event, calendar_date, calendar_time.
 
 {input_text}

@@ -673,4 +673,183 @@ describe("Classification", () => {
       expect(isConfident(result!.confidence!, 0.6)).toBe(false);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Entry Visibility — LLM classification pipeline
+  // ---------------------------------------------------------------------------
+  describe("Entry Visibility", () => {
+    function makeVisibilityJson(overrides: Record<string, unknown>): string {
+      return JSON.stringify({
+        category: "tasks",
+        name: "Visibility test",
+        confidence: 0.9,
+        fields: { status: "pending", due_date: null, notes: null },
+        tags: [],
+        is_task_completion: false,
+        create_calendar_event: false,
+        calendar_date: null,
+        calendar_time: null,
+        ...overrides,
+      });
+    }
+
+    // TS-1.1
+    it("stores visibility='shared' when LLM returns 'shared' at high confidence", async () => {
+      mockChat.mockResolvedValueOnce(
+        makeVisibilityJson({ confidence: 0.9, visibility: "shared" }),
+      );
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "confidence_threshold") return "0.6";
+        return undefined;
+      });
+
+      const result = await classifyText("buy bread", { sql: mockSql });
+
+      expect(result).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result as any).visibility).toBe("shared");
+    });
+
+    // TS-1.2
+    it("stores visibility='private' when LLM returns 'private' at high confidence", async () => {
+      mockChat.mockResolvedValueOnce(
+        makeVisibilityJson({
+          category: "ideas",
+          name: "Personal reflection",
+          confidence: 0.85,
+          visibility: "private",
+          fields: { oneliner: "...", notes: null },
+        }),
+      );
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "confidence_threshold") return "0.6";
+        return undefined;
+      });
+
+      const result = await classifyText("private thought about M", {
+        sql: mockSql,
+      });
+
+      expect(result).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result as any).visibility).toBe("private");
+    });
+
+    // TS-1.3
+    it("forces visibility='private' when LLM returns 'shared' at low confidence", async () => {
+      mockChat.mockResolvedValueOnce(
+        makeVisibilityJson({ confidence: 0.45, visibility: "shared" }),
+      );
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "confidence_threshold") return "0.6";
+        return undefined;
+      });
+
+      const result = await classifyText("ambiguous capture", { sql: mockSql });
+
+      expect(result).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result as any).visibility).toBe("private");
+    });
+
+    // TS-1.4
+    it("keeps visibility='private' when LLM returns 'private' at low confidence", async () => {
+      mockChat.mockResolvedValueOnce(
+        makeVisibilityJson({ confidence: 0.45, visibility: "private" }),
+      );
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "confidence_threshold") return "0.6";
+        return undefined;
+      });
+
+      const result = await classifyText("ambiguous private", { sql: mockSql });
+
+      expect(result).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result as any).visibility).toBe("private");
+    });
+
+    // TS-1.5
+    it("defaults visibility='private' when LLM omits the visibility key at high confidence", async () => {
+      // makeVisibilityJson without a visibility override → key omitted.
+      mockChat.mockResolvedValueOnce(makeVisibilityJson({ confidence: 0.9 }));
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "confidence_threshold") return "0.6";
+        return undefined;
+      });
+
+      const result = await classifyText("no visibility field", {
+        sql: mockSql,
+      });
+
+      expect(result).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result as any).visibility).toBe("private");
+    });
+
+    // TS-1.6
+    it("defaults visibility='private' when LLM returns an invalid visibility string", async () => {
+      mockChat.mockResolvedValueOnce(
+        makeVisibilityJson({ confidence: 0.9, visibility: "public" }),
+      );
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "confidence_threshold") return "0.6";
+        return undefined;
+      });
+
+      const result = await classifyText("invalid visibility value", {
+        sql: mockSql,
+      });
+
+      expect(result).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result as any).visibility).toBe("private");
+    });
+
+    // TS-1.7
+    it("stores visibility='private' with category=null when classification throws", async () => {
+      mockChat.mockRejectedValueOnce(new Error("LLM provider down"));
+      mockResolveConfigValue.mockImplementation(async (key: string) => {
+        if (key === "confidence_threshold") return "0.6";
+        return undefined;
+      });
+
+      const result = await classifyText("will fail", { sql: mockSql });
+
+      expect(result).not.toBeNull();
+      expect(result!.category).toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((result as any).visibility).toBe("private");
+    });
+
+    // TS-1.8
+    it("prompts/classify.md documents the visibility heuristic and enum values", async () => {
+      const { readFile } = await import("node:fs/promises");
+      // Use the real readFile, not the mocked one — read from the repo root.
+      const { fileURLToPath } = await import("node:url");
+      const { dirname, resolve } = await import("node:path");
+      const here = dirname(fileURLToPath(import.meta.url));
+      const promptPath = resolve(here, "..", "..", "prompts", "classify.md");
+
+      const originalReadFile = (readFile as unknown as { mockRestore?: () => void });
+      if (originalReadFile.mockRestore) {
+        originalReadFile.mockRestore();
+      }
+
+      const { readFile: realReadFile } = await vi.importActual<
+        typeof import("node:fs/promises")
+      >("node:fs/promises");
+      const content = await realReadFile(promptPath, "utf-8");
+
+      // Visibility mentioned
+      expect(content).toMatch(/visibility/i);
+      // Both enum values documented
+      expect(content).toMatch(/"private"/);
+      expect(content).toMatch(/"shared"/);
+      // Listed under the English-only enum section
+      expect(content.toLowerCase()).toMatch(
+        /enum[^]*english[^]*visibility|visibility[^]*english[^]*only/i,
+      );
+    });
+  });
 });

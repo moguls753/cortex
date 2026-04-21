@@ -1,5 +1,5 @@
 /**
- * Integration tests for the kitchen-display feature.
+ * Integration tests for the display feature.
  * Uses testcontainers PostgreSQL for real DB operations (task queries, settings).
  *
  * Rendering is mocked — TS-8.2, TS-C-3, TS-NG-1, TS-NG-8 assert endpoint
@@ -24,7 +24,7 @@ import { startTestDb, runMigrations, type TestDb } from "../helpers/test-db.js";
 
 // Top-level mocks — hoisted before the SUT import
 vi.mock("../../src/display/render.js", () => ({
-  renderKitchenDisplay: vi.fn().mockResolvedValue(Buffer.from("fake-png-bytes")),
+  renderDisplay: vi.fn().mockResolvedValue(Buffer.from("fake-png-bytes")),
 }));
 
 vi.mock("../../src/display/calendar-data.js", () => ({
@@ -36,10 +36,10 @@ vi.mock("../../src/display/weather-data.js", () => ({
 }));
 
 import { createDisplayRoutes } from "../../src/display/index.js";
-import { renderKitchenDisplay } from "../../src/display/render.js";
+import { renderDisplay } from "../../src/display/render.js";
 import { getDisplayTasks } from "../../src/display/task-data.js";
 
-const mockRender = renderKitchenDisplay as ReturnType<typeof vi.fn>;
+const mockRender = renderDisplay as ReturnType<typeof vi.fn>;
 
 function buildApp(sql: Parameters<typeof createDisplayRoutes>[0]): Hono {
   const app = new Hono();
@@ -62,7 +62,7 @@ async function enableDisplay(sql: TestDb["sql"]): Promise<void> {
   await setSetting(sql, "display_enabled", "true");
 }
 
-describe("Kitchen Display Integration", () => {
+describe("Display Integration", () => {
   let db: TestDb;
 
   beforeAll(async () => {
@@ -101,21 +101,22 @@ describe("Kitchen Display Integration", () => {
     await setSetting(db.sql, "display_enabled", "false");
     const app = buildApp(db.sql);
 
-    const first = await app.request("/api/kitchen.png");
+    const first = await app.request("/api/display.png");
     expect(first.status).toBe(404);
 
     await setSetting(db.sql, "display_enabled", "true");
 
-    const second = await app.request("/api/kitchen.png");
+    const second = await app.request("/api/display.png");
     expect(second.status).toBe(200);
   });
 
   // ─── TS-6.1, 6.2, 6.2b ─────────────────────────────────────
 
   it("TS-6.1 — pending task appears in getDisplayTasks result", async () => {
+    // Post entry-visibility: display reads only visibility='shared' rows.
     await db.sql`
-      INSERT INTO entries (category, name, fields, source)
-      VALUES ('tasks', 'Pending thing', ${db.sql.json({ status: "pending" })}, 'webapp')
+      INSERT INTO entries (category, name, fields, source, visibility)
+      VALUES ('tasks', 'Pending thing', ${db.sql.json({ status: "pending" })}, 'webapp', 'shared')
     `;
     const tasks = await getDisplayTasks(db.sql, 7);
     expect(tasks).toHaveLength(1);
@@ -125,10 +126,11 @@ describe("Kitchen Display Integration", () => {
 
   it("TS-6.2 — recently-done task (< 24h) appears in done state", async () => {
     await db.sql`
-      INSERT INTO entries (category, name, fields, source, updated_at)
+      INSERT INTO entries (category, name, fields, source, visibility, updated_at)
       VALUES ('tasks', 'Freshly done',
               ${db.sql.json({ status: "done" })},
               'webapp',
+              'shared',
               now() - interval '2 hours')
     `;
     const tasks = await getDisplayTasks(db.sql, 7);
@@ -139,10 +141,11 @@ describe("Kitchen Display Integration", () => {
 
   it("TS-6.2b — stale done task (> 24h) does NOT appear", async () => {
     await db.sql`
-      INSERT INTO entries (category, name, fields, source, updated_at)
+      INSERT INTO entries (category, name, fields, source, visibility, updated_at)
       VALUES ('tasks', 'Stale done',
               ${db.sql.json({ status: "done" })},
               'webapp',
+              'shared',
               now() - interval '48 hours')
     `;
     const tasks = await getDisplayTasks(db.sql, 7);
@@ -153,10 +156,10 @@ describe("Kitchen Display Integration", () => {
 
   it("TS-6.3 — pending tasks ordered by due date ascending (nulls last)", async () => {
     await db.sql`
-      INSERT INTO entries (category, name, fields, source) VALUES
-        ('tasks', 'A', ${db.sql.json({ status: "pending", due_date: "2026-05-01" })}, 'webapp'),
-        ('tasks', 'B', ${db.sql.json({ status: "pending", due_date: "2026-04-01" })}, 'webapp'),
-        ('tasks', 'C', ${db.sql.json({ status: "pending", due_date: "2026-06-01" })}, 'webapp')
+      INSERT INTO entries (category, name, fields, source, visibility) VALUES
+        ('tasks', 'A', ${db.sql.json({ status: "pending", due_date: "2026-05-01" })}, 'webapp', 'shared'),
+        ('tasks', 'B', ${db.sql.json({ status: "pending", due_date: "2026-04-01" })}, 'webapp', 'shared'),
+        ('tasks', 'C', ${db.sql.json({ status: "pending", due_date: "2026-06-01" })}, 'webapp', 'shared')
     `;
     const tasks = await getDisplayTasks(db.sql, 7);
     expect(tasks.map((t) => t.name)).toEqual(["B", "A", "C"]);
@@ -167,8 +170,8 @@ describe("Kitchen Display Integration", () => {
   it("TS-6.4 — limit caps the returned count", async () => {
     for (let i = 0; i < 10; i++) {
       await db.sql`
-        INSERT INTO entries (category, name, fields, source)
-        VALUES ('tasks', ${"Task " + i}, ${db.sql.json({ status: "pending" })}, 'webapp')
+        INSERT INTO entries (category, name, fields, source, visibility)
+        VALUES ('tasks', ${"Task " + i}, ${db.sql.json({ status: "pending" })}, 'webapp', 'shared')
       `;
     }
     const tasks = await getDisplayTasks(db.sql, 3);
@@ -181,7 +184,7 @@ describe("Kitchen Display Integration", () => {
     await enableDisplay(db.sql);
     const app = buildApp(db.sql);
 
-    const res = await app.request("/api/kitchen.png");
+    const res = await app.request("/api/display.png");
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/png");
@@ -205,8 +208,8 @@ describe("Kitchen Display Integration", () => {
     await enableDisplay(db.sql);
     const app = buildApp(db.sql);
 
-    await app.request("/api/kitchen.png");
-    await app.request("/api/kitchen.png");
+    await app.request("/api/display.png");
+    await app.request("/api/display.png");
 
     expect(mockRender.mock.calls.length).toBe(2);
   });
@@ -227,7 +230,7 @@ describe("Kitchen Display Integration", () => {
     }
     const app = buildApp(db.sql);
 
-    const res = await app.request("/api/kitchen.png");
+    const res = await app.request("/api/display.png");
     expect(res.status).toBe(200);
   });
 
@@ -238,7 +241,7 @@ describe("Kitchen Display Integration", () => {
     const app = buildApp(db.sql);
 
     for (let i = 0; i < 100; i++) {
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
       expect(res.status).toBe(200);
     }
     expect(mockRender.mock.calls.length).toBe(100);
@@ -260,7 +263,7 @@ describe("Kitchen Display Integration", () => {
     const mockGetEvents = getDisplayEvents as ReturnType<typeof vi.fn>;
 
     const app = buildApp(db.sql);
-    await app.request("/api/kitchen.png");
+    await app.request("/api/display.png");
 
     expect(mockGetEvents).toHaveBeenCalled();
     const tzArg = mockGetEvents.mock.calls[0][1];

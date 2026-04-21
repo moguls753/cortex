@@ -911,9 +911,9 @@ describe("Web Settings", () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // Kitchen Display settings (spec 2026-04-15 sweep)
+  // Display settings (spec 2026-04-15 sweep)
   // ═══════════════════════════════════════════════════════════════════
-  describe("Kitchen Display settings", () => {
+  describe("Display settings", () => {
     it("renders the new display_max_today_events, display_base_url, and display_calendars fields", async () => {
       const { getAllSettings } = await import(
         "../../src/web/settings-queries.js"

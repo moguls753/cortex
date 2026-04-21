@@ -3,11 +3,11 @@ import { timingSafeEqual } from "node:crypto";
 import type postgres from "postgres";
 import { createLogger } from "../logger.js";
 import { getAllSettings } from "../web/settings-queries.js";
-import { renderKitchenDisplay } from "./render.js";
+import { renderDisplay } from "./render.js";
 import { getWeather } from "./weather-data.js";
 import { getDisplayTasks } from "./task-data.js";
 import { getDisplayEvents } from "./calendar-data.js";
-import type { KitchenData } from "./types.js";
+import type { DisplayData } from "./types.js";
 
 type Sql = postgres.Sql;
 
@@ -36,7 +36,7 @@ export function formatTime(now: Date): string {
 export function createDisplayRoutes(sql: Sql): Hono {
   const app = new Hono();
 
-  app.get("/api/kitchen.png", async (c) => {
+  app.get("/api/display.png", async (c) => {
     try {
       const settings = await getAllSettings(sql);
 
@@ -95,7 +95,7 @@ export function createDisplayRoutes(sql: Sql): Hono {
         new Date().toLocaleString("en-US", { timeZone: timezone }),
       );
 
-      const data: KitchenData = {
+      const data: DisplayData = {
         date: formatDate(now),
         time: formatTime(now),
         weather,
@@ -105,7 +105,7 @@ export function createDisplayRoutes(sql: Sql): Hono {
         maxTodayEvents,
       };
 
-      const png = await renderKitchenDisplay(data, width, height);
+      const png = await renderDisplay(data, width, height);
 
       return new Response(new Uint8Array(png), {
         status: 200,
@@ -115,7 +115,7 @@ export function createDisplayRoutes(sql: Sql): Hono {
         },
       });
     } catch (err) {
-      log.error("Failed to render kitchen display", {
+      log.error("Failed to render display", {
         error: err instanceof Error ? err.message : String(err),
       });
       return c.text("Internal Server Error", 500);
@@ -136,16 +136,16 @@ export function createDisplayRoutes(sql: Sql): Hono {
       let imageUrl: string;
       if (settings.display_base_url) {
         const base = settings.display_base_url.replace(/\/+$/, "");
-        imageUrl = `${base}/api/kitchen.png${tokenParam}`;
+        imageUrl = `${base}/api/display.png${tokenParam}`;
       } else {
         const host = c.req.header("host") || "localhost";
         const protocol = c.req.header("x-forwarded-proto") || "http";
-        imageUrl = `${protocol}://${host}/api/kitchen.png${tokenParam}`;
+        imageUrl = `${protocol}://${host}/api/display.png${tokenParam}`;
       }
 
       return c.json({
         image_url: imageUrl,
-        filename: "cortex-kitchen",
+        filename: "cortex-display",
       });
     } catch (err) {
       log.error("Failed to serve display endpoint", {

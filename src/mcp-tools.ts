@@ -19,6 +19,11 @@ const log = createLogger("mcp");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_CATEGORIES = ["people", "projects", "tasks", "ideas", "reference"];
+const VALID_VISIBILITY = ["private", "shared"] as const;
+type Visibility = (typeof VALID_VISIBILITY)[number];
+function isValidVisibility(v: unknown): v is Visibility {
+  return v === "private" || v === "shared";
+}
 
 interface ToolResult {
   content: Array<{ type: "text"; text: string }>;
@@ -55,6 +60,12 @@ const TOOLS = [
       type: "object" as const,
       properties: {
         text: { type: "string", description: "The thought to capture" },
+        visibility: {
+          type: "string",
+          description:
+            "Optional explicit visibility override. When supplied, stored as-is and bypasses the confidence fail-safe. When omitted, visibility is inferred by the LLM with the fail-safe applied.",
+          enum: [...VALID_VISIBILITY],
+        },
       },
       required: ["text"],
     },
@@ -97,6 +108,11 @@ const TOOLS = [
         category: { type: "string", description: "New category", enum: VALID_CATEGORIES },
         tags: { type: "array", items: { type: "string" }, description: "New tags" },
         fields: { type: "object", description: "New fields" },
+        visibility: {
+          type: "string",
+          description: "New visibility — 'private' or 'shared'.",
+          enum: [...VALID_VISIBILITY],
+        },
       },
       required: ["id"],
     },
@@ -149,6 +165,7 @@ export async function handleSearchBrain(sql: any, params: { query: string; limit
       name: r.name,
       content: r.content && r.content.length > 500 ? r.content.substring(0, 500) : r.content,
       tags: r.tags,
+      visibility: r.visibility,
       similarity: r.similarity,
       created_at: r.created_at,
     }));
@@ -159,9 +176,20 @@ export async function handleSearchBrain(sql: any, params: { query: string; limit
   }
 }
 
-export async function handleAddThought(sql: any, params: { text: string }): Promise<ToolResult> {
+export async function handleAddThought(
+  sql: any,
+  params: { text: string; visibility?: unknown },
+): Promise<ToolResult> {
   if (!params.text || !params.text.trim()) {
     return err("Text cannot be empty");
+  }
+
+  // Explicit visibility override — validate before any classification work.
+  // An invalid value rejects the whole call without inserting.
+  const explicitVisibility =
+    params.visibility === undefined ? undefined : params.visibility;
+  if (explicitVisibility !== undefined && !isValidVisibility(explicitVisibility)) {
+    return err("Invalid visibility — must be 'private' or 'shared'");
   }
 
   let classification: any = null;
@@ -184,6 +212,14 @@ export async function handleAddThought(sql: any, params: { text: string }): Prom
     // Embedding failed — store without embedding
   }
 
+  // Explicit override wins over LLM inference + fail-safe. When omitted,
+  // `classification?.visibility` already has the fail-safe applied inside
+  // classifyText. Fallback of last resort is 'private' (safe default).
+  const visibility: Visibility =
+    (explicitVisibility as Visibility | undefined) ??
+    (classification?.visibility as Visibility | undefined) ??
+    "private";
+
   const entryData = {
     name: classification?.name ?? params.text.substring(0, 100),
     content: params.text,
@@ -194,6 +230,7 @@ export async function handleAddThought(sql: any, params: { text: string }): Prom
     source: "mcp",
     source_type: "text",
     embedding,
+    visibility,
   };
 
   try {
@@ -277,6 +314,7 @@ export async function handleListRecent(sql: any, params: { days?: number; catego
       category: e.category,
       name: e.name,
       tags: e.tags,
+      visibility: e.visibility,
       created_at: e.created_at,
       updated_at: e.updated_at,
     }));
@@ -307,6 +345,7 @@ export async function handleGetEntry(sql: any, params: { id: string }): Promise<
       confidence: entry.confidence,
       source: entry.source,
       source_type: entry.source_type,
+      visibility: entry.visibility,
       created_at: entry.created_at,
       updated_at: entry.updated_at,
     });
@@ -323,6 +362,7 @@ export async function handleUpdateEntry(sql: any, params: {
   category?: string;
   tags?: string[];
   fields?: Record<string, unknown>;
+  visibility?: unknown;
 }): Promise<ToolResult> {
   if (!UUID_RE.test(params.id)) {
     return err("Invalid entry ID");
@@ -330,6 +370,10 @@ export async function handleUpdateEntry(sql: any, params: {
 
   if (params.category && !VALID_CATEGORIES.includes(params.category)) {
     return err("Invalid category");
+  }
+
+  if (params.visibility !== undefined && !isValidVisibility(params.visibility)) {
+    return err("Invalid visibility — must be 'private' or 'shared'");
   }
 
   let entry: any;
@@ -349,6 +393,7 @@ export async function handleUpdateEntry(sql: any, params: {
   if (params.category !== undefined) updates.category = params.category;
   if (params.tags !== undefined) updates.tags = params.tags;
   if (params.fields !== undefined) updates.fields = params.fields;
+  if (params.visibility !== undefined) updates.visibility = params.visibility;
 
   if (Object.keys(updates).length === 0) {
     return ok({
@@ -361,6 +406,7 @@ export async function handleUpdateEntry(sql: any, params: {
       confidence: entry.confidence,
       source: entry.source,
       source_type: entry.source_type,
+      visibility: entry.visibility,
       created_at: entry.created_at,
       updated_at: entry.updated_at,
     });
@@ -392,6 +438,7 @@ export async function handleUpdateEntry(sql: any, params: {
       confidence: updated.confidence,
       source: updated.source,
       source_type: updated.source_type,
+      visibility: updated.visibility,
       created_at: updated.created_at,
       updated_at: updated.updated_at,
     });

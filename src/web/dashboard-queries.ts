@@ -12,6 +12,7 @@ export interface EntryRow {
   confidence: number | null;
   source: string;
   source_type: string;
+  visibility: "private" | "shared";
   deleted_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -23,7 +24,7 @@ export async function getRecentEntries(
 ): Promise<EntryRow[]> {
   const rows = await sql`
     SELECT id, name, category, content, fields, tags, confidence,
-           source, source_type, deleted_at, created_at, updated_at
+           source, source_type, visibility, deleted_at, created_at, updated_at
     FROM entries
     WHERE deleted_at IS NULL
     ORDER BY created_at DESC
@@ -88,8 +89,12 @@ export async function insertEntry(
   sql: Sql,
   data: Record<string, unknown>,
 ): Promise<string> {
+  const visibility =
+    data.visibility === "shared" || data.visibility === "private"
+      ? (data.visibility as string)
+      : "private";
   const rows = await sql`
-    INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type)
+    INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
     VALUES (
       ${(data.name as string) ?? "Untitled"},
       ${(data.content as string) ?? null},
@@ -98,7 +103,8 @@ export async function insertEntry(
       ${sql.json((data.fields ?? {}) as unknown as Parameters<typeof sql.json>[0])},
       ${(data.tags as string[]) ?? []},
       ${(data.source as string) ?? "webapp"},
-      ${(data.source_type as string) ?? "text"}
+      ${(data.source_type as string) ?? "text"},
+      ${visibility}
     )
     RETURNING id
   `;

@@ -1,5 +1,9 @@
 export const CATEGORIES = ["people", "projects", "tasks", "ideas", "reference"];
 
+export const VISIBILITY_VALUES = ["private", "shared"] as const;
+export type Visibility = (typeof VISIBILITY_VALUES)[number];
+
+
 export const CATEGORY_LABELS: Record<string, string> = {
   people: "People",
   projects: "Projects",

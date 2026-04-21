@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 
 vi.mock("../../src/display/render.js", () => ({
-  renderKitchenDisplay: vi.fn().mockResolvedValue(Buffer.from("fake-png")),
+  renderDisplay: vi.fn().mockResolvedValue(Buffer.from("fake-png")),
 }));
 
 vi.mock("../../src/display/weather-data.js", () => ({
@@ -51,13 +51,13 @@ vi.mock("../../src/logger.js", () => ({
 
 import { createDisplayRoutes, formatDate, formatTime } from "../../src/display/index.js";
 import { getAllSettings } from "../../src/web/settings-queries.js";
-import { renderKitchenDisplay } from "../../src/display/render.js";
+import { renderDisplay } from "../../src/display/render.js";
 import { getWeather } from "../../src/display/weather-data.js";
 import { getDisplayEvents } from "../../src/display/calendar-data.js";
 import { getDisplayTasks } from "../../src/display/task-data.js";
 
 const mockGetAllSettings = getAllSettings as ReturnType<typeof vi.fn>;
-const mockRender = renderKitchenDisplay as ReturnType<typeof vi.fn>;
+const mockRender = renderDisplay as ReturnType<typeof vi.fn>;
 const mockGetWeather = getWeather as ReturnType<typeof vi.fn>;
 const mockGetEvents = getDisplayEvents as ReturnType<typeof vi.fn>;
 const mockGetTasks = getDisplayTasks as ReturnType<typeof vi.fn>;
@@ -81,12 +81,12 @@ describe("display routes", () => {
     mockRender.mockResolvedValue(Buffer.from("fake-png"));
   });
 
-  // ─── GET /api/kitchen.png ────────────────────────────────────
+  // ─── GET /api/display.png ────────────────────────────────────
 
-  describe("GET /api/kitchen.png", () => {
+  describe("GET /api/display.png", () => {
     it("returns PNG when enabled", async () => {
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("image/png");
@@ -102,7 +102,7 @@ describe("display routes", () => {
       });
 
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(404);
     });
@@ -115,7 +115,7 @@ describe("display routes", () => {
       });
 
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(403);
     });
@@ -128,7 +128,7 @@ describe("display routes", () => {
       });
 
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png?token=wrong");
+      const res = await app.request("/api/display.png?token=wrong");
 
       expect(res.status).toBe(403);
     });
@@ -141,13 +141,13 @@ describe("display routes", () => {
       });
 
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png?token=secret123");
+      const res = await app.request("/api/display.png?token=secret123");
 
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("image/png");
     });
 
-    it("calls renderKitchenDisplay with correct dimensions from settings", async () => {
+    it("calls renderDisplay with correct dimensions from settings", async () => {
       mockGetAllSettings.mockResolvedValue({
         display_enabled: "true",
         display_width: "800",
@@ -156,7 +156,7 @@ describe("display routes", () => {
       });
 
       const app = buildApp();
-      await app.request("/api/kitchen.png");
+      await app.request("/api/display.png");
 
       expect(mockRender).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -172,7 +172,7 @@ describe("display routes", () => {
       mockGetAllSettings.mockRejectedValue(new Error("DB down"));
 
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(500);
     });
@@ -190,8 +190,8 @@ describe("display routes", () => {
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json).toHaveProperty("image_url");
-      expect(json).toHaveProperty("filename", "cortex-kitchen");
-      expect(json.image_url).toContain("/api/kitchen.png");
+      expect(json).toHaveProperty("filename", "cortex-display");
+      expect(json.image_url).toContain("/api/display.png");
       expect(json.image_url).toContain("cortex.local:3000");
     });
 
@@ -263,7 +263,7 @@ describe("display routes", () => {
     it("TS-1.2 — PNG returns 404 'Not Found' when disabled, renderer not called", async () => {
       mockGetAllSettings.mockResolvedValue({ display_enabled: "false" });
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(404);
       expect(await res.text()).toBe("Not Found");
@@ -283,7 +283,7 @@ describe("display routes", () => {
   describe("TS-2.x: PNG endpoint", () => {
     it("TS-2.1 — returns a non-empty binary PNG payload when enabled", async () => {
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(200);
       const buf = Buffer.from(await res.arrayBuffer());
@@ -292,13 +292,13 @@ describe("display routes", () => {
 
     it("TS-2.2 — Content-Type is image/png", async () => {
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
       expect(res.headers.get("content-type")).toBe("image/png");
     });
 
     it("TS-2.3 — Cache-Control is no-cache", async () => {
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
       expect(res.headers.get("cache-control")).toBe("no-cache");
     });
 
@@ -310,7 +310,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      await app.request("/api/kitchen.png");
+      await app.request("/api/display.png");
 
       expect(mockRender).toHaveBeenCalled();
       const call = mockRender.mock.calls[0];
@@ -320,7 +320,7 @@ describe("display routes", () => {
 
     it("TS-2.5 — default dimensions 1872 x 1404 when settings absent", async () => {
       const app = buildApp();
-      await app.request("/api/kitchen.png");
+      await app.request("/api/display.png");
 
       const call = mockRender.mock.calls[0];
       expect(call[1]).toBe(1872);
@@ -330,7 +330,7 @@ describe("display routes", () => {
     it("TS-2.6 — rendering exception returns 500 and logs at error level", async () => {
       mockRender.mockRejectedValueOnce(new Error("boom"));
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(500);
       expect(await res.text()).toBe("Internal Server Error");
@@ -343,7 +343,7 @@ describe("display routes", () => {
   describe("TS-3.x: token auth", () => {
     it("TS-3.1 — no token required when display_token is absent", async () => {
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
       expect(res.status).toBe(200);
     });
 
@@ -354,7 +354,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(403);
       expect(await res.text()).toBe("Forbidden");
@@ -367,7 +367,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png?token=wrong");
+      const res = await app.request("/api/display.png?token=wrong");
 
       expect(res.status).toBe(403);
       expect(await res.text()).toBe("Forbidden");
@@ -380,7 +380,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png?token=correct");
+      const res = await app.request("/api/display.png?token=correct");
       expect(res.status).toBe(200);
     });
 
@@ -424,22 +424,22 @@ describe("display routes", () => {
       expect(Object.keys(json).sort()).toEqual(["filename", "image_url"]);
     });
 
-    it("TS-4.2 — filename is the literal 'cortex-kitchen'", async () => {
+    it("TS-4.2 — filename is the literal 'cortex-display'", async () => {
       const app = buildApp();
       const res = await app.request("/api/display", {
         headers: { host: "cortex.local" },
       });
       const json = (await res.json()) as { filename: string };
-      expect(json.filename).toBe("cortex-kitchen");
+      expect(json.filename).toBe("cortex-display");
     });
 
-    it("TS-4.3 — image_url uses Host header and /api/kitchen.png path", async () => {
+    it("TS-4.3 — image_url uses Host header and /api/display.png path", async () => {
       const app = buildApp();
       const res = await app.request("/api/display", {
         headers: { host: "cortex.local:3000" },
       });
       const json = (await res.json()) as { image_url: string };
-      expect(json.image_url).toBe("http://cortex.local:3000/api/kitchen.png");
+      expect(json.image_url).toBe("http://cortex.local:3000/api/display.png");
     });
 
     it("TS-4.4 — image_url honors X-Forwarded-Proto: https", async () => {
@@ -452,7 +452,7 @@ describe("display routes", () => {
       });
       const json = (await res.json()) as { image_url: string };
       expect(
-        json.image_url.startsWith("https://cortex.example.com/api/kitchen.png"),
+        json.image_url.startsWith("https://cortex.example.com/api/display.png"),
       ).toBe(true);
     });
 
@@ -474,7 +474,7 @@ describe("display routes", () => {
       req.headers.delete("host");
       const res = await app.fetch(req);
       const json = (await res.json()) as { image_url: string };
-      expect(json.image_url).toBe("http://localhost/api/kitchen.png");
+      expect(json.image_url).toBe("http://localhost/api/display.png");
     });
 
     it("TS-4.7 — image_url ends with ?token=<value> when display_token set", async () => {
@@ -511,7 +511,7 @@ describe("display routes", () => {
         headers: { host: "internal-container:3000" },
       });
       const json = (await res.json()) as { image_url: string };
-      expect(json.image_url).toBe("https://proxy.example.com/api/kitchen.png");
+      expect(json.image_url).toBe("https://proxy.example.com/api/display.png");
     });
 
     it("TS-4.10 — display_base_url tolerates a trailing slash (KG-4: expected FAIL)", async () => {
@@ -525,7 +525,7 @@ describe("display routes", () => {
         headers: { host: "internal:3000" },
       });
       const json = (await res.json()) as { image_url: string };
-      expect(json.image_url).toBe("https://proxy.example.com/api/kitchen.png");
+      expect(json.image_url).toBe("https://proxy.example.com/api/display.png");
     });
 
     it("TS-4.11 — adapter returns 404 when feature is disabled", async () => {
@@ -551,7 +551,7 @@ describe("display routes", () => {
       mockGetEvents.mockResolvedValue({ today: events, tomorrow: [] });
 
       const app = buildApp();
-      await app.request("/api/kitchen.png");
+      await app.request("/api/display.png");
 
       expect(mockRender).toHaveBeenCalled();
       const data = mockRender.mock.calls[0][0] as {
@@ -574,7 +574,7 @@ describe("display routes", () => {
       mockGetEvents.mockResolvedValue({ today: events, tomorrow: [] });
 
       const app = buildApp();
-      await app.request("/api/kitchen.png");
+      await app.request("/api/display.png");
 
       const data = mockRender.mock.calls[0][0] as {
         maxTodayEvents: number;
@@ -591,7 +591,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      await app.request("/api/kitchen.png");
+      await app.request("/api/display.png");
 
       expect(mockGetWeather).not.toHaveBeenCalled();
       const data = mockRender.mock.calls[0][0] as { weather: unknown };
@@ -606,7 +606,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      await app.request("/api/kitchen.png");
+      await app.request("/api/display.png");
 
       expect(mockGetWeather).not.toHaveBeenCalled();
       const data = mockRender.mock.calls[0][0] as { weather: unknown };
@@ -621,7 +621,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      await app.request("/api/kitchen.png");
+      await app.request("/api/display.png");
 
       expect(mockGetWeather).not.toHaveBeenCalled();
       const data = mockRender.mock.calls[0][0] as { weather: unknown };
@@ -647,7 +647,7 @@ describe("display routes", () => {
       ]);
 
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(200);
       const data = mockRender.mock.calls[0][0] as {
@@ -681,7 +681,7 @@ describe("display routes", () => {
       ]);
 
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(200);
       const data = mockRender.mock.calls[0][0] as {
@@ -703,7 +703,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(200);
       expect(mockGetEvents).toHaveBeenCalled();
@@ -720,7 +720,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png");
+      const res = await app.request("/api/display.png");
 
       expect(res.status).toBe(200);
       const call = mockRender.mock.calls[0];
@@ -732,7 +732,7 @@ describe("display routes", () => {
   describe("TS-C-x: constraints", () => {
     it("TS-C-2 — session cookie has no effect on the PNG endpoint", async () => {
       const app = buildApp();
-      const res = await app.request("/api/kitchen.png", {
+      const res = await app.request("/api/display.png", {
         headers: { cookie: "cortex_session=anything" },
       });
       expect(res.status).toBe(200);

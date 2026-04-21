@@ -12,7 +12,7 @@ import {
 } from "./browse-queries.js";
 import { generateEmbedding } from "../embed.js";
 import type { EntryRow } from "./dashboard-queries.js";
-import { iconSearch } from "./icons.js";
+import { iconSearch, iconEye } from "./icons.js";
 import type { TFunction } from "i18next";
 import { i18next, type Locale } from "./i18n/index.js";
 import { CATEGORIES, CATEGORY_LABELS, escapeHtml } from "./shared.js";
@@ -229,9 +229,14 @@ export function renderEntryList(
     const badgeClass = categoryBadgeClass(entry.category);
     const timeDate = timeField === "deleted_at" && entry.deleted_at ? entry.deleted_at : entry.updated_at;
     const time = relativeTime(timeDate, t);
+    const visibilityMark =
+      entry.visibility === "shared"
+        ? `<span data-visibility="shared" class="shrink-0 inline-flex items-center text-muted-foreground" title="Shared">${iconEye("size-3")}</span>`
+        : "";
     html += `
       <a href="/entry/${escapeHtml(entry.id)}" class="w-full flex items-center gap-2 rounded px-2 py-1.5 hover:bg-secondary transition-colors group">
         <span class="text-[9px] uppercase tracking-wide px-1 py-0.5 rounded font-medium shrink-0 ${badgeClass}">${escapeHtml(badgeLabel)}</span>
+        ${visibilityMark}
         <span class="text-xs text-foreground truncate flex-1 group-hover:text-primary transition-colors">${escapeHtml(entry.name)}</span>
         <span class="text-[10px] text-muted-foreground shrink-0">${time}</span>
       </a>`;
@@ -432,6 +437,7 @@ export function createBrowseRoutes(sql: Sql): Hono {
 
         if (result && result.category && !result.error) {
           const tags = result.tags || [];
+          const visibility = result.visibility ?? "private";
           await sql`
             UPDATE entries SET
               name = ${result.name || row.name},
@@ -439,6 +445,7 @@ export function createBrowseRoutes(sql: Sql): Hono {
               confidence = ${result.confidence},
               fields = ${sql.json((result.fields || {}) as unknown as Parameters<typeof sql.json>[0])},
               tags = ${sql.array(tags)},
+              visibility = ${visibility},
               updated_at = NOW()
             WHERE id = ${row.id}
           `;

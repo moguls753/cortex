@@ -1,6 +1,6 @@
 # Spec-DD Progress Tracker
 
-Last updated: 2026-04-19 (auth-refactor complete)
+Last updated: 2026-04-20 (entry-visibility complete)
 
 ## Feature Status
 
@@ -24,6 +24,7 @@ Last updated: 2026-04-19 (auth-refactor complete)
 | kitchen-display (TRMNL) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ui-language | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | auth-refactor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| entry-visibility | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 
@@ -179,7 +180,11 @@ Remaining known trade-offs (documented for Phase 6 review; tests green):
 
 All 17 features now complete through all 6 spec-dd phases.
 
+All 19 features now complete through all 6 spec-dd phases.
+
 **Auth Refactor complete (2026-04-19).** All 6 phases done. 787 / 787 unit + 169 / 169 integration (zero regressions; +20 net new unit tests). Review report at `docs/specs/auth-refactor-implementation-review.md`. PASS verdict after a doublecheck / ultrathink review pass that closed 7 findings (F-1 coverage gap, F-2 redundant type casts, F-3 magic number, F-4 preserved-behavior audit, F-5 locale-injection audit, F-6 re-issue semantics, F-7 legacy-mode cookie shape). Structural cleanup with one performance improvement: `src/web/session.ts` extracted as the single source of truth for cookie sign/verify/parse/issue; `src/web/auth.ts` is now the real, wired auth path (middleware + `/login` + `/logout`); `src/web/setup.ts` owns only the wizard and no longer duplicates session helpers; `src/web/i18n/middleware.ts` changes signature from `(sql)` to `(secret)` and reads locale from the session cookie — zero DB queries per authenticated request. Session payload is exactly `{ issued_at: number, locale: string }` (no `user_id` — we stay single-user). Settings POST re-issues the cookie on `ui_language` change, preserving the original `issued_at` so the 30-day expiry is not reset. Two tech-debt items documented: `createAuthRoutes` accepts a string password for legacy test harnesses, `createSettingsRoutes` keeps `secret` optional so existing isolation tests continue to mount settings without auth. Both are non-blocking follow-ups.
+
+**Entry Visibility complete (2026-04-20).** All 6 phases done. 829 / 829 unit + 180 / 180 integration (zero pre-existing regressions; +42 net new unit tests, +11 net new integration tests including 1 Phase-6 regression guard). Review report at `docs/specs/entry-visibility-implementation-review.md`. PASS verdict after two doublecheck / ultrathink review passes that closed 14 findings (initial pass: F-1 dashboard capture API visibility propagation, F-2 browse bulk-reclassify propagation, F-3 AC-4.4 strict-vs-lenient drift, F-4 missing google-calendar mock in telegram-bot.test.ts, F-5 double fail-safe rationale, F-6 Telegram toggle i18n keys, F-7 webapp form i18n keys, F-8 Phase-4 ts-expect-error cleanup, F-9 Phase-4 JSONB test-setup bug; second pass: F-10 SSE client-side row template missing the visibility marker, F-11 SSE `entry:updated` listener didn't reconcile the marker, F-12 visibility-toggle callback dropped category-correction buttons, F-13 dashboard TS-4.5 inverse regex too broad after F-10 fix, F-14 ARCHITECTURE.md schema snippet). New feature: per-entry `visibility` flag (`'private'` / `'shared'`) inferred automatically by the LLM at classification time with a confidence-threshold fail-safe (`confidence < threshold → force 'private'`); the kitchen display filters to `visibility = 'shared'` only; Telegram low-confidence replies expose a one-tap visibility toggle alongside the 5 category-correction buttons (pure UPDATE, no LLM round-trip); the webapp edit form carries a two-option radio with strict 422 on missing-or-invalid; MCP read tools return visibility, `add_thought` accepts an optional explicit override that bypasses the fail-safe (explicit agent intent wins), `update_entry` accepts visibility changes; SSE NOTIFY trigger extended to include visibility in `entry:created`/`entry:updated` payloads and to fire on visibility-only UPDATEs; dashboard's live SSE client-side renderer mirrors the same marker logic so the UI stays in sync without page reloads. Three documented non-blocking follow-ups (F-6, F-7, F-8): Telegram and webapp visibility labels not in i18n catalogs (English fallback works); leftover Phase-4 `@ts-expect-error` directives in tests (tsconfig excludes `tests/` so they don't flag unused).
 
 ## Spec Files
 
@@ -199,6 +204,7 @@ All 17 features now complete through all 6 spec-dd phases.
 | digests | `digests-specification.md`, `digests-test-specification.md`, `digests-test-implementation-specification.md`, `digests-implementation-review.md` |
 | ui-language | `ui-language-specification.md`, `ui-language-test-specification.md`, `ui-language-test-implementation-specification.md`, `ui-language-implementation-review.md` |
 | auth-refactor | `auth-refactor-specification.md`, `auth-refactor-test-specification.md`, `auth-refactor-test-implementation-specification.md`, `auth-refactor-implementation-review.md` |
+| entry-visibility | `entry-visibility-specification.md`, `entry-visibility-test-specification.md`, `entry-visibility-test-implementation-specification.md`, `entry-visibility-implementation-review.md` |
 
 ## Other Documents
 

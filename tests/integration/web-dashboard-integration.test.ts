@@ -367,6 +367,43 @@ describe("Web Dashboard Integration", () => {
       expect(rows[0]!.source).toBe("webapp");
       expect(rows[0]!.category).toBe("tasks");
     });
+
+    // Phase-6 regression guard: the dashboard capture pipeline must propagate
+    // the classifier's `visibility` decision into the stored row. Before the
+    // Phase-6 fix, visibility always fell through to the `insertEntry` default
+    // regardless of what the classifier returned.
+    it("propagates classifier visibility into the stored entry", async () => {
+      const { classifyText } = await import("../../src/classify.js");
+      vi.mocked(classifyText).mockResolvedValue({
+        category: "tasks",
+        name: "Buy bread",
+        confidence: 0.92,
+        fields: { status: "pending" },
+        tags: [],
+        visibility: "shared",
+        content: "Buy bread at the bakery",
+      });
+
+      const { embedEntry } = await import("../../src/embed.js");
+      vi.mocked(embedEntry).mockResolvedValue(undefined);
+
+      const { app } = await createIntegrationDashboard(db.sql);
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/api/capture", {
+        method: "POST",
+        body: JSON.stringify({ text: "Buy bread at the bakery" }),
+        headers: { Cookie: cookie, "Content-Type": "application/json" },
+      });
+
+      expect(res.status).toBe(201);
+
+      const rows = await db.sql`
+        SELECT visibility FROM entries WHERE name = 'Buy bread'
+      `;
+      expect(rows.length).toBe(1);
+      expect(rows[0]!.visibility).toBe("shared");
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════════

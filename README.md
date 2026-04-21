@@ -23,8 +23,12 @@
 - **Search** - semantic search via pgvector + qwen3-embedding with text fallback, filter by category/tags/date, multilingual (EN/DE)
 - **Google Calendar** - automatic event creation from classified entries, multi-calendar support with LLM-based routing
 - **Digests** - daily briefing and weekly review, delivered by email and shown on the dashboard
-- **E-ink display** - PNG endpoint for e-ink devices (e.g. TRMNL) showing today's calendar, pending tasks, and weather
+- **Display** - PNG endpoint for e-ink devices (e.g. TRMNL) showing today's calendar, pending tasks, and weather
 - **Self-hosted** - local embeddings, local voice transcription, LLM-agnostic (Anthropic, OpenAI, or any compatible endpoint), 7 MCP tools
+
+## How to use
+
+Capture / correction / search / MCP workflows with examples: [USAGE.md](USAGE.md).
 
 ## Quick Start
 

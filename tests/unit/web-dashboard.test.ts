@@ -646,4 +646,106 @@ describe("Web Dashboard", () => {
       expect(json.confidence).toBeNull();
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Entry Visibility — webapp indicator
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Entry Visibility", () => {
+    // TS-4.1 — shared indicator appears on dashboard recent-entries for
+    // visibility='shared' rows.
+    it("renders a visibility='shared' indicator on dashboard recent entries", async () => {
+      const { getRecentEntries } = await import(
+        "../../src/web/dashboard-queries.js"
+      );
+      vi.mocked(getRecentEntries).mockResolvedValue([
+        createMockEntry({
+          id: "11111111-1111-1111-1111-111111111111",
+          name: "Grocery run",
+          category: "tasks",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "shared",
+        }),
+      ]);
+
+      const { app } = await createTestDashboard();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/", { headers: { Cookie: cookie } });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      expect(body).toContain("Grocery run");
+      // Shared indicator: the entry's rendered block carries a
+      // data-visibility="shared" attribute. Phase 5 adds this marker to the
+      // visibility-icon wrapper inside the entry list-item.
+      expect(body).toMatch(/data-visibility=["']shared["']/);
+    });
+
+    // TS-4.5 (dashboard inverse) — private entries have no shared indicator.
+    it("renders no shared indicator on private dashboard entries", async () => {
+      const { getRecentEntries } = await import(
+        "../../src/web/dashboard-queries.js"
+      );
+      vi.mocked(getRecentEntries).mockResolvedValue([
+        createMockEntry({
+          id: "22222222-2222-2222-2222-222222222222",
+          name: "Personal reflection",
+          category: "ideas",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "private",
+        }),
+      ]);
+
+      const { app } = await createTestDashboard();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/", { headers: { Cookie: cookie } });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      expect(body).toContain("Personal reflection");
+      // Strip <script> bodies before asserting — the dashboard's client-side
+      // SSE renderer contains the marker as a JS string template so it can be
+      // emitted when a shared entry arrives live. The rendered entry list
+      // itself (not the script template) is what must stay marker-free for
+      // private entries.
+      const bodyNoScripts = body.replace(
+        /<script[\s\S]*?<\/script>/g,
+        "",
+      );
+      expect(bodyNoScripts).not.toMatch(/data-visibility=["']shared["']/);
+    });
+
+    // TS-4.9 (dashboard) — the dashboard does not filter recent entries by
+    // visibility; both shared and private entries are listed.
+    it("does not filter dashboard recent entries by visibility", async () => {
+      const { getRecentEntries } = await import(
+        "../../src/web/dashboard-queries.js"
+      );
+      vi.mocked(getRecentEntries).mockResolvedValue([
+        createMockEntry({
+          id: "33333333-3333-3333-3333-333333333333",
+          name: "Public task",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "shared",
+        }),
+        createMockEntry({
+          id: "44444444-4444-4444-4444-444444444444",
+          name: "Surprise gift plan",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "private",
+        }),
+      ]);
+
+      const { app } = await createTestDashboard();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/", { headers: { Cookie: cookie } });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      expect(body).toContain("Public task");
+      expect(body).toContain("Surprise gift plan");
+    });
+  });
 });

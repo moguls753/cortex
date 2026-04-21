@@ -187,6 +187,7 @@ describe("Web Entry Integration", () => {
           name: "New Name",
           category: "tasks",
           content: "updated",
+          visibility: "private",
         }),
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -223,6 +224,7 @@ describe("Web Entry Integration", () => {
           name: "Test",
           category: "tasks",
           content: "completely new content",
+          visibility: "private",
         }),
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -257,6 +259,7 @@ describe("Web Entry Integration", () => {
           name: "Test",
           category: "tasks",
           content: "stuff",
+          visibility: "private",
         }),
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -326,6 +329,7 @@ describe("Web Entry Integration", () => {
           name: "Test",
           category: "tasks",
           content: "stuff",
+          visibility: "private",
           "fields[status]": "active",
           "fields[next_action]": "review",
           "fields[notes]": "some notes",
@@ -391,6 +395,7 @@ describe("Web Entry Integration", () => {
           name: "Test",
           category: "tasks",
           content: "updated",
+          visibility: "private",
         }),
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -426,6 +431,7 @@ describe("Web Entry Integration", () => {
           category: "tasks",
           content: "stuff",
           tags: "existing,brand-new-tag",
+          visibility: "private",
         }),
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",

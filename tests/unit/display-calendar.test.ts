@@ -365,4 +365,45 @@ describe("getDisplayEvents", () => {
     expect(result.today).toHaveLength(1);
     expect(result.today[0].name).toBe("(no title)");
   });
+
+  // ─── Entry Visibility — NG-5 guard ───────────────────────────
+  // TS-2.3 — calendar events are NOT filtered by Cortex entry visibility.
+  // `getDisplayEvents` must read only from Google; it must never touch the
+  // entries table. This test guards against a future coupling where display
+  // calendar fetches get wired through the entries table with a visibility
+  // filter that would drop events for private entries.
+  it("TS-2.3 — does not read the entries table when fetching display events", async () => {
+    resolveCalendarConfigMock.mockResolvedValue(makeConfig());
+
+    fetchMock
+      .mockResolvedValueOnce(
+        googleEventsResponse([
+          {
+            summary: "Household dinner",
+            start: { dateTime: "2026-04-20T19:00:00+02:00" },
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(emptyEventsResponse());
+
+    const sqlCalls: Array<{ query: string }> = [];
+    const entriesSql = Object.assign(
+      vi.fn((strings: TemplateStringsArray) => {
+        sqlCalls.push({ query: strings.join("?") });
+        return Promise.resolve([]);
+      }),
+      { unsafe: vi.fn().mockResolvedValue([]) },
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await getDisplayEvents(entriesSql as any, "Europe/Berlin");
+
+    expect(result.today).toHaveLength(1);
+    expect(result.today[0].name).toBe("Household dinner");
+    // No sql call touched the entries table.
+    for (const call of sqlCalls) {
+      expect(call.query.toLowerCase()).not.toContain("from entries");
+      expect(call.query.toLowerCase()).not.toContain("visibility");
+    }
+  });
 });

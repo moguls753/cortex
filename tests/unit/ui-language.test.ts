@@ -1661,9 +1661,14 @@ describe("UI Language", () => {
       const replyOptions = mocks.reply.mock.calls[0][1] as any;
       const buttons = replyOptions?.reply_markup?.inline_keyboard?.flat();
       expect(buttons).toBeDefined();
-      expect(buttons).toHaveLength(5);
+      // Post entry-visibility: low-confidence keyboards carry 5 category buttons
+      // + 1 visibility toggle. Filter to the category set for the legacy assertion.
+      const categoryButtons = buttons.filter((b: any) =>
+        String(b.callback_data).startsWith("correct:"),
+      );
+      expect(categoryButtons).toHaveLength(5);
       // Each button text should match de catalog; callback_data remains English
-      const peopleButton = buttons.find((b: any) =>
+      const peopleButton = categoryButtons.find((b: any) =>
         (b.callback_data as string).includes("people"),
       );
       expect(peopleButton).toBeDefined();

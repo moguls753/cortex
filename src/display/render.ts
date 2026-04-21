@@ -1,4 +1,4 @@
-// Kitchen display rendering pipeline: layout -> Satori (SVG) -> Resvg (PNG).
+// Display rendering pipeline: layout -> Satori (SVG) -> Resvg (PNG).
 
 import satori from "satori";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildLayout } from "./layout.js";
-import type { KitchenData } from "./types.js";
+import type { DisplayData } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -25,8 +25,8 @@ function loadFonts(): void {
   );
 }
 
-export async function renderKitchenDisplay(
-  data: KitchenData,
+export async function renderDisplay(
+  data: DisplayData,
   width = 1872,
   height = 1404,
 ): Promise<Buffer> {

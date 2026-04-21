@@ -11,7 +11,7 @@ export async function searchBySimilarity(
 ): Promise<any[]> {
   const vecStr = `[${embedding.join(",")}]`;
   const rows = await sql`
-    SELECT id, category, name, content, tags,
+    SELECT id, category, name, content, tags, visibility,
            1 - (embedding <=> ${vecStr}::vector) AS similarity,
            created_at
     FROM entries
@@ -36,12 +36,13 @@ export async function insertMcpEntry(
     source: string;
     source_type: string;
     embedding: number[] | null;
+    visibility: "private" | "shared";
   },
 ): Promise<any> {
   if (data.embedding) {
     const vecStr = `[${data.embedding.join(",")}]`;
     const rows = await sql`
-      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, embedding)
+      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, embedding, visibility)
       VALUES (
         ${data.name},
         ${data.content},
@@ -51,7 +52,8 @@ export async function insertMcpEntry(
         ${data.tags},
         ${data.source},
         ${data.source_type},
-        ${vecStr}::vector(4096)
+        ${vecStr}::vector(4096),
+        ${data.visibility}
       )
       RETURNING *
     `;
@@ -59,7 +61,7 @@ export async function insertMcpEntry(
   }
 
   const rows = await sql`
-    INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type)
+    INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
     VALUES (
       ${data.name},
       ${data.content},
@@ -68,7 +70,8 @@ export async function insertMcpEntry(
       ${sql.json(data.fields as unknown as Parameters<typeof sql.json>[0])},
       ${data.tags},
       ${data.source},
-      ${data.source_type}
+      ${data.source_type},
+      ${data.visibility}
     )
     RETURNING *
   `;
@@ -82,7 +85,7 @@ export async function listRecentEntries(
 ): Promise<any[]> {
   if (category) {
     const rows = await sql`
-      SELECT id, category, name, tags, created_at, updated_at
+      SELECT id, category, name, tags, visibility, created_at, updated_at
       FROM entries
       WHERE deleted_at IS NULL
         AND category = ${category}
@@ -93,7 +96,7 @@ export async function listRecentEntries(
   }
 
   const rows = await sql`
-    SELECT id, category, name, tags, created_at, updated_at
+    SELECT id, category, name, tags, visibility, created_at, updated_at
     FROM entries
     WHERE deleted_at IS NULL
       AND created_at >= NOW() - ${days + " days"}::interval
@@ -108,7 +111,7 @@ export async function getEntryById(
 ): Promise<any | null> {
   const rows = await sql`
     SELECT id, category, name, content, fields, tags, confidence,
-           source, source_type, deleted_at, created_at, updated_at
+           source, source_type, visibility, deleted_at, created_at, updated_at
     FROM entries
     WHERE id = ${id}
   `;
@@ -143,6 +146,10 @@ export async function updateEntryFields(
     setClauses.push("fields = $" + (values.length + 1) + "::jsonb");
     values.push(JSON.stringify(updates.fields));
   }
+  if ("visibility" in updates) {
+    setClauses.push("visibility = $" + (values.length + 1));
+    values.push(updates.visibility);
+  }
   if ("embedding" in updates) {
     if (updates.embedding === null) {
       setClauses.push("embedding = NULL");
@@ -161,7 +168,7 @@ export async function updateEntryFields(
     UPDATE entries SET ${setClauses.join(", ")}
     WHERE id = $${values.length + 1} AND deleted_at IS NULL
     RETURNING id, category, name, content, fields, tags, confidence,
-              source, source_type, deleted_at, created_at, updated_at
+              source, source_type, visibility, deleted_at, created_at, updated_at
   `;
   values.push(id);
 

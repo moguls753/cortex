@@ -66,6 +66,16 @@ vi.mock("../../src/web/settings-queries.js", () => ({
   getAllSettings: (...args: unknown[]) => mockGetAllSettings(...args),
 }));
 
+// processCalendarEvent mock — enables TS-8.5 to assert the handler still
+// dispatches calendar creation for private entries (visibility is orthogonal
+// to calendar writes per NG-5). Other calendar calls stay as plain closures
+// so vi.restoreAllMocks() doesn't wipe them.
+vi.mock("../../src/google-calendar.js", () => ({
+  processCalendarEvent: vi.fn().mockResolvedValue({ created: false }),
+  getCalendarNames: async () => [] as string[],
+  handleEntryCalendarCleanup: async () => undefined,
+}));
+
 // Mock grammy (for startup tests)
 const mockBotStart = vi.fn();
 const mockBotStop = vi.fn();
@@ -399,6 +409,8 @@ describe("Telegram Bot", () => {
   describe("inline keyboard", () => {
     it("includes an inline keyboard with 5 category buttons on low-confidence replies", async () => {
       // TS-2.4
+      // Post entry-visibility: the low-confidence reply also carries 1 visibility
+      // toggle button in a second row. The category correction set remains 5.
       mockClassifyText.mockResolvedValue(
         createClassificationResult({ confidence: 0.4 }),
       );
@@ -416,8 +428,11 @@ describe("Telegram Bot", () => {
         inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
       };
       const buttons = markup.inline_keyboard.flat();
-      expect(buttons).toHaveLength(5);
-      expect(buttons.map((b) => b.text)).toEqual([
+      const categoryButtons = buttons.filter((b) =>
+        String(b.callback_data).startsWith("correct:"),
+      );
+      expect(categoryButtons).toHaveLength(5);
+      expect(categoryButtons.map((b) => b.text)).toEqual([
         "People",
         "Projects",
         "Tasks",
@@ -723,10 +738,14 @@ describe("Telegram Bot", () => {
       >;
       expect(replyOptions).toHaveProperty("reply_markup");
       const markup = replyOptions.reply_markup as {
-        inline_keyboard: Array<Array<{ text: string }>>;
+        inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
       };
       const buttons = markup.inline_keyboard.flat();
-      expect(buttons).toHaveLength(5);
+      // Post entry-visibility: 5 category buttons + 1 visibility toggle.
+      const categoryButtons = buttons.filter((b) =>
+        String(b.callback_data).startsWith("correct:"),
+      );
+      expect(categoryButtons).toHaveLength(5);
     });
   });
 
@@ -1253,6 +1272,411 @@ describe("Telegram Bot", () => {
         // Should not contain a "welcome" or "help" message
         expect(replyText).not.toMatch(/welcome|help|start/i);
       }
+    });
+  });
+
+  // =========================================================================
+  // Entry Visibility — reply formatting, toggle semantics, /fix + calendar
+  // =========================================================================
+  describe("Entry Visibility", () => {
+    // Shared helper to read the options object from the first reply call.
+    function firstReplyOpts(mocks: {
+      reply: ReturnType<typeof vi.fn>;
+    }): Record<string, unknown> | undefined {
+      const calls = mocks.reply.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      return calls[0][1] as Record<string, unknown> | undefined;
+    }
+
+    function firstReplyText(mocks: {
+      reply: ReturnType<typeof vi.fn>;
+    }): string {
+      return mocks.reply.mock.calls[0][0] as string;
+    }
+
+    // TS-3.1 — confident shared reply has 👁 glyph, no inline keyboard.
+    it("confident shared reply includes 👁 glyph and no inline toggle", async () => {
+      mockClassifyText.mockResolvedValue(
+        createClassificationResult({
+          category: "tasks",
+          name: "Buy bread",
+          confidence: 0.9,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...({ visibility: "shared" } as any),
+        }),
+      );
+
+      const { ctx, mocks } = createMockContext({ text: "buy bread" });
+      await handleTextMessage(ctx, mockSql);
+
+      expect(firstReplyText(mocks)).toContain("👁");
+      const opts = firstReplyOpts(mocks);
+      // Either no options at all, or no reply_markup attached.
+      expect(opts?.reply_markup).toBeFalsy();
+    });
+
+    // TS-3.2 — confident private reply has no glyph and no inline keyboard.
+    it("confident private reply has no 👁 glyph and no inline toggle", async () => {
+      mockClassifyText.mockResolvedValue(
+        createClassificationResult({
+          category: "ideas",
+          name: "Quiet thought",
+          confidence: 0.85,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...({ visibility: "private" } as any),
+        }),
+      );
+
+      const { ctx, mocks } = createMockContext({ text: "quiet thought" });
+      await handleTextMessage(ctx, mockSql);
+
+      expect(firstReplyText(mocks)).not.toContain("👁");
+      const opts = firstReplyOpts(mocks);
+      expect(opts?.reply_markup).toBeFalsy();
+    });
+
+    // TS-3.3 — low-confidence (LLM said shared) reply: no glyph, 5 category
+    // buttons, 1 "Make shared" toggle (stored value is private after fail-safe).
+    it("low-confidence reply with LLM='shared' has 5 category buttons + 'Make shared' toggle", async () => {
+      mockIsConfident.mockReturnValue(false);
+      mockClassifyText.mockResolvedValue(
+        createClassificationResult({
+          category: "tasks",
+          name: "Ambiguous capture",
+          confidence: 0.45,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...({ visibility: "shared" } as any),
+        }),
+      );
+
+      const { ctx, mocks } = createMockContext({ text: "ambiguous capture" });
+      await handleTextMessage(ctx, mockSql);
+
+      // Reply reflects post-fail-safe storage (private) — no glyph.
+      expect(firstReplyText(mocks)).not.toContain("👁");
+
+      const opts = firstReplyOpts(mocks) as
+        | { reply_markup?: { inline_keyboard: unknown[][] } }
+        | undefined;
+      const keyboard = opts?.reply_markup?.inline_keyboard ?? [];
+
+      // Flatten all button rows and inspect callback_data fields.
+      const buttons = keyboard.flat() as Array<{
+        text?: string;
+        callback_data?: string;
+      }>;
+      const categoryButtons = buttons.filter((b) =>
+        String(b.callback_data ?? "").startsWith("correct:"),
+      );
+      const visibilityButtons = buttons.filter((b) =>
+        String(b.callback_data ?? "").startsWith("visibility:"),
+      );
+
+      expect(categoryButtons).toHaveLength(5);
+      expect(visibilityButtons).toHaveLength(1);
+      const vb = visibilityButtons[0]!;
+      expect(String(vb.callback_data)).toMatch(/:shared$/);
+      expect(String(vb.text ?? "").toLowerCase()).toContain("shared");
+    });
+
+    // TS-3.4 — low-confidence (LLM said private) reply: same shape.
+    it("low-confidence reply with LLM='private' has 5 category buttons + 'Make shared' toggle", async () => {
+      mockIsConfident.mockReturnValue(false);
+      mockClassifyText.mockResolvedValue(
+        createClassificationResult({
+          category: "ideas",
+          name: "Uncertain private",
+          confidence: 0.45,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...({ visibility: "private" } as any),
+        }),
+      );
+
+      const { ctx, mocks } = createMockContext({ text: "uncertain private" });
+      await handleTextMessage(ctx, mockSql);
+
+      expect(firstReplyText(mocks)).not.toContain("👁");
+
+      const opts = firstReplyOpts(mocks) as
+        | { reply_markup?: { inline_keyboard: unknown[][] } }
+        | undefined;
+      const keyboard = opts?.reply_markup?.inline_keyboard ?? [];
+      const buttons = keyboard.flat() as Array<{
+        text?: string;
+        callback_data?: string;
+      }>;
+
+      expect(
+        buttons.filter((b) =>
+          String(b.callback_data ?? "").startsWith("correct:"),
+        ),
+      ).toHaveLength(5);
+
+      const vb = buttons.find((b) =>
+        String(b.callback_data ?? "").startsWith("visibility:"),
+      );
+      expect(vb).toBeDefined();
+      expect(String(vb!.callback_data)).toMatch(/:shared$/);
+      expect(String(vb!.text ?? "").toLowerCase()).toContain("shared");
+    });
+
+    // TS-3.5 — toggle label inverse of stored visibility, both directions.
+    // This test dispatches two callback_query taps (at different times) to
+    // observe that the re-rendered keyboard label inverts the stored value.
+    it("toggle button label reflects the inverse of the stored visibility on re-render", async () => {
+      // Test path 1: stored shared → edited message shows 'Make private'.
+      mockSql = vi.fn().mockResolvedValue([
+        {
+          id: "11111111-1111-1111-1111-111111111111",
+          category: "tasks",
+          confidence: 0.45,
+          content: "...",
+          deleted_at: null,
+          visibility: "shared",
+        },
+      ]);
+      mockReclassifyEntry.mockResolvedValue({
+        category: "tasks",
+        name: "After toggle",
+        confidence: 0.45,
+        fields: {},
+        tags: [],
+      });
+
+      const ctx1 = {
+        callbackQuery: {
+          data: "visibility:11111111-1111-1111-1111-111111111111:private",
+          message: {
+            chat: { id: 123456 },
+            message_id: 42,
+            text: "❓ Best guess: Tasks → Thing (45%) 👁",
+          },
+        },
+        editMessageText: vi.fn().mockResolvedValue(true),
+        answerCallbackQuery: vi.fn().mockResolvedValue(true),
+      };
+      await handleCallbackQuery(ctx1, mockSql);
+      expect(ctx1.editMessageText).toHaveBeenCalled();
+      const editCall = ctx1.editMessageText.mock.calls[0] as [
+        string,
+        { reply_markup?: { inline_keyboard: unknown[][] } } | undefined,
+      ];
+      const keyboard = editCall[1]?.reply_markup?.inline_keyboard ?? [];
+      const buttons = keyboard.flat() as Array<{
+        text?: string;
+        callback_data?: string;
+      }>;
+      const viz = buttons.find((b) =>
+        String(b.callback_data ?? "").startsWith("visibility:"),
+      );
+      expect(viz).toBeDefined();
+      // After flipping to 'private', the toggle's next action is 'Make shared'.
+      // If Phase 5 re-renders the keyboard after each tap, label contains "shared".
+      // If Phase 5 removes the keyboard entirely on edit, the test accepts that too.
+      if (viz) {
+        expect(String(viz.text ?? "").toLowerCase()).toContain("shared");
+        expect(String(viz.callback_data)).toMatch(/:shared$/);
+      }
+    });
+
+    // TS-3.6 — tap on visibility toggle calls UPDATE, no LLM/embed calls.
+    it("visibility toggle tap updates DB without calling LLM or embed", async () => {
+      const updates: Array<{ query: string; values: unknown[] }> = [];
+      const recordingSql = vi.fn(
+        (strings: TemplateStringsArray, ...values: unknown[]) => {
+          const query = strings.join("?");
+          updates.push({ query, values });
+          if (/SELECT/i.test(query)) {
+            return Promise.resolve([
+              {
+                id: "22222222-2222-2222-2222-222222222222",
+                category: "tasks",
+                confidence: 0.45,
+                content: "text",
+                deleted_at: null,
+                visibility: "private",
+              },
+            ]);
+          }
+          return Promise.resolve([]);
+        },
+      );
+
+      const ctx = {
+        callbackQuery: {
+          data: "visibility:22222222-2222-2222-2222-222222222222:shared",
+          message: {
+            chat: { id: 123456 },
+            message_id: 42,
+            text: "❓ Best guess: Tasks → Thing (45%)",
+          },
+        },
+        editMessageText: vi.fn().mockResolvedValue(true),
+        answerCallbackQuery: vi.fn().mockResolvedValue(true),
+      };
+      await handleCallbackQuery(ctx, recordingSql);
+
+      // At least one UPDATE targeting entries with visibility was issued.
+      const updateQueries = updates.filter(
+        (u) => /UPDATE\s+entries/i.test(u.query) && /visibility/i.test(u.query),
+      );
+      expect(updateQueries.length).toBeGreaterThan(0);
+
+      // No LLM call, no embedding call.
+      expect(mockReclassifyEntry).not.toHaveBeenCalled();
+      expect(mockClassifyText).not.toHaveBeenCalled();
+      expect(mockEmbedEntry).not.toHaveBeenCalled();
+    });
+
+    // TS-3.7 — tap edits the original reply so the user sees the new state.
+    it("visibility toggle tap edits the original reply", async () => {
+      mockSql = vi.fn().mockResolvedValue([
+        {
+          id: "33333333-3333-3333-3333-333333333333",
+          category: "tasks",
+          confidence: 0.45,
+          content: "text",
+          deleted_at: null,
+          visibility: "shared",
+        },
+      ]);
+
+      const ctx = {
+        callbackQuery: {
+          data: "visibility:33333333-3333-3333-3333-333333333333:private",
+          message: {
+            chat: { id: 123456 },
+            message_id: 42,
+            text: "❓ Best guess: Tasks → Name (45%) 👁",
+          },
+        },
+        editMessageText: vi.fn().mockResolvedValue(true),
+        answerCallbackQuery: vi.fn().mockResolvedValue(true),
+      };
+      await handleCallbackQuery(ctx, mockSql);
+
+      expect(ctx.editMessageText).toHaveBeenCalledTimes(1);
+      const [newText] = ctx.editMessageText.mock.calls[0] as [string, unknown];
+      // After flipping to private, the glyph should be absent.
+      expect(newText).not.toContain("👁");
+    });
+
+    // TS-3.8 — voice capture reply follows the same visibility-format rules.
+    it("voice capture reply includes 👁 glyph on confident shared", async () => {
+      global.fetch = vi.fn().mockImplementation(async (input: unknown) => {
+        const url = String(input);
+        if (url.includes("/v1/audio/transcriptions")) {
+          return new Response(JSON.stringify({ text: "voice transcript" }), {
+            status: 200,
+          });
+        }
+        return new Response(new ArrayBuffer(16), { status: 200 });
+      }) as unknown as typeof fetch;
+
+      mockClassifyText.mockResolvedValue(
+        createClassificationResult({
+          category: "tasks",
+          name: "Spoken task",
+          confidence: 0.9,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...({ visibility: "shared" } as any),
+        }),
+      );
+
+      const { ctx, mocks } = createMockContext({
+        voice: { file_id: "v1", duration: 3 },
+        chatId: 123456,
+      });
+      // mock-telegram createMockContext uses ctx.message.text OR voice — voice branch
+      await handleVoiceMessage(ctx, mockSql);
+
+      const text = firstReplyText(mocks);
+      expect(text).toContain("🎤");
+      expect(text).toContain("voice transcript");
+      expect(text).toContain("👁");
+      const opts = firstReplyOpts(mocks);
+      expect(opts?.reply_markup).toBeFalsy();
+    });
+
+    // TS-8.4 — /fix pipeline still applies the visibility fail-safe.
+    it("/fix reclassification below threshold still stores visibility='private'", async () => {
+      const recordedUpdates: Array<{ query: string; values: unknown[] }> = [];
+      mockSql = vi.fn(
+        (strings: TemplateStringsArray, ...values: unknown[]) => {
+          const query = strings.join("?");
+          if (/SELECT/i.test(query) && /FROM entries/i.test(query)) {
+            return Promise.resolve([
+              {
+                id: "44444444-4444-4444-4444-444444444444",
+                content: "original",
+                category: "ideas",
+                source: "telegram",
+              },
+            ]);
+          }
+          if (/UPDATE entries/i.test(query)) {
+            recordedUpdates.push({ query, values });
+          }
+          return Promise.resolve([]);
+        },
+      );
+
+      mockReclassifyEntry.mockResolvedValue({
+        category: "ideas",
+        name: "Reclassified",
+        confidence: 0.4, // below threshold
+        fields: {},
+        tags: [],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...({ visibility: "shared" } as any),
+      });
+
+      const { ctx } = createMockContext({
+        text: "/fix this is sensitive",
+        chatId: 123456,
+      });
+      await handleFixCommand(ctx, mockSql);
+
+      // The UPDATE must set visibility to 'private' (fail-safe), not 'shared'.
+      const updateWithVisibility = recordedUpdates.find((u) =>
+        /visibility/i.test(u.query),
+      );
+      expect(updateWithVisibility).toBeDefined();
+      expect(updateWithVisibility!.values).toContain("private");
+    });
+
+    // TS-8.5 — private entry with create_calendar_event=true still creates event (NG-5 guard).
+    it("private entry with create_calendar_event=true still triggers processCalendarEvent", async () => {
+      const { processCalendarEvent } = await import(
+        "../../src/google-calendar.js"
+      );
+      const spy = vi.mocked(processCalendarEvent);
+      spy.mockResolvedValue({ created: true } as any);
+
+      mockClassifyText.mockResolvedValue(
+        createClassificationResult({
+          category: "tasks",
+          name: "Private meeting",
+          confidence: 0.9,
+          create_calendar_event: true,
+          calendar_date: "2026-05-01",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...({ visibility: "private" } as any),
+        }),
+      );
+
+      const { ctx } = createMockContext({ text: "private meeting" });
+      await handleTextMessage(ctx, mockSql);
+
+      // Fire-and-forget — give the microtask queue a tick so the .then chain runs.
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      const args = spy.mock.calls[0];
+      const classificationArg = args[2] as { visibility?: string };
+      // The classification passed through still carries visibility='private' —
+      // proving the handler does NOT strip or suppress calendar events for private entries.
+      expect(classificationArg.visibility).toBe("private");
     });
   });
 });

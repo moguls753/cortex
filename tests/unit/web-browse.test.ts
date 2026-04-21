@@ -750,4 +750,61 @@ describe("Web Browse", () => {
       expect(body).toMatch(/hidden|collapse|display:\s*none/i);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Entry Visibility — browse indicator
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Entry Visibility", () => {
+    // TS-4.2
+    it("renders a visibility='shared' indicator on browse cards", async () => {
+      const { browseEntries } = await import(
+        "../../src/web/browse-queries.js"
+      );
+      vi.mocked(browseEntries).mockResolvedValue([
+        createMockEntry({
+          id: "55555555-5555-5555-5555-555555555555",
+          name: "Household grocery",
+          category: "tasks",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "shared",
+        }),
+      ]);
+
+      const { app } = await createTestBrowse();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/browse", { headers: { Cookie: cookie } });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      expect(body).toContain("Household grocery");
+      expect(body).toMatch(/data-visibility=["']shared["']/);
+    });
+
+    // TS-4.5 (browse inverse)
+    it("renders no shared indicator on private browse entries", async () => {
+      const { browseEntries } = await import(
+        "../../src/web/browse-queries.js"
+      );
+      vi.mocked(browseEntries).mockResolvedValue([
+        createMockEntry({
+          id: "66666666-6666-6666-6666-666666666666",
+          name: "Private note",
+          category: "ideas",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "private",
+        }),
+      ]);
+
+      const { app } = await createTestBrowse();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/browse", { headers: { Cookie: cookie } });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      expect(body).toContain("Private note");
+      expect(body).not.toMatch(/data-visibility=["']shared["']/);
+    });
+  });
 });

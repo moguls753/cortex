@@ -609,4 +609,222 @@ describe("Web Entry", () => {
       expect(body).toContain("tasks");
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Entry Visibility — view, edit, soft-delete/restore preservation
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Entry Visibility", () => {
+    // TS-4.4
+    it("renders visibility='shared' indicator on the entry view page", async () => {
+      const { getEntry } = await import("../../src/web/entry-queries.js");
+      vi.mocked(getEntry).mockResolvedValue(
+        createMockEntry({
+          name: "Shared entry view",
+          category: "tasks",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "shared",
+        }),
+      );
+
+      const { app } = await createTestEntry();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request(`/entry/${TEST_UUID}`, {
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      expect(body).toContain("Shared entry view");
+      expect(body).toMatch(/data-visibility=["']shared["']/);
+    });
+
+    // TS-4.5 (entry view inverse)
+    it("renders no visibility indicator on private entry view page", async () => {
+      const { getEntry } = await import("../../src/web/entry-queries.js");
+      vi.mocked(getEntry).mockResolvedValue(
+        createMockEntry({
+          name: "Private entry view",
+          category: "ideas",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "private",
+        }),
+      );
+
+      const { app } = await createTestEntry();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request(`/entry/${TEST_UUID}`, {
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      expect(body).toContain("Private entry view");
+      expect(body).not.toMatch(/data-visibility=["']shared["']/);
+    });
+
+    // TS-4.6
+    it("edit form includes a two-option visibility control with the current value pre-selected", async () => {
+      const { getEntry } = await import("../../src/web/entry-queries.js");
+      vi.mocked(getEntry).mockResolvedValue(
+        createMockEntry({
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "private",
+        }),
+      );
+
+      const { app } = await createTestEntry();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request(`/entry/${TEST_UUID}/edit`, {
+        headers: { Cookie: cookie },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      // The form must name the visibility control, offer both options,
+      // and pre-select the current (private) value.
+      expect(body).toMatch(/name=["']visibility["']/);
+      expect(body).toMatch(/value=["']private["']/);
+      expect(body).toMatch(/value=["']shared["']/);
+      // Current value private is checked/selected. Accept either markup form.
+      expect(body).toMatch(
+        /value=["']private["'][^>]*\b(?:checked|selected)\b|\b(?:checked|selected)\b[^>]*value=["']private["']/,
+      );
+    });
+
+    // TS-4.7
+    it("edit POST with visibility='shared' updates the stored value", async () => {
+      const { getEntry, updateEntry } = await import(
+        "../../src/web/entry-queries.js"
+      );
+      vi.mocked(getEntry).mockResolvedValue(
+        createMockEntry({
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "private",
+        }),
+      );
+
+      const { app } = await createTestEntry();
+      const cookie = await loginAndGetCookie(app);
+
+      const body = new URLSearchParams({
+        name: "Edited entry",
+        category: "tasks",
+        content: "new content",
+        tags: "",
+        visibility: "shared",
+      });
+
+      const res = await app.request(`/entry/${TEST_UUID}/edit`, {
+        method: "POST",
+        body,
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(303);
+      expect(vi.mocked(updateEntry)).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(updateEntry).mock.calls[0] ?? [];
+      const updatePayload = call[2] as { visibility?: string };
+      expect(updatePayload).toBeDefined();
+      expect(updatePayload.visibility).toBe("shared");
+    });
+
+    // TS-4.8
+    it("edit POST with invalid visibility value returns 422 and does not call updateEntry", async () => {
+      const { getEntry, updateEntry } = await import(
+        "../../src/web/entry-queries.js"
+      );
+      vi.mocked(getEntry).mockResolvedValue(
+        createMockEntry({
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "private",
+        }),
+      );
+
+      const { app } = await createTestEntry();
+      const cookie = await loginAndGetCookie(app);
+
+      const body = new URLSearchParams({
+        name: "Edited entry",
+        category: "tasks",
+        content: "new content",
+        tags: "",
+        visibility: "public", // invalid — not in { 'private', 'shared' }
+      });
+
+      const res = await app.request(`/entry/${TEST_UUID}/edit`, {
+        method: "POST",
+        body,
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(422);
+      expect(vi.mocked(updateEntry)).not.toHaveBeenCalled();
+      const html = await res.text();
+      expect(html.toLowerCase()).toMatch(/visibility/i);
+    });
+
+    // TS-8.2 — soft-delete does not pass a visibility argument, proving it
+    // cannot accidentally rewrite the stored flag during deletion.
+    it("soft-delete does not modify the entry's visibility", async () => {
+      const { getEntry, softDeleteEntry } = await import(
+        "../../src/web/entry-queries.js"
+      );
+      vi.mocked(getEntry).mockResolvedValue(
+        createMockEntry({
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "shared",
+        }),
+      );
+
+      const { app } = await createTestEntry();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request(`/entry/${TEST_UUID}/delete`, {
+        method: "POST",
+        headers: { Cookie: cookie },
+      });
+
+      expect(res.status).toBe(303);
+      expect(vi.mocked(softDeleteEntry)).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(softDeleteEntry).mock.calls[0] ?? [];
+      // Handler must only pass (sql, id) — no visibility arg slipping in.
+      expect(call.length).toBe(2);
+    });
+
+    // TS-8.3 — restore does not rewrite visibility either.
+    it("restore does not modify the entry's visibility", async () => {
+      const { getEntry, restoreEntry } = await import(
+        "../../src/web/entry-queries.js"
+      );
+      vi.mocked(getEntry).mockResolvedValue(
+        createMockEntry({
+          deleted_at: new Date(),
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "private",
+        }),
+      );
+
+      const { app } = await createTestEntry();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request(`/entry/${TEST_UUID}/restore`, {
+        method: "POST",
+        headers: { Cookie: cookie },
+      });
+
+      expect(res.status).toBe(303);
+      expect(vi.mocked(restoreEntry)).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(restoreEntry).mock.calls[0] ?? [];
+      expect(call.length).toBe(2);
+    });
+  });
 });

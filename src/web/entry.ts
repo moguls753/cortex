@@ -18,14 +18,17 @@ import {
 import { embedEntry } from "../embed.js";
 import { handleEntryCalendarCleanup } from "../google-calendar.js";
 import {
+  iconEye,
   iconTrash2,
 } from "./icons.js";
 import {
   CATEGORIES,
   CATEGORY_FIELDS,
   CATEGORY_LABELS,
+  VISIBILITY_VALUES,
   escapeHtml,
   parseTags,
+  type Visibility,
 } from "./shared.js";
 
 type Sql = postgres.Sql;
@@ -79,6 +82,7 @@ function renderViewPage(
     confidence: number | null;
     source: string;
     source_type: string;
+    visibility: Visibility;
     deleted_at: Date | null;
     created_at: Date;
     updated_at: Date;
@@ -111,6 +115,10 @@ function renderViewPage(
   html += `<h1 class="text-lg font-medium text-foreground tracking-tight">${escapeHtml(entry.name)}</h1>`;
   html += `<div class="flex items-center gap-2 mt-1 flex-wrap">`;
   html += `<span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium ${badgeClass}">${escapeHtml(badgeLabel)}</span>`;
+
+  if (entry.visibility === "shared") {
+    html += `<span data-visibility="shared" class="inline-flex items-center gap-1 text-[10px] text-muted-foreground" title="${escapeHtml(t("visibility.shared_hint") === "visibility.shared_hint" ? "Visible on the display" : t("visibility.shared_hint"))}">${iconEye("size-3")}</span>`;
+  }
 
   if (entry.deleted_at) {
     html += `<span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium bg-destructive text-destructive-foreground">${escapeHtml(t("entry.deleted_badge"))}</span>`;
@@ -202,6 +210,7 @@ function renderEditPage(
     content: string | null;
     fields: Record<string, unknown>;
     tags: string[];
+    visibility: Visibility;
   },
   allTags: string[],
   t: TFunction,
@@ -253,6 +262,27 @@ function renderEditPage(
     html += `<option value="${escapeHtml(tag)}">`;
   }
   html += `</datalist>`;
+  html += `</div>`;
+
+  // Visibility — two-option radio control. Current value pre-selected.
+  const visibilityLabel = (() => {
+    const v = t("visibility.label");
+    return v === "visibility.label" ? "Visibility" : v;
+  })();
+  const privateLabel = (() => {
+    const v = t("visibility.private");
+    return v === "visibility.private" ? "Private" : v;
+  })();
+  const sharedLabel = (() => {
+    const v = t("visibility.shared");
+    return v === "visibility.shared" ? "Shared" : v;
+  })();
+  html += `<div>`;
+  html += `<label class="block text-xs font-medium text-muted-foreground mb-1">${escapeHtml(visibilityLabel)}</label>`;
+  html += `<div class="flex items-center gap-4 text-sm font-sans">`;
+  html += `<label class="inline-flex items-center gap-1.5"><input type="radio" name="visibility" value="private"${entry.visibility === "private" ? " checked" : ""} class="accent-primary"> ${escapeHtml(privateLabel)}</label>`;
+  html += `<label class="inline-flex items-center gap-1.5"><input type="radio" name="visibility" value="shared"${entry.visibility === "shared" ? " checked" : ""} class="accent-primary"> ${escapeHtml(sharedLabel)}</label>`;
+  html += `</div>`;
   html += `</div>`;
 
   // Content
@@ -392,6 +422,7 @@ export function createEntryRoutes(sql: Sql): Hono {
     const content = String(formData["content"] ?? "") || null;
     const tagsRaw = String(formData["tags"] ?? "");
     const tags = parseTags(tagsRaw);
+    const visibilityRaw = String(formData["visibility"] ?? "");
 
     // Collect submitted fields. Category-specific fields are submitted with
     // direct names (e.g. `due_date`, `status`) per AC-3.3; the legacy
@@ -413,28 +444,57 @@ export function createEntryRoutes(sql: Sql): Hono {
       }
     }
 
-    // Validate
-    if (!name) {
+    // Shared renderer for validation-failure paths — keeps the user's in-flight
+    // edits on-screen and just swaps the error message.
+    const renderValidationError = async (message: string): Promise<Response> => {
       const entry = await getEntry(sql, id);
       if (!entry) {
         return c.html(renderLayout("Not Found", render404(), "/", await health(), c), 404);
       }
       const allTagsList = (await getAllTags(sql)) ?? [];
-      const errorEntry = { ...entry, name: "", category, content, tags, fields: submittedFields };
+      const fallbackVisibility: Visibility =
+        visibilityRaw === "private" || visibilityRaw === "shared"
+          ? (visibilityRaw as Visibility)
+          : (entry.visibility as Visibility);
+      const errorEntry = {
+        ...entry,
+        name: name || "",
+        category,
+        content,
+        tags,
+        fields: submittedFields,
+        visibility: fallbackVisibility,
+      };
       const locale = ((c.get("locale") as Locale | undefined) ?? "en") as Locale;
       const t =
         (c.get("t") as TFunction | undefined) ??
         (i18next.getFixedT(locale) as TFunction);
       return c.html(
-        renderLayout("Edit — " + entry.name, renderEditPage(errorEntry, allTagsList, t, "Name is required"), "/", await health(), c),
+        renderLayout("Edit — " + entry.name, renderEditPage(errorEntry, allTagsList, t, message), "/", await health(), c),
         422,
       );
+    };
+
+    // Validate
+    if (!name) {
+      return renderValidationError("Name is required");
     }
+
+    // Validate visibility — missing OR invalid → 422 per AC-4.4. The edit form
+    // always renders both radios with the current value pre-selected (AC-4.3),
+    // so a human user always submits a valid value. Missing here means a
+    // programmatic POST that bypassed the form — reject it loudly.
+    if (!(VISIBILITY_VALUES as readonly string[]).includes(visibilityRaw)) {
+      return renderValidationError(
+        "Visibility must be either 'private' or 'shared'",
+      );
+    }
+    const visibility = visibilityRaw as Visibility;
 
     // Migrate fields to new category schema
     const fields = migrateFields(submittedFields, category);
 
-    await updateEntry(sql, id, { name, category, content, fields, tags });
+    await updateEntry(sql, id, { name, category, content, fields, tags, visibility });
 
     // Re-generate embedding (best-effort, async)
     try {

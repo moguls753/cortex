@@ -45,7 +45,7 @@ export function createAuthMiddleware(secret: string): MiddlewareHandler {
       path === "/login" ||
       path === "/logout" ||
       path.startsWith("/setup") ||
-      path === "/api/kitchen.png" ||
+      path === "/api/display.png" ||
       path === "/api/display"
     ) {
       await next();

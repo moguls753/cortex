@@ -19,7 +19,7 @@ export interface WeatherData {
   hourly: Array<{ time: string; temp: number }>; // next 4 hours
 }
 
-export interface KitchenData {
+export interface DisplayData {
   date: string; // "Monday, March 31"
   time: string; // "07:30"
   weather: WeatherData | null;

@@ -10,7 +10,7 @@ export async function getEntry(
 ): Promise<EntryRow | null> {
   const rows = await sql`
     SELECT id, name, category, content, fields, tags, confidence,
-           source, source_type, deleted_at, created_at, updated_at
+           source, source_type, visibility, deleted_at, created_at, updated_at
     FROM entries
     WHERE id = ${id}
   `;
@@ -27,6 +27,7 @@ export async function updateEntry(
     content: string | null;
     fields: Record<string, unknown>;
     tags: string[];
+    visibility: "private" | "shared";
   },
 ): Promise<void> {
   await sql`
@@ -36,6 +37,7 @@ export async function updateEntry(
         content = ${data.content},
         fields = ${sql.json(data.fields as unknown as Parameters<typeof sql.json>[0])},
         tags = ${data.tags},
+        visibility = ${data.visibility},
         confidence = NULL
     WHERE id = ${id}
   `;

@@ -1,7 +1,7 @@
-// Kitchen display layout builder for Satori rendering.
+// Display layout builder for Satori rendering.
 // Produces a Satori-compatible element tree matching the "Classified Briefing" design.
 
-import type { KitchenData, DisplayEvent, DisplayTask } from "./types.js";
+import type { DisplayData, DisplayEvent, DisplayTask } from "./types.js";
 import {
   iconBrain,
   iconCalendar,
@@ -204,7 +204,7 @@ function taskRow(task: DisplayTask): El {
 
 // ─── Layout Sections ───────────────────────────────────────────
 
-function buildHeader(data: KitchenData): El {
+function buildHeader(data: DisplayData): El {
   return el(
     "div",
     {
@@ -247,7 +247,7 @@ function buildHeader(data: KitchenData): El {
   );
 }
 
-function buildWeatherStrip(data: KitchenData): El | false {
+function buildWeatherStrip(data: DisplayData): El | false {
   if (!data.weather) return false;
 
   const w = data.weather;
@@ -336,7 +336,7 @@ function buildWeatherStrip(data: KitchenData): El | false {
   );
 }
 
-function buildTodaySection(data: KitchenData): El {
+function buildTodaySection(data: DisplayData): El {
   const visibleEvents = data.todayEvents.slice(0, data.maxTodayEvents);
   const overflow = data.todayEvents.length - data.maxTodayEvents;
 
@@ -425,7 +425,7 @@ function buildTodaySection(data: KitchenData): El {
   );
 }
 
-function buildTaskSection(data: KitchenData): El {
+function buildTaskSection(data: DisplayData): El {
   const taskContent: (El | string | null | false)[] =
     data.tasks.length === 0
       ? [
@@ -478,7 +478,7 @@ function buildTaskSection(data: KitchenData): El {
   );
 }
 
-function buildFooter(data: KitchenData): El {
+function buildFooter(data: DisplayData): El {
   return el(
     "div",
     {
@@ -499,7 +499,7 @@ function buildFooter(data: KitchenData): El {
 // ─── Main Export ───────────────────────────────────────────────
 
 export function buildLayout(
-  data: KitchenData,
+  data: DisplayData,
   width: number,
   height: number,
 ): El {

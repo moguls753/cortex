@@ -174,4 +174,160 @@ describe("DB NOTIFY Integration", () => {
       await listenSql.end();
     }
   });
+
+  // ─── Entry Visibility — SSE payload ─────────────────────────────
+
+  // TS-6.1
+  it("entry:created NOTIFY payload includes visibility", async () => {
+    const { createSSEBroadcaster } = await import("../../src/web/sse.js");
+    const { listenForEntryChanges } = await import("../../src/db/notify.js");
+
+    const listenSql = postgres(db.url);
+
+    try {
+      const broadcaster = createSSEBroadcaster();
+      const received: unknown[] = [];
+      broadcaster.subscribe((event) => received.push(event));
+      await listenForEntryChanges(listenSql, broadcaster);
+
+      await db.sql`
+        INSERT INTO entries (name, content, source, source_type, visibility)
+        VALUES ('Shared entry', 'body', 'telegram', 'text', 'shared')
+      `;
+
+      await new Promise((r) => setTimeout(r, 300));
+
+      expect(received).toHaveLength(1);
+      expect(received[0]).toMatchObject({
+        type: "entry:created",
+        data: expect.objectContaining({
+          name: "Shared entry",
+          visibility: "shared",
+        }),
+      });
+    } finally {
+      await listenSql.end();
+    }
+  });
+
+  // TS-6.2
+  it("entry:updated NOTIFY payload includes visibility", async () => {
+    const { createSSEBroadcaster } = await import("../../src/web/sse.js");
+    const { listenForEntryChanges } = await import("../../src/db/notify.js");
+
+    const listenSql = postgres(db.url);
+
+    try {
+      const broadcaster = createSSEBroadcaster();
+      const received: unknown[] = [];
+
+      const rows = await db.sql`
+        INSERT INTO entries (name, content, source, source_type, visibility)
+        VALUES ('Update test', 'body', 'webapp', 'text', 'private')
+        RETURNING id
+      `;
+      const entryId = (rows[0] as { id: string }).id;
+
+      broadcaster.subscribe((event) => received.push(event));
+      await listenForEntryChanges(listenSql, broadcaster);
+
+      await new Promise((r) => setTimeout(r, 100));
+
+      // Non-visibility update — should fire entry:updated, payload carries current visibility.
+      await db.sql`UPDATE entries SET category = 'tasks' WHERE id = ${entryId}`;
+
+      await new Promise((r) => setTimeout(r, 300));
+
+      expect(received).toHaveLength(1);
+      expect(received[0]).toMatchObject({
+        type: "entry:updated",
+        data: expect.objectContaining({
+          id: entryId,
+          visibility: "private",
+        }),
+      });
+    } finally {
+      await listenSql.end();
+    }
+  });
+
+  // TS-6.3
+  it("entry:deleted NOTIFY payload carries only id (no visibility)", async () => {
+    const { createSSEBroadcaster } = await import("../../src/web/sse.js");
+    const { listenForEntryChanges } = await import("../../src/db/notify.js");
+
+    const listenSql = postgres(db.url);
+
+    try {
+      const broadcaster = createSSEBroadcaster();
+      const received: unknown[] = [];
+
+      const rows = await db.sql`
+        INSERT INTO entries (name, content, source, source_type, visibility)
+        VALUES ('Delete test', 'body', 'webapp', 'text', 'shared')
+        RETURNING id
+      `;
+      const entryId = (rows[0] as { id: string }).id;
+
+      broadcaster.subscribe((event) => received.push(event));
+      await listenForEntryChanges(listenSql, broadcaster);
+
+      await new Promise((r) => setTimeout(r, 100));
+
+      await db.sql`UPDATE entries SET deleted_at = NOW() WHERE id = ${entryId}`;
+
+      await new Promise((r) => setTimeout(r, 300));
+
+      expect(received).toHaveLength(1);
+      const event = received[0] as {
+        type: string;
+        data: Record<string, unknown>;
+      };
+      expect(event.type).toBe("entry:deleted");
+      expect(event.data).toEqual({ id: entryId });
+      expect("visibility" in event.data).toBe(false);
+    } finally {
+      await listenSql.end();
+    }
+  });
+
+  // TS-6.4
+  it("visibility-only UPDATE fires an entry:updated event with the new value", async () => {
+    const { createSSEBroadcaster } = await import("../../src/web/sse.js");
+    const { listenForEntryChanges } = await import("../../src/db/notify.js");
+
+    const listenSql = postgres(db.url);
+
+    try {
+      const broadcaster = createSSEBroadcaster();
+      const received: unknown[] = [];
+
+      const rows = await db.sql`
+        INSERT INTO entries (name, content, source, source_type, visibility)
+        VALUES ('Viz toggle test', 'body', 'webapp', 'text', 'private')
+        RETURNING id
+      `;
+      const entryId = (rows[0] as { id: string }).id;
+
+      broadcaster.subscribe((event) => received.push(event));
+      await listenForEntryChanges(listenSql, broadcaster);
+
+      await new Promise((r) => setTimeout(r, 100));
+
+      await db.sql`UPDATE entries SET visibility = 'shared' WHERE id = ${entryId}`;
+
+      await new Promise((r) => setTimeout(r, 300));
+
+      expect(received).toHaveLength(1);
+      expect(received[0]).toMatchObject({
+        type: "entry:updated",
+        data: expect.objectContaining({
+          id: entryId,
+          visibility: "shared",
+        }),
+      });
+    } finally {
+      await listenSql.end();
+    }
+  });
 });

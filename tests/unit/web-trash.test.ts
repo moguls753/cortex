@@ -623,4 +623,61 @@ describe("Web Trash", () => {
       expect(body).toContain("Ancient Entry");
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Entry Visibility — trash indicator
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Entry Visibility", () => {
+    // TS-4.3
+    it("renders a visibility='shared' indicator on trash rows", async () => {
+      const { browseEntries } = await import(
+        "../../src/web/browse-queries.js"
+      );
+      vi.mocked(browseEntries).mockResolvedValue([
+        createMockEntry({
+          id: "77777777-7777-7777-7777-777777777777",
+          name: "Deleted shared task",
+          category: "tasks",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "shared",
+        }),
+      ]);
+
+      const { app } = await createTestTrash(1);
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/trash", { headers: { Cookie: cookie } });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      expect(body).toContain("Deleted shared task");
+      expect(body).toMatch(/data-visibility=["']shared["']/);
+    });
+
+    // TS-4.5 (trash inverse)
+    it("renders no shared indicator on deleted private entries", async () => {
+      const { browseEntries } = await import(
+        "../../src/web/browse-queries.js"
+      );
+      vi.mocked(browseEntries).mockResolvedValue([
+        createMockEntry({
+          id: "88888888-8888-8888-8888-888888888888",
+          name: "Deleted private thought",
+          category: "ideas",
+          // @ts-expect-error — Phase-4 contract: visibility added in Phase 5
+          visibility: "private",
+        }),
+      ]);
+
+      const { app } = await createTestTrash(1);
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/trash", { headers: { Cookie: cookie } });
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      expect(body).toContain("Deleted private thought");
+      expect(body).not.toMatch(/data-visibility=["']shared["']/);
+    });
+  });
 });

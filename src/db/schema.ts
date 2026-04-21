@@ -23,6 +23,7 @@ export const entries = pgTable(
     source: text("source").notNull(),
     sourceType: text("source_type").default("text"),
     // embedding column is vector(4096), defined via raw SQL migration
+    visibility: text("visibility").notNull().default("private"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
@@ -39,6 +40,10 @@ export const entries = pgTable(
     check(
       "entries_source_type_check",
       sql`${table.sourceType} IN ('text', 'voice')`,
+    ),
+    check(
+      "entries_visibility_check",
+      sql`${table.visibility} IN ('private', 'shared')`,
     ),
     index("entries_category_idx").on(table.category),
     index("entries_created_at_idx").on(table.createdAt),

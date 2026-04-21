@@ -27,6 +27,29 @@ const log = createLogger("telegram");
 
 const CATEGORIES = ["People", "Projects", "Tasks", "Ideas", "Reference"];
 const CATEGORY_VALUES = ["people", "projects", "tasks", "ideas", "reference"];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type Visibility = "private" | "shared";
+
+function buildVisibilityToggleButton(
+  entryId: string,
+  currentVisibility: Visibility,
+  t?: TFunction,
+): { text: string; callback_data: string } {
+  const target: Visibility =
+    currentVisibility === "shared" ? "private" : "shared";
+  // Label reflects the TARGET (inverse of current). "Make shared" flips from
+  // private → shared; "Make private" flips from shared → private.
+  const fallback =
+    target === "shared" ? "👁 Make shared" : "🔒 Make private";
+  const key = `telegram.make_${target}`;
+  const label = t ? t(key) : fallback;
+  const text = label === key ? fallback : label;
+  return {
+    text,
+    callback_data: `visibility:${entryId}:${target}`,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Authorization
@@ -155,10 +178,13 @@ export async function handleTextMessage(
     const classResult = await classifyText(text, { contextEntries, outputLanguage, calendarNames, sql });
 
     if (!classResult || classResult.category === null) {
-      // Store unclassified
+      // Store unclassified — classifyText always returns a visibility value even
+      // on failure paths (fail-safe default is "private").
+      const unclassifiedVisibility: Visibility =
+        classResult?.visibility ?? "private";
       await (sql as any)`
-        INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type)
-        VALUES (${"Untitled"}, ${text}, ${null}, ${null}, ${{}}, ${[]}, ${"telegram"}, ${"text"})
+        INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
+        VALUES (${"Untitled"}, ${text}, ${null}, ${null}, ${{}}, ${[]}, ${"telegram"}, ${"text"}, ${unclassifiedVisibility})
         RETURNING id
       `;
       const reply = (ctx.reply as Function).bind(ctx) as (text: string, options?: unknown) => Promise<unknown>;
@@ -170,11 +196,17 @@ export async function handleTextMessage(
     const thresholdSetting = await resolveConfigValue("confidence_threshold", sql);
     const threshold = resolveConfidenceThreshold(thresholdSetting);
     const confident = isConfident(classResult.confidence!, threshold);
+    // Double-apply the fail-safe at the storage edge. classifyText already
+    // applies this internally, but mocked tests can bypass that path; the edge
+    // check guarantees low-confidence entries always land as 'private'.
+    const visibility: Visibility = confident
+      ? classResult.visibility ?? "private"
+      : "private";
 
     // Store entry
     const rows = await (sql as any)`
-      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type)
-      VALUES (${classResult.name}, ${text}, ${classResult.category}, ${classResult.confidence}, ${classResult.fields}, ${classResult.tags}, ${"telegram"}, ${"text"})
+      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
+      VALUES (${classResult.name}, ${text}, ${classResult.category}, ${classResult.confidence}, ${classResult.fields}, ${classResult.tags}, ${"telegram"}, ${"text"}, ${visibility})
       RETURNING id
     `;
     const entryId = rows[0]?.id as string;
@@ -218,40 +250,56 @@ export async function handleTextMessage(
     const pct = formatConfidence(classResult.confidence!);
     const savedAs = t("telegram.saved_as");
     const bestGuess = t("telegram.saved_as_low_confidence");
+    // 👁 glyph only on SHARED entries. Private stays silent. See AC-3.4/AC-3.5.
+    const visGlyph = visibility === "shared" ? " 👁" : "";
 
     const hasCompletions = completionResult &&
       (completionResult.autoCompleted.length > 0 || completionResult.needsConfirmation.length > 0);
 
     if (hasCompletions) {
       const classText = confident
-        ? `✅ ${savedAs} ${actualCategory} → ${nameStr} (${pct})`
-        : `❓ ${bestGuess}: ${actualCategory} → ${nameStr} (${pct})`;
+        ? `✅ ${savedAs} ${actualCategory}${visGlyph} → ${nameStr} (${pct})`
+        : `❓ ${bestGuess}: ${actualCategory}${visGlyph} → ${nameStr} (${pct})`;
       const formatted = formatCompletionReply({
         classificationText: classText,
         autoCompleted: completionResult!.autoCompleted,
         needsConfirmation: completionResult!.needsConfirmation,
       });
       const replyOptions: Record<string, unknown> = { parse_mode: undefined };
-      // Merge completion buttons with category correction buttons if both exist
+      // Low-confidence correction surface: 5 category buttons + 1 visibility toggle.
       const categoryButtons = !confident
         ? (buildInlineKeyboard(entryId, t) as { inline_keyboard: unknown[][] }).inline_keyboard
         : [];
       const completionButtons = formatted.inlineKeyboard ?? [];
-      if (categoryButtons.length > 0 || completionButtons.length > 0) {
+      const visibilityRow = !confident
+        ? [[buildVisibilityToggleButton(entryId, visibility, t)]]
+        : [];
+      if (categoryButtons.length > 0 || completionButtons.length > 0 || visibilityRow.length > 0) {
         replyOptions.reply_markup = {
-          inline_keyboard: [...categoryButtons, ...completionButtons],
+          inline_keyboard: [...categoryButtons, ...visibilityRow, ...completionButtons],
         };
       }
       await reply(formatted.text, replyOptions);
     } else if (confident) {
       await reply(
-        `✅ ${savedAs} ${actualCategory} → ${nameStr} (${pct}) — reply /fix to correct`,
+        `✅ ${savedAs} ${actualCategory}${visGlyph} → ${nameStr} (${pct}) — reply /fix to correct`,
         { parse_mode: undefined },
       );
     } else {
       await reply(
-        `❓ ${bestGuess}: ${actualCategory} → ${nameStr} (${pct})`,
-        { reply_markup: buildInlineKeyboard(entryId, t) },
+        `❓ ${bestGuess}: ${actualCategory}${visGlyph} → ${nameStr} (${pct})`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              ...(
+                buildInlineKeyboard(entryId, t) as {
+                  inline_keyboard: unknown[][];
+                }
+              ).inline_keyboard,
+              [buildVisibilityToggleButton(entryId, visibility, t)],
+            ],
+          },
+        },
       );
     }
 
@@ -336,10 +384,11 @@ export async function handleVoiceMessage(
     const reply = (ctx.reply as Function).bind(ctx) as (text: string, options?: unknown) => Promise<unknown>;
 
     if (!classResult || classResult.category === null) {
-      // Store unclassified
+      const unclassifiedVisibility: Visibility =
+        classResult?.visibility ?? "private";
       await (sql as any)`
-        INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type)
-        VALUES (${"Untitled"}, ${transcript}, ${null}, ${null}, ${{}}, ${[]}, ${"telegram"}, ${"voice"})
+        INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
+        VALUES (${"Untitled"}, ${transcript}, ${null}, ${null}, ${{}}, ${[]}, ${"telegram"}, ${"voice"}, ${unclassifiedVisibility})
         RETURNING id
       `;
       await reply("Stored but could not classify — will retry");
@@ -350,11 +399,14 @@ export async function handleVoiceMessage(
     const thresholdSetting = await resolveConfigValue("confidence_threshold", sql);
     const threshold = resolveConfidenceThreshold(thresholdSetting);
     const confident = isConfident(classResult.confidence!, threshold);
+    const visibility: Visibility = confident
+      ? classResult.visibility ?? "private"
+      : "private";
 
     // Store entry
     const rows = await (sql as any)`
-      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type)
-      VALUES (${classResult.name}, ${transcript}, ${classResult.category}, ${classResult.confidence}, ${classResult.fields}, ${classResult.tags}, ${"telegram"}, ${"voice"})
+      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
+      VALUES (${classResult.name}, ${transcript}, ${classResult.category}, ${classResult.confidence}, ${classResult.fields}, ${classResult.tags}, ${"telegram"}, ${"voice"}, ${visibility})
       RETURNING id
     `;
     const entryId = rows[0]?.id as string;
@@ -397,40 +449,56 @@ export async function handleVoiceMessage(
 
     const hasCompletions = completionResult &&
       (completionResult.autoCompleted.length > 0 || completionResult.needsConfirmation.length > 0);
-
     const t = await resolveTelegramT(sql);
     const savedAs = t("telegram.saved_as");
     const bestGuess = t("telegram.saved_as_low_confidence");
+    const visGlyph = visibility === "shared" ? " 👁" : "";
     if (hasCompletions) {
       const classText = confident
-        ? `🎤 '${transcript}'\n✅ ${savedAs} ${actualCategory} → ${nameStr} (${pct})`
-        : `🎤 '${transcript}'\n❓ ${bestGuess}: ${actualCategory} → ${nameStr} (${pct})`;
+        ? `🎤 '${transcript}'\n✅ ${savedAs} ${actualCategory}${visGlyph} → ${nameStr} (${pct})`
+        : `🎤 '${transcript}'\n❓ ${bestGuess}: ${actualCategory}${visGlyph} → ${nameStr} (${pct})`;
       const formatted = formatCompletionReply({
         classificationText: classText,
         autoCompleted: completionResult!.autoCompleted,
         needsConfirmation: completionResult!.needsConfirmation,
       });
       const replyOptions: Record<string, unknown> = { parse_mode: undefined };
-      if (formatted.inlineKeyboard) {
-        const existingButtons = !confident
-          ? (buildInlineKeyboard(entryId, t) as { inline_keyboard: unknown[][] }).inline_keyboard
-          : [];
+      const existingButtons = !confident
+        ? (buildInlineKeyboard(entryId, t) as { inline_keyboard: unknown[][] }).inline_keyboard
+        : [];
+      const visibilityRow = !confident
+        ? [[buildVisibilityToggleButton(entryId, visibility, t)]]
+        : [];
+      if (formatted.inlineKeyboard || existingButtons.length > 0 || visibilityRow.length > 0) {
         replyOptions.reply_markup = {
-          inline_keyboard: [...existingButtons, ...formatted.inlineKeyboard],
+          inline_keyboard: [
+            ...existingButtons,
+            ...visibilityRow,
+            ...(formatted.inlineKeyboard ?? []),
+          ],
         };
-      } else if (!confident) {
-        replyOptions.reply_markup = buildInlineKeyboard(entryId, t);
       }
       await reply(formatted.text, replyOptions);
     } else if (confident) {
       await reply(
-        `🎤 '${transcript}'\n✅ ${savedAs} ${actualCategory} → ${nameStr} (${pct})`,
+        `🎤 '${transcript}'\n✅ ${savedAs} ${actualCategory}${visGlyph} → ${nameStr} (${pct})`,
         { parse_mode: undefined },
       );
     } else {
       await reply(
-        `🎤 '${transcript}'\n❓ ${bestGuess}: ${actualCategory} → ${nameStr} (${pct})`,
-        { reply_markup: buildInlineKeyboard(entryId, t) },
+        `🎤 '${transcript}'\n❓ ${bestGuess}: ${actualCategory}${visGlyph} → ${nameStr} (${pct})`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              ...(
+                buildInlineKeyboard(entryId, t) as {
+                  inline_keyboard: unknown[][];
+                }
+              ).inline_keyboard,
+              [buildVisibilityToggleButton(entryId, visibility, t)],
+            ],
+          },
+        },
       );
     }
 
@@ -479,8 +547,79 @@ export async function handleCallbackQuery(
 
     const parts = callbackQuery.data.split(":");
 
+    // Handle visibility toggle: `visibility:<uuid>:<private|shared>`. This is a
+    // pure UPDATE — no LLM call, no embedding regeneration — so the user can
+    // flip the flag in one tap per AC-3.1.
+    if (parts.length === 3 && parts[0] === "visibility") {
+      const [, visibilityEntryId, targetValue] = parts;
+      const answer = (ctx.answerCallbackQuery as Function).bind(ctx) as () => Promise<unknown>;
+
+      if (!UUID_RE.test(visibilityEntryId)) {
+        await answer();
+        return;
+      }
+      if (targetValue !== "private" && targetValue !== "shared") {
+        await answer();
+        return;
+      }
+
+      const target: Visibility = targetValue;
+      await (sql as any)`
+        UPDATE entries SET visibility = ${target} WHERE id = ${visibilityEntryId}
+      `;
+
+      // Edit the original reply so the glyph and toggle label reflect the new
+      // stored state. The original message carried the opposite-direction text
+      // (private → no glyph; shared → has glyph). After the flip we swap it.
+      const originalText = (callbackQuery.message as any)?.text ?? "";
+      const editMessageText = (ctx.editMessageText as Function).bind(ctx) as (
+        text: string,
+        options?: unknown,
+      ) => Promise<unknown>;
+
+      let newText = originalText;
+      if (target === "shared" && !originalText.includes("👁")) {
+        // Inserting the glyph — place it before the arrow separator if present,
+        // else append at end of the first line.
+        const arrowIdx = originalText.indexOf(" → ");
+        if (arrowIdx > -1) {
+          newText =
+            originalText.slice(0, arrowIdx) + " 👁" + originalText.slice(arrowIdx);
+        } else {
+          newText = originalText + " 👁";
+        }
+      } else if (target === "private" && originalText.includes("👁")) {
+        // Drop the glyph (and any leading space we added).
+        newText = originalText.replace(/ 👁/g, "").replace(/👁/g, "");
+      }
+
+      const t = await resolveTelegramT(sql);
+      // Re-render the full low-confidence keyboard so the user can still
+      // correct the category. The visibility toggle can only appear on
+      // low-confidence replies (AC-3.3), so when we receive this callback we
+      // know we're in correction mode — preserve the category buttons and
+      // just flip the toggle's direction.
+      const categoryRow = (
+        buildInlineKeyboard(visibilityEntryId, t) as {
+          inline_keyboard: unknown[][];
+        }
+      ).inline_keyboard;
+      const nextKeyboard = {
+        inline_keyboard: [
+          ...categoryRow,
+          [buildVisibilityToggleButton(visibilityEntryId, target, t)],
+        ],
+      };
+      try {
+        await editMessageText(newText, { reply_markup: nextKeyboard });
+      } catch {
+        // Message may already be edited or identical — non-fatal.
+      }
+      await answer();
+      return;
+    }
+
     // Handle task completion confirmation buttons
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (parts.length === 2 && (parts[0] === "task_complete_yes" || parts[0] === "task_complete_no")) {
       const [action, taskEntryId] = parts;
       const answer = (ctx.answerCallbackQuery as Function).bind(ctx) as () => Promise<unknown>;
@@ -572,6 +711,18 @@ export async function handleCallbackQuery(
     const finalName = result?.name || entry.category || "Unknown";
     const finalFields = result?.fields || {};
     const finalTags = result?.tags || [];
+    // Edge fail-safe on the category-correction path: if the re-classification
+    // was low-confidence, force visibility='private' regardless of the LLM's
+    // output. Reuses the same threshold as the initial classification.
+    const correctThresholdRaw = await resolveConfigValue(
+      "confidence_threshold",
+      sql,
+    );
+    const correctThreshold = resolveConfidenceThreshold(correctThresholdRaw);
+    const finalVisibility: Visibility =
+      result && result.confidence >= correctThreshold
+        ? result.visibility ?? "private"
+        : "private";
 
     // Update entry — set confidence to null (human-corrected)
     await (sql as any)`
@@ -580,7 +731,8 @@ export async function handleCallbackQuery(
         name = ${finalName},
         confidence = ${null},
         fields = ${finalFields},
-        tags = ${finalTags}
+        tags = ${finalTags},
+        visibility = ${finalVisibility}
       WHERE id = ${entryId}
     `;
 
@@ -679,14 +831,27 @@ export async function handleFixCommand(
     );
 
     if (result) {
-      // Update entry
+      // Edge-level fail-safe: reclassifyEntry already applies the threshold
+      // internally, but mocked tests that stub reclassifyEntry bypass that
+      // path. Re-apply here so visibility always lands in the safer direction
+      // for low-confidence reclassifications.
+      const fixThresholdRaw = await resolveConfigValue(
+        "confidence_threshold",
+        sql,
+      );
+      const fixThreshold = resolveConfidenceThreshold(fixThresholdRaw);
+      const fixVisibility: Visibility =
+        result.confidence >= fixThreshold
+          ? result.visibility ?? "private"
+          : "private";
       await (sql as any)`
         UPDATE entries SET
           category = ${result.category},
           name = ${result.name},
           confidence = ${result.confidence},
           fields = ${result.fields},
-          tags = ${result.tags}
+          tags = ${result.tags},
+          visibility = ${fixVisibility}
         WHERE id = ${entry.id}
       `;
 

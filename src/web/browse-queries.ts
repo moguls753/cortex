@@ -19,7 +19,7 @@ export async function browseEntries(
 
   const rows = await sql`
     SELECT id, name, category, content, fields, tags, confidence,
-           source, source_type, deleted_at, created_at, updated_at
+           source, source_type, visibility, deleted_at, created_at, updated_at
     FROM entries
     WHERE ${deleted ? sql`deleted_at IS NOT NULL` : sql`deleted_at IS NULL`}
       ${category === "unclassified" ? sql`AND category IS NULL` : category ? sql`AND category = ${category}` : sql``}
@@ -41,7 +41,7 @@ export async function semanticSearch(
 
   const rows = await sql`
     SELECT id, name, category, content, fields, tags, confidence,
-           source, source_type, deleted_at, created_at, updated_at,
+           source, source_type, visibility, deleted_at, created_at, updated_at,
            1 - (embedding <=> ${embeddingLiteral}::vector(4096)) AS similarity
     FROM entries
     WHERE ${deleted ? sql`deleted_at IS NOT NULL` : sql`deleted_at IS NULL`}
@@ -66,7 +66,7 @@ export async function textSearch(
 
   const rows = await sql`
     SELECT id, name, category, content, fields, tags, confidence,
-           source, source_type, deleted_at, created_at, updated_at
+           source, source_type, visibility, deleted_at, created_at, updated_at
     FROM entries
     WHERE ${deleted ? sql`deleted_at IS NOT NULL` : sql`deleted_at IS NULL`}
       AND (name ILIKE ${pattern} OR content ILIKE ${pattern})

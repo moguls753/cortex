@@ -106,6 +106,7 @@ CREATE TABLE entries (
     source        TEXT NOT NULL CHECK (source IN ('telegram', 'webapp', 'mcp')),
     source_type   TEXT DEFAULT 'text' CHECK (source_type IN ('text', 'voice')),
     embedding     vector(4096),          -- qwen3-embedding dimensions
+    visibility    TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'shared')),
     deleted_at    TIMESTAMPTZ,           -- soft delete (null = active)
     created_at    TIMESTAMPTZ DEFAULT now(),
     updated_at    TIMESTAMPTZ DEFAULT now()

@@ -22,6 +22,7 @@ export async function runMigrations(url: string): Promise<void> {
         source        TEXT NOT NULL CHECK (source IN ('telegram', 'webapp', 'mcp')),
         source_type   TEXT DEFAULT 'text' CHECK (source_type IN ('text', 'voice')),
         embedding     vector(4096),
+        visibility    TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'shared')),
         deleted_at    TIMESTAMPTZ,
         created_at    TIMESTAMPTZ DEFAULT now(),
         updated_at    TIMESTAMPTZ DEFAULT now()
@@ -79,7 +80,8 @@ export async function runMigrations(url: string): Promise<void> {
              AND NEW.fields = OLD.fields
              AND NEW.tags = OLD.tags
              AND NEW.content IS NOT DISTINCT FROM OLD.content
-             AND NEW.deleted_at IS NOT DISTINCT FROM OLD.deleted_at THEN
+             AND NEW.deleted_at IS NOT DISTINCT FROM OLD.deleted_at
+             AND NEW.visibility IS NOT DISTINCT FROM OLD.visibility THEN
             RETURN NEW;
           END IF;
           event_type := 'entry:updated';
@@ -95,7 +97,8 @@ export async function runMigrations(url: string): Promise<void> {
               'id', NEW.id,
               'name', NEW.name,
               'category', NEW.category,
-              'confidence', NEW.confidence
+              'confidence', NEW.confidence,
+              'visibility', NEW.visibility
             )
           );
         END IF;
@@ -119,6 +122,18 @@ export async function runMigrations(url: string): Promise<void> {
 
       ALTER TABLE entries ADD COLUMN IF NOT EXISTS google_calendar_event_id TEXT;
       ALTER TABLE entries ADD COLUMN IF NOT EXISTS google_calendar_target TEXT;
+      ALTER TABLE entries ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'private';
+      DO $do$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'entries_visibility_check'
+            AND conrelid = 'entries'::regclass
+        ) THEN
+          ALTER TABLE entries
+            ADD CONSTRAINT entries_visibility_check
+            CHECK (visibility IN ('private', 'shared'));
+        END IF;
+      END $do$;
 
       -- Drop HNSW index (not needed, and incompatible with 4096 dims)
       DROP INDEX IF EXISTS entries_embedding_idx;

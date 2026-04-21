@@ -123,7 +123,7 @@ export const en = {
       llm: "LLM",
       digests: "Digests",
       preferences: "Preferences",
-      display: "Kitchen display",
+      display: "Display",
     },
     language: {
       description:
