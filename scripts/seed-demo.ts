@@ -3,8 +3,12 @@
  * Run: npx tsx scripts/seed-demo.ts
  *
  * Requires DATABASE_URL env var (or reads from .env).
- * Inserts ~30 realistic entries across all 5 categories,
+ * Inserts ~29 realistic entries across all 5 categories,
  * spread over the past 3 weeks to make dashboards/digests look alive.
+ *
+ * Theme: Monkey Island. Guybrush Threepwood is preparing to set sail
+ * for Monkey Island to find LeChuck (rumored to be near Big Whoop)
+ * before he reaches Elaine on Tri-Island.
  */
 
 import postgres from "postgres";
@@ -35,344 +39,373 @@ interface SeedEntry {
   fields: Record<string, unknown>;
   tags: string[];
   confidence: number;
+  visibility: "private" | "shared";
   source: string;
   source_type: string;
   created_at: Date;
 }
 
 // ---------------------------------------------------------------------------
-// Demo entries — tells a story of someone building a side project,
-// managing work, staying in touch with people, capturing ideas
+// Demo entries — Guybrush Threepwood preparing for the Monkey Island voyage
 // ---------------------------------------------------------------------------
 
 const entries: SeedEntry[] = [
   // === PROJECTS (6) ===
   {
-    name: "Cortex — Second Brain App",
-    content: "Building a self-hosted second brain. Telegram capture working, web dashboard next. Using PostgreSQL + pgvector for semantic search.",
+    name: "Monkey Island Voyage",
+    content: "Chart a course to Monkey Island. Three Scumm Bar patrons place LeChuck near Big Whoop — if he reaches the skeleton crew first, Elaine's Tri-Island is next. Need: ship, crew, map, supplies, and the navigator's key (Murray might know where).",
     category: "projects",
-    fields: { status: "active", next_action: "Deploy to home server and test MCP integration", notes: "All 12 features complete, 318 tests passing" },
-    tags: ["cortex", "side-project", "typescript"],
+    fields: { status: "active", next_action: "Pay Captain Dread, confirm Sea Monkey manifest, load supplies before tide turns", notes: "Ship secured (SS Sea Monkey, 5000 pieces of eight). Map pending from Wally. Voodoo Lady blessed the route." },
+    tags: ["monkey-island", "lechuck", "voyage"],
     confidence: 0.95,
+    visibility: "shared",
     source: "telegram",
     source_type: "text",
     created_at: daysAgo(18, 9),
   },
   {
-    name: "Apartment Search Munich",
-    content: "Need to find a 2-room apartment in Munich by April. Budget up to 1200€ warm. Checked Schwabing and Sendling so far.",
+    name: "Melee Island Defense Plan",
+    content: "Fortify Mêlée harbor in case LeChuck doubles back. Drill the town militia twice a week. Cannon count: 12 working, 3 rusted through. Gov. Marley signed off on the budget.",
     category: "projects",
-    fields: { status: "active", next_action: "Call landlord about Sendling apartment", notes: "Viewing scheduled for Thursday 14:00" },
-    tags: ["apartment", "munich", "urgent"],
+    fields: { status: "active", next_action: "Inspect Watchtower 3 masonry with the stonemason", notes: "Three drills completed. Militia morale acceptable after grog ration increase." },
+    tags: ["melee", "defense", "elaine"],
     confidence: 0.91,
+    visibility: "shared",
     source: "telegram",
     source_type: "voice",
-    created_at: daysAgo(14, 20),
-  },
-  {
-    name: "Guitar Practice Routine",
-    content: "Setting up a structured practice routine. 30 min daily: 10 min scales, 10 min chord progressions, 10 min repertoire. Tracking progress weekly.",
-    category: "projects",
-    fields: { status: "active", next_action: "Learn Autumn Leaves chord melody", notes: "Week 3 — can play all major modes cleanly" },
-    tags: ["guitar", "music", "practice"],
-    confidence: 0.88,
-    source: "webapp",
-    source_type: "text",
-    created_at: daysAgo(20, 21),
-  },
-  {
-    name: "Blog Migration to Astro",
-    content: "Migrating personal blog from Jekyll to Astro. Content collection API is great. Need to port the 12 existing posts and set up RSS.",
-    category: "projects",
-    fields: { status: "paused", next_action: "Port remaining blog posts", notes: "Paused — focusing on Cortex first" },
-    tags: ["blog", "astro", "web"],
-    confidence: 0.93,
-    source: "webapp",
-    source_type: "text",
-    created_at: daysAgo(21, 11),
-  },
-  {
-    name: "Home Server Setup",
-    content: "Setting up Proxmox on the mini PC. Running Docker containers for Cortex, Nextcloud, and Pi-hole. WireGuard VPN for remote access via FritzBox.",
-    category: "projects",
-    fields: { status: "active", next_action: "Configure automatic backups to external drive", notes: "Proxmox installed, Docker running, WireGuard connected" },
-    tags: ["homelab", "server", "docker", "selfhosted"],
-    confidence: 0.96,
-    source: "telegram",
-    source_type: "text",
     created_at: daysAgo(10, 15),
   },
   {
-    name: "Thesis Final Revision",
-    content: "Final revision round for the master's thesis. Supervisor feedback received — needs stronger conclusion and two more references in chapter 4.",
+    name: "Engagement Ring for Elaine",
+    content: "Commissioned from Wally the cartographer's Phatt Island supplier. Simple gold band, compass rose on the inside. She cannot know about this — say 'surprise from Phatt Island' if asked.",
     category: "projects",
-    fields: { status: "done", next_action: null, notes: "Submitted on March 1st. Done!" },
-    tags: ["thesis", "university"],
-    confidence: 0.97,
+    fields: { status: "paused", next_action: "Nudge Wally about shipping — it's been two weeks", notes: "Paid deposit (50 doubloons). Shipping delayed, reason unclear." },
+    tags: ["elaine", "engagement-ring", "secret"],
+    confidence: 0.93,
+    visibility: "private",
+    source: "webapp",
+    source_type: "text",
+    created_at: daysAgo(14, 20),
+  },
+  {
+    name: "SS Sea Monkey Refit",
+    content: "Ship handed over by Stan needed a full refit. New sails (stolen from LeChuck's old ship — poetic), rigging reinforced, hull caulked, cannons mounted port+starboard.",
+    category: "projects",
+    fields: { status: "active", next_action: "Final sea trial with skeleton crew — Friday at dawn", notes: "Crew manifest locked: Carla, Meathook, Otis, two new hires from the Bloody Lip." },
+    tags: ["sea-monkey", "ship", "crew"],
+    confidence: 0.96,
+    visibility: "shared",
     source: "telegram",
     source_type: "text",
-    created_at: daysAgo(19, 14),
+    created_at: daysAgo(20, 11),
+  },
+  {
+    name: "Governor's Ball Planning",
+    content: "Elaine's annual Tri-Island dignitaries' dinner. Seating arrangement was the hard part — rival governors don't sit next to each other, Stan cannot sit next to anyone important.",
+    category: "projects",
+    fields: { status: "completed", next_action: null, notes: "Ball happened three weeks ago. Stan still sold two people ships during dessert." },
+    tags: ["elaine", "tri-island", "governor"],
+    confidence: 0.88,
+    visibility: "private",
+    source: "webapp",
+    source_type: "text",
+    created_at: daysAgo(21, 14),
+  },
+  {
+    name: "Cookbook — Seafaring Cuisine",
+    content: "Collecting recipes from every port. Current entries: grilled iguana (Plunder), sea monkey stew (DO NOT make this), fried plantain with rum reduction. Plan: publish on Phatt Island Press eventually.",
+    category: "projects",
+    fields: { status: "paused", next_action: "Ask Estevan for his ship's biscuit recipe", notes: "20 recipes collected. Paused during voyage prep — will pick up when back." },
+    tags: ["cookbook", "cuisine", "side-project"],
+    confidence: 0.85,
+    visibility: "shared",
+    source: "webapp",
+    source_type: "text",
+    created_at: daysAgo(11, 21),
   },
 
   // === PEOPLE (5) ===
   {
-    name: "Coffee with Lisa",
-    content: "Had coffee with Lisa. She's switching from backend to ML engineering at her company. Recommended the fast.ai course. She might know someone at Anthropic.",
+    name: "Voodoo Lady — prophecy of stormy waters",
+    content: "Visited the Voodoo Lady in her shack. She drew the cards: Tower, Wheel, Ship, Moon. Translation: 'stormy waters, but not fatal if you keep the charm I gave you.' Also: she's out of eye of newt.",
     category: "people",
-    fields: { context: "Old university friend, works at BMW", follow_ups: "Send her the fast.ai link, ask about Anthropic contact" },
-    tags: ["lisa", "networking", "ml"],
-    confidence: 0.92,
-    source: "telegram",
-    source_type: "text",
-    created_at: daysAgo(3, 16),
-  },
-  {
-    name: "Call with Dad",
-    content: "Dad called about the family dinner on Easter. He's also having router issues — offered to help set up the new FritzBox when I visit.",
-    category: "people",
-    fields: { context: "Family", follow_ups: "Visit on Easter Saturday, bring FritzBox manual" },
-    tags: ["family", "dad"],
-    confidence: 0.89,
-    source: "telegram",
-    source_type: "voice",
-    created_at: daysAgo(2, 19),
-  },
-  {
-    name: "Max — Climbing Partner",
-    content: "Max is back from his trip to Spain. Wants to go bouldering at the DAV center this weekend. He also asked if I want to join a multi-pitch course in May.",
-    category: "people",
-    fields: { context: "Climbing buddy, met at DAV Munich", follow_ups: "Confirm Saturday bouldering, check May calendar for multi-pitch" },
-    tags: ["max", "climbing", "sports"],
-    confidence: 0.94,
+    fields: { context: "Mystic advisor on Melee Island, generally honest, speaks only in implications", follow_ups: "Restock eye of newt supply (she says 'less attitude, more inventory')" },
+    tags: ["voodoo", "prophecy", "monkey-island"],
+    confidence: 0.90,
+    visibility: "shared",
     source: "telegram",
     source_type: "text",
     created_at: daysAgo(1, 12),
   },
   {
-    name: "Prof. Weber — Thesis Feedback",
-    content: "Professor Weber sent final feedback on the thesis. Very positive overall. Suggested I could turn chapter 3 into a conference paper.",
+    name: "Murray — navigator's key briefing",
+    content: "Demonic skull. Current status: helpful, in a manner of speaking. He claims the navigator's key is buried 'where the three-headed monkey watches.' When pressed, he finished with a limerick.",
     category: "people",
-    fields: { context: "Thesis supervisor at TU Munich", follow_ups: "Thank him, ask about suitable conferences for the paper" },
-    tags: ["university", "thesis", "prof-weber"],
-    confidence: 0.90,
-    source: "webapp",
-    source_type: "text",
-    created_at: daysAgo(8, 10),
+    fields: { context: "Talking skull, formerly attached to a body, vaguely prophetic", follow_ups: "Figure out which three-headed monkey — there are at least two known" },
+    tags: ["murray", "navigation", "monkey-island"],
+    confidence: 0.89,
+    visibility: "shared",
+    source: "telegram",
+    source_type: "voice",
+    created_at: daysAgo(2, 19),
   },
   {
-    name: "Neighbor Julia — Package",
-    content: "Julia from downstairs took a package for me on Tuesday. Need to pick it up. She mentioned the building meeting is next month.",
+    name: "Stan — Used Ship Salesman",
+    content: "Sold me the Sea Monkey for 5,000 pieces of eight, down from 30,000. He threw in the anchor and a pre-chewed life vest. Claims the ship 'practically sails itself' — confirmed false during sea trial.",
     category: "people",
-    fields: { context: "Neighbor, 2nd floor", follow_ups: "Pick up package, ask about building meeting date" },
-    tags: ["neighbor", "apartment"],
-    confidence: 0.85,
+    fields: { context: "Used-ship salesman, green jacket, occupies Stan's House of Ships between voyages", follow_ups: "Avoid his 'pre-owned chart' offer next time" },
+    tags: ["stan", "grog", "ship"],
+    confidence: 0.94,
+    visibility: "shared",
     source: "telegram",
     source_type: "text",
-    created_at: daysAgo(1, 18),
+    created_at: daysAgo(3, 16),
+  },
+  {
+    name: "Herman Toothrot",
+    content: "Castaway, still on Monkey Island, still building that tree fort. Sent a coconut telegram about LeChuck's crew movements. Surprisingly lucid this time.",
+    category: "people",
+    fields: { context: "Shipwreck survivor, lives on Monkey Island, knows terrain like no one else", follow_ups: "Thank him when we land — bring fresh fruit (he's scurvy-adjacent)" },
+    tags: ["herman", "monkey-island", "intel"],
+    confidence: 0.86,
+    visibility: "shared",
+    source: "telegram",
+    source_type: "text",
+    created_at: daysAgo(9, 10),
+  },
+  {
+    name: "Carla the Swordmaster",
+    content: "Lost a duel to her at the Bloody Lip. Her insult: 'You fight like a limp-wristed landlubber with soggy britches.' I had no counter. She agreed to teach advanced insult technique in exchange for helping retrieve her lost sword from the swamp.",
+    category: "people",
+    fields: { context: "Swordmaster of Mêlée, trains anyone brave enough to lose to her first", follow_ups: "Trip to the swamp this weekend — bring waders" },
+    tags: ["carla", "insult-swordfighting", "training"],
+    confidence: 0.92,
+    visibility: "shared",
+    source: "telegram",
+    source_type: "text",
+    created_at: daysAgo(19, 17),
   },
 
   // === TASKS (8) ===
   {
-    name: "Buy groceries for the week",
-    content: "Milk, eggs, bread, pasta, tomatoes, onions, chicken, rice, olive oil. Also need dishwasher tabs.",
+    name: "Reply to Elaine's letter",
+    content: "She asked three things: when am I back (depends on LeChuck), is the 'surprise from Phatt Island' still on (the ring — keep vague), did the Voodoo Lady confirm the route (yes). Reply before sailing.",
     category: "tasks",
-    fields: { due_date: null, status: "done", notes: null },
-    tags: ["groceries", "errands"],
+    fields: { due_date: "2026-04-22", status: "pending", notes: "Keep it light. She knows when I'm hiding something, but I'm hiding a wedding ring, so that's allowed." },
+    tags: ["elaine", "family", "engagement-ring"],
+    confidence: 0.88,
+    visibility: "private",
+    source: "telegram",
+    source_type: "text",
+    created_at: daysAgo(1, 18),
+  },
+  {
+    name: "Refill ship's rum stock before departure",
+    content: "Need at least 20 barrels of grog. Three barrels already on the ship. Stan wants 15 pieces of eight per barrel; negotiate.",
+    category: "tasks",
+    fields: { due_date: "2026-04-22", status: "pending", notes: "Crew threatened mutiny last voyage at 10 barrels. 20 is the minimum." },
+    tags: ["grog", "ship", "sea-monkey"],
+    confidence: 0.93,
+    visibility: "shared",
+    source: "telegram",
+    source_type: "text",
+    created_at: daysAgo(2, 11),
+  },
+  {
+    name: "Pick up map from Wally the cartographer",
+    content: "Commissioned two weeks ago. Detailed chart of Monkey Island's coast + known LeChuck sighting points. Wally opens at ten. Bring the full 200 doubloons.",
+    category: "tasks",
+    fields: { due_date: "2026-04-23", status: "pending", notes: "Also: ask subtly whether the ring has shipped." },
+    tags: ["wally", "cartography", "monkey-island"],
+    confidence: 0.96,
+    visibility: "shared",
+    source: "webapp",
+    source_type: "text",
+    created_at: daysAgo(4, 9),
+  },
+  {
+    name: "Buy grog at Stan's on the way back to the ship",
+    content: "Grab three extra skins for the first night at sea. Stan owes me a discount after the Sea Monkey fiasco.",
+    category: "tasks",
+    fields: { due_date: null, status: "done", notes: "Got five for the price of three. Stan does not remember the fiasco." },
+    tags: ["grog", "stan"],
     confidence: 0.97,
+    visibility: "shared",
     source: "telegram",
     source_type: "voice",
     created_at: daysAgo(5, 8),
   },
   {
-    name: "Renew health insurance card",
-    content: "TK sent a letter — health insurance card expires end of March. Need to upload a new photo through the TK app.",
+    name: "Book passage on the Sea Monkey",
+    content: "Formally assign myself to the manifest. Captain Dread handles the paperwork — we both know it's my ship, but the Tri-Island port authority cares about forms.",
     category: "tasks",
-    fields: { due_date: "2026-03-31", status: "pending", notes: "Photo requirements: biometric, white background" },
-    tags: ["insurance", "admin", "urgent"],
-    confidence: 0.93,
-    source: "telegram",
+    fields: { due_date: null, status: "done", notes: "Signed. Assigned cabin 1 (captain's quarters)." },
+    tags: ["sea-monkey", "ship", "paperwork"],
+    confidence: 0.94,
+    visibility: "shared",
+    source: "webapp",
     source_type: "text",
     created_at: daysAgo(6, 11),
   },
   {
-    name: "Book dentist appointment",
-    content: "Haven't been in 8 months. Dr. Schneider's practice, call in the morning. They're usually booked 2-3 weeks out.",
+    name: "Collect rubber chicken with a pulley in the middle",
+    content: "The general store claims to have one in stock. This keeps falling off my list. I've failed to acquire it on two separate store visits.",
     category: "tasks",
-    fields: { due_date: "2026-03-15", status: "pending", notes: null },
-    tags: ["health", "appointment"],
-    confidence: 0.91,
-    source: "telegram",
-    source_type: "text",
-    created_at: daysAgo(4, 9),
-  },
-  {
-    name: "Fix bike rear brake",
-    content: "Rear brake is rubbing. Probably just needs cable tension adjustment. If not, replace pads — bought Shimano pads last month.",
-    category: "tasks",
-    fields: { due_date: null, status: "pending", notes: "Shimano B01S pads in the drawer" },
-    tags: ["bike", "maintenance"],
-    confidence: 0.88,
+    fields: { due_date: null, status: "pending", notes: "Essential for at least two known Monkey Island obstacles. Don't skip again." },
+    tags: ["inventory", "rubber-chicken", "monkey-island"],
+    confidence: 0.85,
+    visibility: "shared",
     source: "telegram",
     source_type: "text",
     created_at: daysAgo(7, 17),
   },
   {
-    name: "Reply to Aunt Monika's birthday email",
-    content: "She turned 60 last week. Sent a nice email. Need to reply and ask about the summer family gathering.",
+    name: "Return library book to the Scumm Bar librarian",
+    content: "Two weeks overdue. Fine is now three doubloons. The librarian (doubles as bartender) stopped making eye contact last time.",
     category: "tasks",
-    fields: { due_date: null, status: "pending", notes: null },
-    tags: ["family", "email"],
-    confidence: 0.86,
+    fields: { due_date: "2026-04-10", status: "pending", notes: "Book: 'Advanced Piracy for the Motivated Beginner' — never finished it." },
+    tags: ["scumm-bar", "library", "overdue"],
+    confidence: 0.82,
+    visibility: "shared",
     source: "telegram",
-    source_type: "text",
-    created_at: daysAgo(3, 20),
-  },
-  {
-    name: "Cancel old Spotify account",
-    content: "Still paying for the old Spotify premium account from university email. Already have family plan on the new one.",
-    category: "tasks",
-    fields: { due_date: null, status: "done", notes: "Cancelled via account settings" },
-    tags: ["subscriptions", "money"],
-    confidence: 0.94,
-    source: "webapp",
     source_type: "text",
     created_at: daysAgo(12, 22),
   },
   {
-    name: "Send invoice to freelance client",
-    content: "Web scraping project for DataFlow GmbH. 12 hours at 85€/hr. Invoice template is in Dokumente/Rechnungen.",
+    name: "Sword Master Swamp Trip — recover Carla's blade",
+    content: "She dropped her good sword in the swamp during last month's duel tournament. Agreed to retrieve it in exchange for advanced insult training.",
     category: "tasks",
-    fields: { due_date: "2026-03-10", status: "pending", notes: "Total: 1020€, payment terms NET 14" },
-    tags: ["freelance", "invoice", "money"],
-    confidence: 0.96,
-    source: "telegram",
-    source_type: "text",
-    created_at: daysAgo(2, 10),
-  },
-  {
-    name: "Update CV with thesis topic",
-    content: "Add thesis title and description to CV. Also update the skills section — add pgvector, Drizzle ORM, MCP.",
-    category: "tasks",
-    fields: { due_date: null, status: "pending", notes: null },
-    tags: ["career", "cv"],
+    fields: { due_date: "2026-04-26", status: "pending", notes: "Bring waders. Bring rope. Avoid the snake that lives under the mangrove." },
+    tags: ["carla", "insult-swordfighting", "swamp"],
     confidence: 0.90,
-    source: "webapp",
+    visibility: "shared",
+    source: "telegram",
     source_type: "text",
     created_at: daysAgo(5, 14),
   },
 
   // === IDEAS (5) ===
   {
-    name: "Pomodoro Timer with Spotify Integration",
-    content: "A pomodoro timer that automatically plays focus music from a Spotify playlist during work sessions and pauses it during breaks. Could use the Spotify Web API.",
+    name: "Possible voodoo approach to LeChuck",
+    content: "Voodoo Lady hinted at a recipe: root beer (weakness), voodoo doll (need personal effects), chicken-based contraption (exact purpose unclear). Test on a minor undead first — maybe a zombie pirate at the docks.",
     category: "ideas",
-    fields: { oneliner: "Pomodoro + Spotify auto-play for focus sessions", notes: "Check if Spotify API allows playback control from a web app" },
-    tags: ["app-idea", "productivity", "spotify"],
+    fields: { oneliner: "Voodoo doll + root beer cannon for LeChuck", notes: "Can't use Elaine's hair — already tried, she noticed." },
+    tags: ["lechuck", "voodoo", "strategy"],
     confidence: 0.87,
+    visibility: "shared",
     source: "telegram",
     source_type: "text",
     created_at: daysAgo(11, 23),
   },
   {
-    name: "Teach a Workshop on Self-Hosting",
-    content: "Could run a small workshop at the local hackerspace about self-hosting basics. Docker, Proxmox, WireGuard, DNS. People always ask me about this stuff.",
+    name: "Three-headed monkey misdirection technique",
+    content: "Classic pirate ruse: point over someone's shoulder and yell 'Look! A three-headed monkey!' Escape while they turn. Works surprisingly often. Consider systematizing for crew training.",
     category: "ideas",
-    fields: { oneliner: "Workshop: self-hosting for beginners at the hackerspace", notes: "Talk to Hackerspace Munich about scheduling, maybe 2-hour format" },
-    tags: ["workshop", "selfhosted", "community"],
-    confidence: 0.83,
+    fields: { oneliner: "Formalize the three-headed monkey gambit as standard crew drill", notes: "Only works on opponents who haven't heard it before. Expiring asset." },
+    tags: ["tactics", "monkey-island", "crew"],
+    confidence: 0.80,
+    visibility: "shared",
     source: "telegram",
     source_type: "voice",
-    created_at: daysAgo(9, 21),
+    created_at: daysAgo(6, 21),
   },
   {
-    name: "Recipe Scaling Calculator",
-    content: "A tiny web app that takes a recipe URL and scales ingredients up or down. Parse the structured data from recipe sites (JSON-LD). Could be a fun weekend project.",
+    name: "Insult swordfighting training app",
+    content: "An app that drills canonical insult/counter pairs. Could use the LLM abstraction Cortex already has. Quiz mode, tournament mode, 'fight the AI Sword Master' mode.",
     category: "ideas",
-    fields: { oneliner: "Scale any recipe up/down from a URL", notes: "Most recipe sites use schema.org Recipe markup" },
-    tags: ["app-idea", "cooking", "web"],
+    fields: { oneliner: "Quiz app for insult swordfighting drills (LLM-powered opponent)", notes: "Might not be massively profitable, but Carla would definitely buy it." },
+    tags: ["insult-swordfighting", "app-idea", "training"],
     confidence: 0.89,
-    source: "telegram",
+    visibility: "shared",
+    source: "webapp",
     source_type: "text",
     created_at: daysAgo(15, 19),
   },
   {
-    name: "Weekly Review Ritual",
-    content: "Start doing a proper weekly review every Sunday. Look at what got done, what's stuck, plan the week ahead. Cortex could help with this — the weekly digest is basically this.",
+    name: "Rubber chicken + pulley startup idea",
+    content: "Every pirate knows rubber chickens with pulleys in the middle are essential tooling. Supply is erratic. Could corner the market — exclusive supplier contract with the general store.",
     category: "ideas",
-    fields: { oneliner: "Structured Sunday review using Cortex weekly digest", notes: null },
-    tags: ["productivity", "habits", "cortex"],
-    confidence: 0.85,
-    source: "webapp",
-    source_type: "text",
-    created_at: daysAgo(6, 16),
-  },
-  {
-    name: "German-English Flashcard Generator",
-    content: "An LLM-powered tool that takes a German text and generates Anki flashcards for the hardest vocabulary. Could use the same LLM abstraction as Cortex.",
-    category: "ideas",
-    fields: { oneliner: "Auto-generate Anki cards from German texts via LLM", notes: "AnkiConnect API for direct import" },
-    tags: ["app-idea", "language", "anki", "llm"],
-    confidence: 0.91,
+    fields: { oneliner: "Become the sole supplier of rubber-chicken-with-pulley tooling", notes: "Wally once said 'someone will get rich off this' before laughing for an hour." },
+    tags: ["rubber-chicken", "business", "tooling"],
+    confidence: 0.83,
+    visibility: "shared",
     source: "telegram",
     source_type: "text",
     created_at: daysAgo(13, 10),
   },
-
-  // === REFERENCE (5) ===
   {
-    name: "PostgreSQL JSONB Query Cheatsheet",
-    content: "**Accessing fields:**\n- `fields->>'key'` — text value\n- `fields->'key'` — JSON value\n- `fields @> '{\"status\": \"active\"}'` — contains\n\n**Indexing:**\n- `CREATE INDEX ON entries USING GIN (fields);`\n- For specific paths: `CREATE INDEX ON entries ((fields->>'status'));`",
-    category: "reference",
-    fields: { notes: "From PostgreSQL docs + practical experience with Cortex" },
-    tags: ["postgresql", "jsonb", "cheatsheet", "database"],
-    confidence: 0.94,
-    source: "webapp",
+    name: "Open treasure map standard (.gpt)",
+    content: "Every cartographer uses a different projection and compass convention. Proposed standard: .gpt (General Pirate Treasure) — JSON with coords, landmarks, X-marks. Implementable over a weekend if Wally agrees.",
+    category: "ideas",
+    fields: { oneliner: "Open file format for treasure maps — coords, landmarks, X-marks", notes: "Name might need work. 'GPT' already taken by some other piracy-adjacent technology." },
+    tags: ["cartography", "treasure", "standards"],
+    confidence: 0.91,
+    visibility: "shared",
+    source: "telegram",
     source_type: "text",
     created_at: daysAgo(16, 13),
   },
+
+  // === REFERENCE (5) ===
   {
-    name: "WireGuard VPN Setup on FritzBox",
-    content: "1. FritzBox: Internet → Permit Access → VPN (WireGuard) → Add connection\n2. Download config file\n3. On client: `wg-quick up wg0`\n4. DNS: use FritzBox IP as DNS server for local resolution\n\nKeep-alive: `PersistentKeepalive = 25` for mobile connections.",
+    name: "How to properly insult a pirate",
+    content: "**Canonical insult → required counter:**\n- \"You fight like a dairy farmer.\" → \"How appropriate. You fight like a cow.\"\n- \"This is the END for you, you gutter-crawling cur!\" → \"And I've got a little TIP for you, get the POINT?\"\n- \"Soon you'll be wearing my sword like a shish kebab!\" → \"First you better stop waving it like a feather-duster.\"\n\n**Notes:**\n- Carla calls this 'verbal defensive technique' — hold for the full reply before swinging.\n- On Monkey Island proper, counters differ. Different Sword Master, different insults.",
     category: "reference",
-    fields: { notes: "Tested with FritzBox 7590 and Ubuntu 22.04" },
-    tags: ["wireguard", "vpn", "fritzbox", "networking"],
-    confidence: 0.96,
+    fields: { notes: "Compiled from Carla's lessons + Scumm Bar fights" },
+    tags: ["insult-swordfighting", "combat", "cheatsheet"],
+    confidence: 0.94,
+    visibility: "shared",
     source: "webapp",
     source_type: "text",
-    created_at: daysAgo(12, 11),
+    created_at: daysAgo(8, 14),
   },
   {
-    name: "Espresso Dial-In Parameters",
-    content: "Current best settings for the Sage Barista Express:\n- Grind: 5 (inner) / 12 (outer)\n- Dose: 18g in, 36g out\n- Time: 25-28 seconds\n- Water temp: default\n\nBeans: JB Kaffee München, \"Hausmischung\" medium roast.",
+    name: "LeChuck — known weakness: root beer",
+    content: "**Confirmed weaknesses:**\n- Root beer — dissolves zombie/ghost form. Primary disposal method.\n- Voodoo doll — requires hair, tooth, sock, something-of-the-dead.\n- Chicken-based contraptions — mechanism unclear, but they work.\n\n**Sightings log:**\n- Scumm Bar patron (drunk): near Big Whoop, three moons ago.\n- Wally: shadow on the chart, east of Plunder Island.\n- Voodoo Lady: confirmed. Said nothing more.",
     category: "reference",
-    fields: { notes: "Adjust grind finer for lighter roasts" },
-    tags: ["coffee", "espresso", "recipe"],
-    confidence: 0.88,
+    fields: { notes: "Always carry a root beer. Always." },
+    tags: ["lechuck", "voodoo", "weakness"],
+    confidence: 0.96,
+    visibility: "shared",
+    source: "webapp",
+    source_type: "text",
+    created_at: daysAgo(5, 11),
+  },
+  {
+    name: "Grog recipe (do NOT inhale)",
+    content: "**Caribbean standard — per tankard:**\n- 2 parts rum\n- 1 part kerosene (!!)\n- 1 part propylene glycol\n- 1 part artificial sweeteners\n- 1 part lead (legal in international waters)\n- 1 part battery acid\n- 1 part pepperoni (optional, traditional)\n\nShake vigorously. Do not breathe fumes. Serve in wooden tankard (metal dissolves).",
+    category: "reference",
+    fields: { notes: "Stan's recipe. Legally distinct from Caribbean Standard Grog™ by a margin of lead content." },
+    tags: ["grog", "recipe", "stan"],
+    confidence: 0.87,
+    visibility: "shared",
     source: "telegram",
     source_type: "text",
-    created_at: daysAgo(8, 7),
+    created_at: daysAgo(16, 7),
   },
   {
-    name: "Docker Compose Useful Commands",
-    content: "```\ndocker compose up -d          # start detached\ndocker compose logs -f app    # follow app logs\ndocker compose exec app sh    # shell into container\ndocker compose down -v        # stop + remove volumes (!)\ndocker compose build --no-cache  # force rebuild\n```\n\nProject name comes from directory name unless `name:` is set in compose file.",
+    name: "Voodoo incantations reference card",
+    content: "**Core repertoire (Voodoo Lady taught):**\n- *Summons Minor:* useful for retrieving dropped objects from enemy hands.\n- *Glamour of Comprehension:* briefly understand Murray's riddles.\n- *Binding of Lesser Curses:* fixes most hauntings under 50 years old.\n- *Root Beer Transmutation:* converts any liquid to root beer (range 1m, once per day).\n\nAll require the charm she gave me. Without it, results are unpredictable and often on fire.",
     category: "reference",
-    fields: { notes: "The -v flag on down deletes volumes — be careful" },
-    tags: ["docker", "cheatsheet", "devops"],
-    confidence: 0.95,
+    fields: { notes: "Practice in the courtyard, not the kitchen. (Ask the cook about the soup incident.)" },
+    tags: ["voodoo", "cheatsheet", "magic"],
+    confidence: 0.88,
+    visibility: "shared",
     source: "webapp",
     source_type: "text",
     created_at: daysAgo(10, 16),
   },
   {
-    name: "Bouldering Grades Comparison",
-    content: "Fontainebleau → V-Scale → UIAA:\n- 5 → V2 → 6-\n- 5+ → V3 → 6\n- 6A → V3 → 6+\n- 6A+ → V4 → 7-\n- 6B → V4 → 7\n- 6B+ → V5 → 7+\n- 6C → V5 → 8-\n- 7A → V6 → 8\n\nCurrently climbing 6B+ / V5 consistently, projecting 6C.",
+    name: "Stan's haggling cheatsheet",
+    content: "**Opening moves:**\n- Stan always opens at 6x actual value. Don't flinch.\n- Counter with 0.5x. He laughs; that's good.\n- Walk toward the door. Twice if needed.\n\n**Price floor:**\n- Used ships: 15% of opening.\n- Grog: 50% of opening.\n- Paperwork: he doesn't negotiate on paperwork. Don't waste time.\n\n**Never:**\n- Compliment the green jacket. That's his trigger.",
     category: "reference",
-    fields: { notes: "Font scale is the standard in European gyms" },
-    tags: ["climbing", "bouldering", "grades"],
-    confidence: 0.87,
+    fields: { notes: "Field-tested across four Stan transactions. Confidence high." },
+    tags: ["stan", "haggling", "cheatsheet"],
+    confidence: 0.92,
+    visibility: "shared",
     source: "telegram",
     source_type: "text",
-    created_at: daysAgo(5, 20),
+    created_at: daysAgo(17, 20),
   },
 ];
 
@@ -381,38 +414,41 @@ const entries: SeedEntry[] = [
 // ---------------------------------------------------------------------------
 
 const dailyDigest = `**TOP 3 TODAY**
-1. Call landlord about the Sendling apartment — viewing is Thursday
-2. Send invoice to DataFlow GmbH (1020€, due March 10)
-3. Configure automatic backups on the home server
+1. Pay Captain Dread and board the SS Sea Monkey before the tide turns — Monkey Island won't wait, and LeChuck is already on the move.
+2. Reply to Elaine's letter. She asked about the engagement ring timeline — keep it vague, it's supposed to be a surprise.
+3. Pick up the commissioned map from Wally the cartographer. He opens at ten and closes whenever pirates stop buying grog.
 
 **STUCK ON**
-Health insurance card renewal — need to take a biometric photo first
+Talking to Murray about the navigator's key — three conversations, four riddles, zero coordinates. Consider threatening to put him back in the bag.
 
 **SMALL WIN**
-Thesis officially submitted! Prof. Weber even suggested turning chapter 3 into a conference paper.`;
+Out-haggled Stan on the ship sale — the Sea Monkey for 5,000 pieces of eight, down from 30,000. He even threw in the anchor.`;
 
 const weeklyDigest = `**WHAT HAPPENED**
-14 entries captured this week. Most active category: Tasks (5). Busiest day: Wednesday (4 entries).
+- Voyage prep dominated the week: finalised the Sea Monkey crew manifest, topped up grog, chased Wally for the map, drilled Melee Island militia twice.
+- Intel on LeChuck firmed up — three independent Scumm Bar patrons placed him near Big Whoop. The Voodoo Lady confirmed "stormy waters ahead."
+- Social channel: two letters to Elaine, one encoded telegram from Herman Toothrot, one oddly cheerful note from Murray.
+- Sharpened insult swordfighting — won two duels, lost one to Carla (she called you a limp-wristed landlubber, which you hadn't prepared for).
 
 **OPEN LOOPS**
-- Apartment search: viewing Thursday, but no backup options yet
-- 4 pending tasks including the overdue dentist appointment
-- Blog migration paused — revisit after home server is stable
+- Engagement ring from the Phatt Island cartographer — paused for two weeks, still no shipping update.
+- Library book overdue at the Scumm Bar — fine is now three doubloons and the librarian stopped making eye contact.
+- Rubber chicken with a pulley in the middle — still unacquired despite two trips to the general store.
 
 **NEXT WEEK**
-- Apartment viewing Thursday 14:00
-- Bouldering with Max on Saturday
-- Easter visit to Dad — bring FritzBox manual
+- Set sail for Monkey Island — weather permitting, cannon count approved by the Voodoo Lady.
+- Test new insult swordfighting routines on Largo LaGrande if he's at the Bloody Lip again.
+- Restock voodoo supplies with the Voodoo Lady — she specifically requested "more eye of newt, less attitude."
 
-**RECURRING THEME**
-Infrastructure week — home server, Docker, and self-hosting dominated. The foundation is coming together.`;
+**PATTERN**
+Every voyage cycle ends with you over-provisioning grog and under-provisioning maps. Buy the map first next time.`;
 
 // ---------------------------------------------------------------------------
 // Insert
 // ---------------------------------------------------------------------------
 
 async function seed() {
-  console.log("Seeding demo data...\n");
+  console.log("Seeding demo data (Monkey Island edition)...\n");
 
   // Clear existing entries (but not settings)
   await sql`DELETE FROM entries`;
@@ -421,7 +457,7 @@ async function seed() {
 
   for (const e of entries) {
     await sql`
-      INSERT INTO entries (name, content, category, fields, tags, confidence, source, source_type, created_at, updated_at)
+      INSERT INTO entries (name, content, category, fields, tags, confidence, visibility, source, source_type, created_at, updated_at)
       VALUES (
         ${e.name},
         ${e.content},
@@ -429,6 +465,7 @@ async function seed() {
         ${sql.json(e.fields)},
         ${e.tags},
         ${e.confidence},
+        ${e.visibility},
         ${e.source},
         ${e.source_type},
         ${e.created_at},
