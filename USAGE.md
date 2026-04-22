@@ -2,8 +2,6 @@
 
 Day-to-day workflows for capturing thoughts, correcting the LLM when it hedges, searching your brain, and pulling data out via MCP. See [README.md](README.md) for setup and [ARCHITECTURE.md](ARCHITECTURE.md) for internals.
 
-All examples use Monkey Island characters — Guybrush is the user, Elaine is his wife, and the rest drift in as context.
-
 ## Contents
 
 - [Capturing thoughts](#capturing-thoughts)
