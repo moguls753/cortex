@@ -23,6 +23,7 @@ vi.mock("../../src/web/browse-queries.js", () => ({
   semanticSearch: vi.fn().mockResolvedValue([]),
   textSearch: vi.fn().mockResolvedValue([]),
   getFilterTags: vi.fn().mockResolvedValue([]),
+  getTagCounts: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../../src/embed.js", () => ({
@@ -124,7 +125,7 @@ describe("Web Browse", () => {
   describe("Category Browsing (US-1)", () => {
     // TS-1.1
     it("shows all category filters with All as default", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([
@@ -132,7 +133,7 @@ describe("Web Browse", () => {
         createMockEntry({ category: "projects", name: "Project X" }),
         createMockEntry({ category: "tasks", name: "Fix bug" }),
       ]);
-      vi.mocked(getFilterTags).mockResolvedValue(["work", "personal"]);
+      vi.mocked(getTagCounts).mockResolvedValue([{ tag: "work", count: 5 }, { tag: "personal", count: 3 }]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -160,7 +161,7 @@ describe("Web Browse", () => {
 
     // TS-1.2
     it("shows only matching entries when category filter applied", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([
@@ -168,7 +169,7 @@ describe("Web Browse", () => {
         createMockEntry({ name: "Task 2", category: "tasks" }),
         createMockEntry({ name: "Task 3", category: "tasks" }),
       ]);
-      vi.mocked(getFilterTags).mockResolvedValue(["urgent"]);
+      vi.mocked(getTagCounts).mockResolvedValue([{ tag: "urgent", count: 2 }]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -268,7 +269,7 @@ describe("Web Browse", () => {
       const mockEmbedding = new Array(4096).fill(0);
       vi.mocked(generateEmbedding).mockResolvedValue(mockEmbedding);
 
-      const { semanticSearch, getFilterTags } = await import(
+      const { semanticSearch } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(semanticSearch).mockResolvedValue([
@@ -276,7 +277,6 @@ describe("Web Browse", () => {
         createMockEntry({ name: "Medium Match" }),
         createMockEntry({ name: "Low Match" }),
       ]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -350,14 +350,13 @@ describe("Web Browse", () => {
   describe("Text Search (US-3)", () => {
     // TS-3.4
     it("bypasses semantic search when text mode is active", async () => {
-      const { textSearch, getFilterTags } = await import(
+      const { textSearch } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(textSearch).mockResolvedValue([
         createMockEntry({ name: "Text Result 1" }),
         createMockEntry({ name: "Text Result 2" }),
       ]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
 
       const { generateEmbedding } = await import("../../src/embed.js");
       const { semanticSearch } = await import(
@@ -425,14 +424,14 @@ describe("Web Browse", () => {
   describe("Tag Filtering (US-4)", () => {
     // TS-4.1
     it("displays tags as clickable filter pills", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([createMockEntry()]);
-      vi.mocked(getFilterTags).mockResolvedValue([
-        "work",
-        "personal",
-        "urgent",
+      vi.mocked(getTagCounts).mockResolvedValue([
+        { tag: "work", count: 5 },
+        { tag: "personal", count: 3 },
+        { tag: "urgent", count: 1 },
       ]);
 
       const { app } = await createTestBrowse();
@@ -454,16 +453,16 @@ describe("Web Browse", () => {
 
     // TS-4.5
     it("switches tag selection when different tag clicked", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([
         createMockEntry({ tags: ["personal"] }),
       ]);
-      vi.mocked(getFilterTags).mockResolvedValue([
-        "work",
-        "personal",
-        "urgent",
+      vi.mocked(getTagCounts).mockResolvedValue([
+        { tag: "work", count: 5 },
+        { tag: "personal", count: 3 },
+        { tag: "urgent", count: 1 },
       ]);
 
       const { app } = await createTestBrowse();
@@ -490,11 +489,11 @@ describe("Web Browse", () => {
 
     // TS-4.6
     it("clears tag filter when active tag clicked", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([createMockEntry()]);
-      vi.mocked(getFilterTags).mockResolvedValue(["work", "personal"]);
+      vi.mocked(getTagCounts).mockResolvedValue([{ tag: "work", count: 3 }, { tag: "personal", count: 2 }]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -529,11 +528,10 @@ describe("Web Browse", () => {
   describe("Constraints", () => {
     // TS-5.1
     it("returns server-rendered HTML", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -598,14 +596,14 @@ describe("Web Browse", () => {
       const { generateEmbedding } = await import("../../src/embed.js");
       vi.mocked(generateEmbedding).mockResolvedValue(new Array(4096).fill(0));
 
-      const { semanticSearch, getFilterTags } = await import(
+      const { semanticSearch, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(semanticSearch).mockResolvedValue([
         createMockEntry({ name: "Budget Entry" }),
         createMockEntry({ name: "Budget Plan" }),
       ]);
-      vi.mocked(getFilterTags).mockResolvedValue(["work"]);
+      vi.mocked(getTagCounts).mockResolvedValue([{ tag: "work", count: 4 }]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -663,11 +661,10 @@ describe("Web Browse", () => {
       const { generateEmbedding } = await import("../../src/embed.js");
       vi.mocked(generateEmbedding).mockResolvedValue(new Array(4096).fill(0));
 
-      const { semanticSearch, getFilterTags } = await import(
+      const { semanticSearch } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(semanticSearch).mockResolvedValue([createMockEntry()]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -686,11 +683,10 @@ describe("Web Browse", () => {
 
     // TS-6.4
     it("shows empty state message when no entries exist", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -705,11 +701,10 @@ describe("Web Browse", () => {
 
     // TS-6.6
     it("shows empty result message for category with no entries", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -726,14 +721,14 @@ describe("Web Browse", () => {
 
     // TS-6.7
     it("shows max 10 tags with show more collapse", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([createMockEntry()]);
       const tags = Array.from({ length: 15 }, (_, i) =>
         `tag-${String(i + 1).padStart(2, "0")}`,
       );
-      vi.mocked(getFilterTags).mockResolvedValue(tags);
+      vi.mocked(getTagCounts).mockResolvedValue(tags.map((t) => ({ tag: t, count: 1 })));
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -911,12 +906,11 @@ describe("Web Browse", () => {
       url: string,
       mockEntries: Entry[] = [],
     ): Promise<{ status: number; body: string }> {
-      const { browseEntries, semanticSearch, textSearch, getFilterTags } =
+      const { browseEntries, semanticSearch, textSearch } =
         await import("../../src/web/browse-queries.js");
       vi.mocked(browseEntries).mockResolvedValue(mockEntries);
       vi.mocked(semanticSearch).mockResolvedValue(mockEntries);
       vi.mocked(textSearch).mockResolvedValue(mockEntries);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
@@ -967,11 +961,10 @@ describe("Web Browse", () => {
 
     // TS-3.6 — DE locale
     it("renders pills in German when the locale is 'de'", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
       // Seed the cookie with locale=de by passing Accept-Language on the
@@ -1242,11 +1235,10 @@ describe("Web Browse", () => {
   describe("Browse Filters — existing behavior preserved", () => {
     // TS-4.1
     it("category tabs render with unchanged hrefs", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
       const res = await app.request("/browse", { headers: { Cookie: cookie } });
@@ -1258,11 +1250,10 @@ describe("Web Browse", () => {
 
     // TS-4.2
     it("search form action=/browse method=GET with name=q input is preserved", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
       const res = await app.request("/browse", { headers: { Cookie: cookie } });
@@ -1275,11 +1266,15 @@ describe("Web Browse", () => {
 
     // TS-4.3
     it("tag pill row renders discovery pills and active tag deselects on click", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue(["alpha", "beta", "gamma"]);
+      vi.mocked(getTagCounts).mockResolvedValue([
+        { tag: "alpha", count: 3 },
+        { tag: "beta", count: 2 },
+        { tag: "gamma", count: 1 },
+      ]);
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
 
@@ -1376,11 +1371,10 @@ describe("Web Browse", () => {
   describe("Browse Filters — constraints", () => {
     // TS-5.1
     it("pill × control is a plain anchor element (not a button requiring JS)", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
       const res = await app.request("/browse?status=pending", {
@@ -1402,11 +1396,10 @@ describe("Web Browse", () => {
 
     // TS-5.2
     it("filter bar subtree contains no inline style attributes", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
       const res = await app.request(
@@ -1502,11 +1495,10 @@ describe("Web Browse", () => {
 
     // TS-5.8
     it("duplicate status params: only the first value is honored", async () => {
-      const { browseEntries, getFilterTags } = await import(
+      const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
       const res = await app.request("/browse?status=pending&status=done", {
@@ -1549,12 +1541,11 @@ describe("Web Browse", () => {
       url: string,
       mockEntries: Entry[] = [],
     ): Promise<{ status: number; body: string }> {
-      const { browseEntries, semanticSearch, textSearch, getFilterTags } =
+      const { browseEntries, semanticSearch, textSearch } =
         await import("../../src/web/browse-queries.js");
       vi.mocked(browseEntries).mockResolvedValue(mockEntries);
       vi.mocked(semanticSearch).mockResolvedValue(mockEntries);
       vi.mocked(textSearch).mockResolvedValue(mockEntries);
-      vi.mocked(getFilterTags).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);

@@ -8,9 +8,11 @@ import {
   semanticSearch,
   textSearch,
   getFilterTags,
+  getTagCounts,
   type BrowseFilters,
   type SinceValue,
   type StatusValue,
+  type TagCount,
 } from "./browse-queries.js";
 import { generateEmbedding } from "../embed.js";
 import type { EntryRow } from "./dashboard-queries.js";
@@ -207,6 +209,54 @@ export function renderTagPills(
   }
 
   html += `</div>`;
+  return html;
+}
+
+export function renderSidebarTags(
+  tagCounts: TagCount[],
+  activeTag: string | undefined,
+  currentCategory: string | undefined,
+  currentQuery: string | undefined,
+  currentMode: string | undefined,
+  basePath = "/browse",
+  t?: TFunction,
+): string {
+  const label = t ? t("browse.filter_tags") : "Tags";
+
+  function renderTagItem(tc: TagCount): string {
+    const isActive = activeTag === tc.tag;
+    const href = isActive
+      ? buildUrl({ category: currentCategory, q: currentQuery, mode: currentMode }, basePath)
+      : buildUrl({ category: currentCategory, tag: tc.tag, q: currentQuery, mode: currentMode }, basePath);
+    const linkCls = isActive
+      ? "flex-1 min-w-0 px-2 py-1 text-xs text-primary truncate active"
+      : "flex-1 min-w-0 px-2 py-1 text-xs text-muted-foreground hover:text-foreground truncate";
+    const countCls = isActive
+      ? "text-[10px] text-primary/60 shrink-0 pr-2 tabular-nums"
+      : "text-[10px] text-muted-foreground/50 shrink-0 pr-2 tabular-nums";
+    return `<div class="flex items-center rounded hover:bg-secondary transition-colors"><a href="${escapeHtml(href)}" class="${linkCls}">${escapeHtml(tc.tag)}</a><span class="${countCls}">${tc.count}</span></div>`;
+  }
+
+  if (tagCounts.length === 0) {
+    return `<div class="px-3 py-3">
+      <div class="text-[9px] uppercase tracking-widest text-muted-foreground font-medium mb-2 px-1">${escapeHtml(label)}</div>
+    </div>`;
+  }
+
+  const visibleTags = tagCounts.slice(0, MAX_VISIBLE_TAGS);
+  const hiddenTags = tagCounts.slice(MAX_VISIBLE_TAGS);
+
+  let html = `<div class="px-3 py-3">
+    <div class="text-[9px] uppercase tracking-widest text-muted-foreground font-medium mb-2 px-1">${escapeHtml(label)}</div>
+    <div class="flex flex-col gap-0.5">
+      ${visibleTags.map((tc) => renderTagItem(tc)).join("")}`;
+
+  if (hiddenTags.length > 0) {
+    html += `<div class="hidden" id="extra-sidebar-tags">${hiddenTags.map((tc) => renderTagItem(tc)).join("")}</div>
+      <button onclick="document.getElementById('extra-sidebar-tags').classList.toggle('hidden');this.textContent=this.textContent.includes('show more')?'show less':'show more'" class="text-[10px] text-primary hover:underline px-2 py-0.5 text-left w-full">show more</button>`;
+  }
+
+  html += `</div></div>`;
   return html;
 }
 
@@ -587,6 +637,7 @@ export function renderFilterBar(params: {
   stale_days: number | undefined;
   resultCount: number;
   t: TFunction;
+  vertical?: boolean;
 }): string {
   const {
     category,
@@ -598,6 +649,7 @@ export function renderFilterBar(params: {
     stale_days: staleDays,
     resultCount,
     t,
+    vertical = false,
   } = params;
 
   const base = { category, tag, q, mode, since, status, stale_days: staleDays };
@@ -694,12 +746,19 @@ export function renderFilterBar(params: {
         : "browse.filter.results_other";
   const countText = t(countKey, { count: resultCount });
 
+  const containerCls = vertical
+    ? "flex flex-col gap-1.5"
+    : "flex items-center gap-2 flex-wrap";
+  const countCls = vertical
+    ? "text-[10px] text-muted-foreground pt-1 px-1"
+    : "text-xs text-muted-foreground ml-auto";
+
   return `
-    <div data-filter-bar class="flex items-center gap-2 flex-wrap">
+    <div data-filter-bar class="${containerCls}">
       ${pills.join("")}
       ${addMenuBlock}
       ${clearLink}
-      <span class="text-xs text-muted-foreground ml-auto">${escapeHtml(countText)}</span>
+      <span class="${countCls}">${escapeHtml(countText)}</span>
     </div>`;
 }
 
@@ -1038,7 +1097,7 @@ export function createBrowseRoutes(sql: Sql): Hono {
       entries = (await browseEntries(sql, filters)) ?? [];
     }
 
-    const tags = (await getFilterTags(sql, { category })) ?? [];
+    const tagCounts = (await getTagCounts(sql, { category })) ?? [];
 
     // Count unclassified entries (for tab visibility) — wrap to survive
     // unit tests that use a bare mock sql that doesn't implement the template
@@ -1069,6 +1128,7 @@ export function createBrowseRoutes(sql: Sql): Hono {
       stale_days: parsed.stale_days,
       resultCount: entries.length,
       t,
+      vertical: true,
     });
 
     const clearFiltersHref = hasAnyFilter
@@ -1079,12 +1139,23 @@ export function createBrowseRoutes(sql: Sql): Hono {
         <div class="shrink-0 flex flex-col gap-2">
           ${renderSearchBar(q, category, tag, "/browse", t)}
           ${renderCategoryTabs(category, tag, q, mode, unclassifiedCount, "/browse", t)}
-          ${renderTagPills(tags, tag, category, q, mode)}
-          ${filterBarHtml}
         </div>
-        ${notice ? renderNotice(notice) : ""}
-        <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin rounded-md border border-border bg-card px-4 py-3">
-          ${hasResults ? renderEntryList(entries) : renderEmptyState(hasQuery, hasCategory, t, clearFiltersHref)}
+        <div class="flex-1 min-h-0 flex gap-3">
+          <div class="w-44 shrink-0 flex flex-col rounded-md border border-border bg-card">
+            <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+              ${renderSidebarTags(tagCounts, tag, category, q, mode, "/browse", t)}
+            </div>
+            <div class="border-t border-border shrink-0"></div>
+            <div class="shrink-0 px-3 py-3">
+              ${filterBarHtml}
+            </div>
+          </div>
+          <div class="flex-1 min-h-0 flex flex-col gap-2">
+            ${notice ? renderNotice(notice) : ""}
+            <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin rounded-md border border-border bg-card px-4 py-3">
+              ${hasResults ? renderEntryList(entries) : renderEmptyState(hasQuery, hasCategory, t, clearFiltersHref)}
+            </div>
+          </div>
         </div>
       </div>
       ${renderFilterBarScript()}

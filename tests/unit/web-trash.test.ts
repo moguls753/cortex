@@ -22,6 +22,7 @@ vi.mock("../../src/web/browse-queries.js", () => ({
   semanticSearch: vi.fn().mockResolvedValue([]),
   textSearch: vi.fn().mockResolvedValue([]),
   getFilterTags: vi.fn().mockResolvedValue([]),
+  getTagCounts: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../../src/embed.js", () => ({

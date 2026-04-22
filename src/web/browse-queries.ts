@@ -129,3 +129,26 @@ export async function getFilterTags(
   `;
   return rows.map((r) => r.tag as string);
 }
+
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+
+export async function getTagCounts(
+  sql: Sql,
+  options?: { category?: string; deleted?: boolean },
+): Promise<TagCount[]> {
+  const category = options?.category;
+  const deleted = options?.deleted ?? false;
+
+  const rows = await sql`
+    SELECT t.tag, COUNT(*)::int AS count
+    FROM entries e, unnest(e.tags) AS t(tag)
+    WHERE ${deleted ? sql`e.deleted_at IS NOT NULL` : sql`e.deleted_at IS NULL`}
+      ${category === "unclassified" ? sql`AND e.category IS NULL` : category ? sql`AND e.category = ${category}` : sql``}
+    GROUP BY t.tag
+    ORDER BY count DESC, t.tag ASC
+  `;
+  return rows as unknown as TagCount[];
+}
