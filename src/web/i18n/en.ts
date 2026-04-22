@@ -83,7 +83,9 @@ export const en = {
     filter: {
       add: "+ Filter",
       clear: "Clear filters",
+      all: "All",
       dimension: {
+        category: "Category",
         status: "Status",
         since: "Updated",
         stale_days: "Inactive",

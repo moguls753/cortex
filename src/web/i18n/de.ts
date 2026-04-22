@@ -71,7 +71,9 @@ export const de: Widen<typeof en> = {
     filter: {
       add: "+ Filter",
       clear: "Filter zurücksetzen",
+      all: "Alle",
       dimension: {
+        category: "Kategorie",
         status: "Status",
         since: "Aktualisiert",
         stale_days: "Inaktiv",

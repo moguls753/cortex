@@ -926,50 +926,51 @@ describe("Web Browse", () => {
       expect(body).toContain("data-filter-bar");
     });
 
-    // TS-3.2
-    it("renders an Updated: This week pill for since=week", async () => {
+    // Peer dropdown renders current value label for since=week
+    it("renders the Updated dropdown with 'this week' as current value for since=week", async () => {
       const { status, body } = await fetchBrowse("/browse?since=week");
       expect(status).toBe(200);
-      expect(body).toMatch(/Updated:\s*This week/);
-      // Pill has a remove (×) anchor
-      expect(body).toMatch(/data-filter-bar[\s\S]*?×/);
+      // Peer dropdown trigger carries data-picker="since" and its value span
+      // is lowercase "this week" (the i18n label lowercased)
+      expect(body).toMatch(/data-picker=["']since["']/);
+      expect(body.toLowerCase()).toMatch(/this week/);
     });
 
-    // TS-3.3
-    it("renders a Status: Pending pill for status=pending", async () => {
+    // Peer dropdown renders current value label for status=pending
+    it("renders the Status dropdown with 'pending' as current value for status=pending", async () => {
       const { status, body } = await fetchBrowse("/browse?status=pending");
       expect(status).toBe(200);
-      expect(body).toMatch(/Status:\s*Pending/);
+      expect(body).toMatch(/data-picker=["']status["']/);
+      expect(body.toLowerCase()).toMatch(/>pending</);
     });
 
-    // TS-3.4
-    it("renders an Inactive: 5+ days pill for stale_days=5", async () => {
+    // Peer dropdown renders Inactive value label for stale_days=5
+    it("renders the Inactive dropdown with '5+ days' as current value for stale_days=5", async () => {
       const { status, body } = await fetchBrowse("/browse?stale_days=5");
       expect(status).toBe(200);
-      expect(body).toMatch(/Inactive:\s*5\+\s*days/);
+      expect(body).toMatch(/data-picker=["']stale_days["']/);
+      expect(body.toLowerCase()).toMatch(/5\+\s*days/);
     });
 
-    // TS-3.5 — EN default
-    it("renders pills in English by default", async () => {
+    // Renders values from i18n in EN by default
+    it("renders dropdown value labels in English by default", async () => {
       const { body } = await fetchBrowse(
         "/browse?since=today&status=done&stale_days=14",
       );
-      expect(body).toMatch(/Updated:\s*Today/);
-      expect(body).toMatch(/Status:\s*Done/);
-      expect(body).toMatch(/Inactive:\s*14\+\s*days/);
+      expect(body.toLowerCase()).toMatch(/today/);
+      expect(body.toLowerCase()).toMatch(/done/);
+      expect(body.toLowerCase()).toMatch(/14\+\s*days/);
     });
 
-    // TS-3.6 — DE locale
-    it("renders pills in German when the locale is 'de'", async () => {
+    // Renders dimension labels in German when the locale is 'de'
+    it("renders dimension labels in German when the locale is 'de'", async () => {
       const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
-      // Seed the cookie with locale=de by passing Accept-Language on the
-      // /login POST — the resolveLoginLocale path picks up the header at
-      // login time and encodes "de" into the session cookie.
+      // Seed cookie with locale=de via Accept-Language on /login POST
       const loginRes = await app.request("/login", {
         method: "POST",
         body: new URLSearchParams({ password: TEST_PASSWORD }),
@@ -989,16 +990,17 @@ describe("Web Browse", () => {
       expect(res.status).toBe(200);
       const { i18next } = await import("../../src/web/i18n/index.js");
       const t = i18next.getFixedT("de");
-      expect(body).toContain(t("browse.filter.dimension.since"));
-      expect(body).toContain(t("browse.filter.dimension.status"));
-      expect(body).toContain(t("browse.filter.dimension.stale_days"));
+      // Dropdown trigger lowercases the dimension label
+      expect(body).toContain((t("browse.filter.dimension.since") as string).toLowerCase());
+      expect(body).toContain((t("browse.filter.dimension.status") as string).toLowerCase());
+      expect(body).toContain((t("browse.filter.dimension.stale_days") as string).toLowerCase());
     });
 
-    // TS-3.7
-    it("renders Inactive: 1+ day using singular pluralization", async () => {
+    // Inactive value label uses singular pluralization when count=1
+    it("renders '1+ day' using singular pluralization in stale_days picker", async () => {
       const { body } = await fetchBrowse("/browse?stale_days=1");
-      // Singular form for count=1. en.ts: "Inactive: 1+ day" (no trailing 's')
-      expect(body).toMatch(/Inactive:\s*1\+\s*day(?!s)/);
+      // Trigger value is the singular label; peer-dropdown lowercases it.
+      expect(body.toLowerCase()).toMatch(/1\+\s*day(?!s)/);
     });
 
     // TS-3.8
@@ -1029,65 +1031,37 @@ describe("Web Browse", () => {
       expect(body).toMatch(/data-picker=["']status["']/);
     });
 
-    // TS-3.11
-    it("+ Filter menu omits dimensions already applied", async () => {
-      const { body } = await fetchBrowse("/browse?status=pending");
-      // A +Filter menu region should exist and not include the Status option
-      // since status is already applied.
-      expect(body).toMatch(/data-filter-add-menu/);
-      // Extract the add-menu region and assert contents.
-      const addMenuMatch = body.match(
-        /data-filter-add-menu[\s\S]*?<\/[a-z]+>\s*(?=<\/|$)/,
-      );
-      const menuRegion = addMenuMatch ? addMenuMatch[0] : "";
-      expect(menuRegion).toContain("Updated");
-      expect(menuRegion).toContain("Inactive");
-      expect(menuRegion).not.toContain("Status");
-    });
-
-    // TS-3.12
-    it("+ Filter offers all three dimensions when none are active", async () => {
+    // Peer dropdown — all 4 dimensions are always visible
+    it("peer-dropdown filter row always renders all four dropdown triggers", async () => {
       const { body } = await fetchBrowse("/browse");
-      expect(body).toMatch(/data-filter-add-menu/);
-      const addMenuMatch = body.match(
-        /data-filter-add-menu[\s\S]*?<\/[a-z]+>\s*(?=<\/|$)/,
-      );
-      const menuRegion = addMenuMatch ? addMenuMatch[0] : "";
-      expect(menuRegion).toContain("Status");
-      expect(menuRegion).toContain("Updated");
-      expect(menuRegion).toContain("Inactive");
-    });
-
-    // TS-3.13
-    it("+ Filter button is omitted when all three dimensions are active", async () => {
-      const { body } = await fetchBrowse(
-        "/browse?status=pending&since=week&stale_days=5",
-      );
-      // The <details data-filter-add-menu> element is absent. We check for an
-      // element opener rather than a bare substring because the new
-      // renderFilterBarScript references the attribute name in its DOM
-      // selector code.
+      for (const dim of ["category", "status", "since", "stale_days"]) {
+        expect(body).toMatch(new RegExp(`data-picker=["']${dim}["']`));
+      }
+      // The old progressive-disclosure +Filter <details> element is gone.
+      // (The attribute name still appears inside the inline JS source, so
+      // only assert the <details> opener is absent.)
       expect(body).not.toMatch(/<details\b[^>]*data-filter-add-menu/);
     });
 
-    // TS-3.14a
-    it("+ Filter dimension menu contains exactly Status, Updated, Inactive options", async () => {
-      const { body } = await fetchBrowse("/browse");
-      const addMenuMatch = body.match(
-        /data-filter-add-menu[\s\S]*?<\/[a-z]+>\s*(?=<\/|$)/,
+    // Alle option is the first option in each dropdown picker (clears dimension)
+    it("each peer dropdown picker includes an 'Alle' option as its first option", async () => {
+      const { body } = await fetchBrowse(
+        "/browse?status=pending&since=week&stale_days=5&category=tasks",
       );
-      const menuRegion = addMenuMatch ? addMenuMatch[0] : "";
-      // Three dimension markers expected
-      expect(menuRegion).toMatch(/data-dimension=["']status["']/);
-      expect(menuRegion).toMatch(/data-dimension=["']since["']/);
-      expect(menuRegion).toMatch(/data-dimension=["']stale_days["']/);
-    });
-
-    // TS-3.14b
-    it("dimension menu item carries a data-attribute that opens the matching value picker", async () => {
-      const { body } = await fetchBrowse("/browse");
-      // Each dimension item should carry data-picker="<dim>" for client JS.
-      expect(body).toMatch(/data-dimension=["']status["'][^>]*data-picker=["']status["']|data-picker=["']status["'][^>]*data-dimension=["']status["']/);
+      // Each picker's first anchor option is the clear-dimension link.
+      // The Alle option's href omits the dimension param.
+      const allLabel = "All"; // en.ts browse.filter.all
+      for (const dim of ["category", "status", "since", "stale_days"]) {
+        const pickerMatch = body.match(
+          new RegExp(
+            `data-picker-values=["']${dim}["'][\\s\\S]*?</div>`,
+          ),
+        );
+        expect(pickerMatch).not.toBeNull();
+        const firstOpt = pickerMatch![0].match(/<a\b[\s\S]*?<\/a>/);
+        expect(firstOpt).not.toBeNull();
+        expect(firstOpt![0]).toContain(allLabel);
+      }
     });
 
     // TS-3.14c
@@ -1194,22 +1168,23 @@ describe("Web Browse", () => {
       expect(noFilter.toLowerCase()).not.toContain("clear filters");
     });
 
-    // TS-3.24
-    it("Clear filters href preserves category and q, drops tag/since/status/stale_days", async () => {
+    // Clear filters link appears only in the empty state (no results),
+    // and clears every filter dimension — including category — keeping only q.
+    it("Clear filters href (empty state) preserves q and drops all filter dimensions", async () => {
       const { body } = await fetchBrowse(
         "/browse?category=tasks&q=alpha&tag=work&status=pending&since=week&stale_days=5",
+        [],
       );
-      // Extract Clear filters href
       const match = body.match(
         /<a[^>]*href="([^"]*)"[^>]*>\s*(?:Clear filters|<[^>]+>\s*Clear filters)/i,
       );
       expect(match).not.toBeNull();
       const href = match![1]!;
-      expect(href).toMatch(/^\/browse\?/);
-      // Must contain category=tasks and q=alpha
-      expect(href).toMatch(/category=tasks/);
+      expect(href).toMatch(/^\/browse/);
+      // Must preserve q
       expect(href).toMatch(/q=alpha/);
-      // Must NOT contain tag/status/since/stale_days
+      // Must NOT contain any filter dimension
+      expect(href).not.toMatch(/category=/);
       expect(href).not.toMatch(/tag=/);
       expect(href).not.toMatch(/status=/);
       expect(href).not.toMatch(/since=/);
@@ -1369,31 +1344,6 @@ describe("Web Browse", () => {
   // Browse Filters — constraints and cross-cutting (Group 5)
   // ═══════════════════════════════════════════════════════════════════
   describe("Browse Filters — constraints", () => {
-    // TS-5.1
-    it("pill × control is a plain anchor element (not a button requiring JS)", async () => {
-      const { browseEntries } = await import(
-        "../../src/web/browse-queries.js"
-      );
-      vi.mocked(browseEntries).mockResolvedValue([]);
-      const { app } = await createTestBrowse();
-      const cookie = await loginAndGetCookie(app);
-      const res = await app.request("/browse?status=pending", {
-        headers: { Cookie: cookie },
-      });
-      const body = await res.text();
-      // Find the × marker inside the filter bar; ensure it is preceded by an
-      // <a> opening tag (not a <button>).
-      const filterBarMatch = body.match(
-        /data-filter-bar[\s\S]*?(×|&times;)/,
-      );
-      expect(filterBarMatch).not.toBeNull();
-      const region = filterBarMatch![0];
-      // The × must live inside an <a>, not a <button>
-      const lastAnchorBeforeX = region.lastIndexOf("<a ");
-      const lastButtonBeforeX = region.lastIndexOf("<button");
-      expect(lastAnchorBeforeX).toBeGreaterThan(lastButtonBeforeX);
-    });
-
     // TS-5.2
     it("filter bar subtree contains no inline style attributes", async () => {
       const { browseEntries } = await import(
@@ -1506,9 +1456,14 @@ describe("Web Browse", () => {
       });
       const body = await res.text();
       expect(res.status).toBe(200);
-      // Only the first value should be rendered as an active pill
-      expect(body).toMatch(/Status:\s*Pending/);
-      expect(body).not.toMatch(/Status:\s*Done/);
+      // The Status dropdown's active value is "pending" — the picker option
+      // for status=pending carries aria-selected="true"; status=done does not.
+      expect(body).toMatch(
+        /href="\/browse\?status=pending"[^>]*aria-selected=["']true["']|aria-selected=["']true["'][^>]*href="\/browse\?status=pending"/,
+      );
+      expect(body).not.toMatch(
+        /href="\/browse\?status=done"[^>]*aria-selected=["']true["']|aria-selected=["']true["'][^>]*href="\/browse\?status=done"/,
+      );
     });
 
     // TS-5.9
@@ -1623,33 +1578,23 @@ describe("Web Browse", () => {
       );
     });
 
-    // TS-3.31 — chevron-down SVG between value text and × anchor
-    it("each pill renders a chevron-down SVG between its value text and its × anchor", async () => {
+    // Each peer-dropdown trigger renders a chevron-down SVG after its value.
+    it("each peer-dropdown trigger renders a chevron-down SVG", async () => {
       const { body } = await fetchBrowse(
         "/browse?status=pending&since=week&stale_days=5",
       );
-      // For each active filter pill, between data-picker and the next ×, a chevron SVG must appear
-      const dims = ["status", "since", "stale_days"];
+      // Each trigger button contains a data-picker-chevron span with the
+      // Lucide chevron-down path (m6 9 6 6 6-6).
+      const dims = ["category", "status", "since", "stale_days"];
       for (const dim of dims) {
         const re = new RegExp(
-          `data-picker=["']${dim}["'][\\s\\S]*?(?:×|&times;)`,
+          `data-picker=["']${dim}["'][\\s\\S]*?</button>`,
         );
         const region = body.match(re)?.[0];
         expect(region).toBeDefined();
-        // Lucide chevron-down geometry: <path d="m6 9 6 6 6-6"/>
+        expect(region!).toMatch(/data-picker-chevron/);
         expect(region!).toMatch(/m6 9 6 6 6-6/);
       }
-    });
-
-    // TS-3.32 — exactly one chevron SVG per pill, positioned between value-span and ×-anchor
-    it("each pill contains exactly one chevron SVG and chevron sits between value-span and ×-anchor", async () => {
-      const { body } = await fetchBrowse("/browse?status=pending");
-      const region = body.match(
-        /data-picker=["']status["'][\s\S]*?(?:×|&times;)/,
-      )?.[0];
-      expect(region).toBeDefined();
-      const occurrences = region!.match(/m6 9 6 6 6-6/g) ?? [];
-      expect(occurrences.length).toBe(1);
     });
 
     // TS-3.33 — + Filter dimension items reuse the same overlay-positioned picker DOM
@@ -1681,8 +1626,11 @@ describe("Web Browse", () => {
       expect(body).toMatch(/(?:'|")Tab(?:'|")/);
     });
 
-    // TS-3.36 — roving tabindex pattern
-    it("the picker option matching the currently-applied value carries tabindex=0; others carry tabindex=-1", async () => {
+    // Roving tabindex: in an active dimension's picker, the applied value's
+    // option carries tabindex=0; other values carry tabindex=-1. In an
+    // unapplied dimension's picker, the "Alle" option is the first option and
+    // carries tabindex=0.
+    it("picker options use roving tabindex with the applied value (or 'Alle') focused", async () => {
       const { body } = await fetchBrowse("/browse?status=pending");
       // Matching option (status=pending) has tabindex=0
       expect(body).toMatch(
@@ -1692,13 +1640,11 @@ describe("Web Browse", () => {
       expect(body).toMatch(
         /href="\/browse\?status=done"[^>]*tabindex=["']-1["']|tabindex=["']-1["'][^>]*href="\/browse\?status=done"/,
       );
-      // Unapplied dimension: first option of the since picker has tabindex=0.
-      // since= URL composition includes status=pending preserved as well.
+      // For unapplied `since` dimension, the first option is the "Alle"
+      // clear-link (href preserves status=pending only). It gets tabindex=0.
+      // "since=today" is the SECOND option → tabindex=-1.
       expect(body).toMatch(
-        /href="[^"]*since=today[^"]*"[^>]*tabindex=["']0["']|tabindex=["']0["'][^>]*href="[^"]*since=today[^"]*"/,
-      );
-      expect(body).toMatch(
-        /href="[^"]*since=week[^"]*"[^>]*tabindex=["']-1["']|tabindex=["']-1["'][^>]*href="[^"]*since=week[^"]*"/,
+        /href="[^"]*since=today[^"]*"[^>]*tabindex=["']-1["']|tabindex=["']-1["'][^>]*href="[^"]*since=today[^"]*"/,
       );
     });
 
@@ -1711,20 +1657,17 @@ describe("Web Browse", () => {
       expect(body).toMatch(/innerWidth/);
     });
 
-    // TS-3.38 — aria-haspopup="listbox"
-    it("each picker trigger carries aria-haspopup=listbox", async () => {
+    // Every peer-dropdown trigger (one per dimension) carries
+    // aria-haspopup="listbox".
+    it("each peer-dropdown trigger carries aria-haspopup=listbox", async () => {
       const { body } = await fetchBrowse("/browse?status=pending&since=week");
-      // Both pill triggers carry aria-haspopup=listbox
-      expect(body).toMatch(
-        /data-picker=["']status["'][^>]*aria-haspopup=["']listbox["']|aria-haspopup=["']listbox["'][^>]*data-picker=["']status["']/,
-      );
-      expect(body).toMatch(
-        /data-picker=["']since["'][^>]*aria-haspopup=["']listbox["']|aria-haspopup=["']listbox["'][^>]*data-picker=["']since["']/,
-      );
-      // +Filter dimension item for the unapplied dimension also carries it
-      expect(body).toMatch(
-        /data-dimension=["']stale_days["'][^>]*aria-haspopup=["']listbox["']|aria-haspopup=["']listbox["'][^>]*data-dimension=["']stale_days["']/,
-      );
+      for (const dim of ["category", "status", "since", "stale_days"]) {
+        expect(body).toMatch(
+          new RegExp(
+            `data-picker=["']${dim}["'][^>]*aria-haspopup=["']listbox["']|aria-haspopup=["']listbox["'][^>]*data-picker=["']${dim}["']`,
+          ),
+        );
+      }
     });
 
     // TS-3.39 — initial aria-expanded="false"
@@ -1759,17 +1702,25 @@ describe("Web Browse", () => {
       }
     });
 
-    // TS-3.42 — × anchor retains aria-label="Remove filter"
-    it("each pill × anchor retains aria-label=Remove filter", async () => {
+    // In peer-dropdown UI, filters are cleared by picking the "Alle" option
+    // within each dropdown. Every picker's first <a> option href omits that
+    // dimension's param.
+    it("each peer dropdown picker's first option clears that dimension", async () => {
       const { body } = await fetchBrowse(
         "/browse?status=pending&since=week&stale_days=5",
       );
-      // At least three remove-filter anchors (one per active pill)
-      const removeAnchors = body.match(
-        /<a\b[^>]*aria-label=["']Remove filter["'][^>]*>[\s\S]*?<\/a>/g,
-      );
-      expect(removeAnchors).not.toBeNull();
-      expect(removeAnchors!.length).toBeGreaterThanOrEqual(3);
+      for (const dim of ["status", "since", "stale_days"]) {
+        const pickerMatch = body.match(
+          new RegExp(
+            `data-picker-values=["']${dim}["'][\\s\\S]*?</div>`,
+          ),
+        );
+        expect(pickerMatch).not.toBeNull();
+        const firstOpt = pickerMatch![0].match(/<a\b[^>]*href="([^"]+)"/);
+        expect(firstOpt).not.toBeNull();
+        const href = firstOpt![1]!;
+        expect(href).not.toMatch(new RegExp(`${dim}=`));
+      }
     });
 
     // TS-3.43 — overlay-positioning class assertions

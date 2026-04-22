@@ -36,8 +36,9 @@ const STATUS_VALUES: readonly StatusValue[] = [
 ] as const;
 const STALE_DAYS_PRESETS: readonly number[] = [5, 14, 30] as const;
 
-type Dimension = "status" | "since" | "stale_days";
-const ADD_FILTER_DIMENSIONS: readonly Dimension[] = [
+type Dimension = "category" | "status" | "since" | "stale_days";
+const PEER_FILTER_DIMENSIONS: readonly Dimension[] = [
+  "category",
   "status",
   "since",
   "stale_days",
@@ -399,54 +400,20 @@ function dimensionLabel(dim: Dimension, t: TFunction): string {
   return t(`browse.filter.dimension.${dim}`);
 }
 
-/**
- * Resolve the localized pill text for a given dimension + raw value.
- * The stale_days dimension uses the singular catalog key for count=1 and the
- * plural key otherwise, mirroring i18next's plural-suffix convention.
- */
-function pillTextFor(
-  dimension: Dimension,
-  rawValue: string,
+function categoryValueLabel(
+  value: string | undefined,
   t: TFunction,
+  includeAll: boolean,
 ): string {
-  if (dimension === "status") {
-    // rawValue here is the localized status label (e.g., "Pending")
-    return t("browse.filter.pill.status", { value: rawValue });
+  if (!value) {
+    return includeAll ? t("browse.filter.all") : "";
   }
-  if (dimension === "since") {
-    return t("browse.filter.pill.since", { value: rawValue });
+  if (value === "unclassified") {
+    return t("browse.unclassified_tab");
   }
-  const count = parseInt(rawValue, 10);
-  return count === 1
-    ? t("browse.filter.pill.stale_days_one", { count })
-    : t("browse.filter.pill.stale_days_other", { count });
-}
-
-/**
- * Render a single filter pill: a positioned wrapper containing the trigger
- * (value + chevron), the × remove anchor, and the value picker overlay.
- *
- * The wrapper carries `relative` so the picker (`absolute top-full`) anchors
- * to the pill itself per AC-3.18 (layout invariant). The trigger exposes
- * `data-picker`, `aria-haspopup="listbox"`, `aria-expanded="false"`, and a
- * chevron-down SVG between the value text and the × anchor (AC-3.12).
- */
-function renderPill(params: {
-  dimension: Dimension;
-  pillText: string;
-  removeHref: string;
-  picker: string; // pre-rendered picker HTML (renderValuePicker output)
-}): string {
-  const { dimension, pillText, removeHref, picker } = params;
-  return `
-    <span class="relative inline-flex items-center gap-1 rounded-full border border-primary px-2 py-0.5 text-[10px] text-primary">
-      <span data-picker="${escapeHtml(dimension)}" aria-haspopup="listbox" aria-expanded="false" role="button" tabindex="0" class="cursor-pointer inline-flex items-center gap-1">
-        <span>${escapeHtml(pillText)}</span>
-        <span data-picker-chevron class="inline-flex items-center transition-transform">${iconChevronDown("size-3")}</span>
-      </span>
-      <a href="${escapeHtml(removeHref)}" aria-label="Remove filter" class="text-muted-foreground hover:text-foreground">×</a>
-      ${picker}
-    </span>`;
+  const key = `category.${value}`;
+  const localized = t(key);
+  return localized === key ? (CATEGORY_LABELS[value] ?? value) : localized;
 }
 
 /**
@@ -470,6 +437,8 @@ function renderValuePicker(params: {
   currentStatus: StatusValue | undefined;
   currentStaleDays: number | undefined;
   t: TFunction;
+  includeAllOption?: boolean;
+  unclassifiedCount?: number;
 }): string {
   const {
     dimension,
@@ -481,6 +450,8 @@ function renderValuePicker(params: {
     currentStatus,
     currentStaleDays,
     t,
+    includeAllOption = false,
+    unclassifiedCount = 0,
   } = params;
 
   const base = {
@@ -493,9 +464,26 @@ function renderValuePicker(params: {
     stale_days: currentStaleDays,
   };
 
-  let options: Array<{ href: string; label: string; value: string }> = [];
+  type PickerOption = { href: string; label: string; value: string | null };
+  let options: PickerOption[] = [];
   let currentValueKey: string | undefined;
-  if (dimension === "status") {
+
+  if (dimension === "category") {
+    const cats: PickerOption[] = CATEGORIES.map((cat) => ({
+      href: browseUrl({ ...base, category: cat }),
+      label: categoryValueLabel(cat, t, false),
+      value: cat,
+    }));
+    if (unclassifiedCount > 0) {
+      cats.push({
+        href: browseUrl({ ...base, category: "unclassified" }),
+        label: categoryValueLabel("unclassified", t, false),
+        value: "unclassified",
+      });
+    }
+    options = cats;
+    currentValueKey = currentCategory;
+  } else if (dimension === "status") {
     options = statusOptions(currentCategory).map((v) => ({
       href: browseUrl({ ...base, status: v }),
       label: statusLabel(v, t),
@@ -522,10 +510,31 @@ function renderValuePicker(params: {
       currentStaleDays !== undefined ? String(currentStaleDays) : undefined;
   }
 
+  // Prepend "Alle" sentinel whose href clears this dimension. Used by the
+  // peer-dropdown filter row (always-visible dropdowns) so every filter has a
+  // way to be cleared from inside its own picker.
+  if (includeAllOption) {
+    const clearBase = { ...base };
+    if (dimension === "category") clearBase.category = undefined;
+    if (dimension === "status") clearBase.status = undefined;
+    if (dimension === "since") clearBase.since = undefined;
+    if (dimension === "stale_days") clearBase.stale_days = undefined;
+    options = [
+      {
+        href: browseUrl(clearBase),
+        label: t("browse.filter.all"),
+        value: null,
+      },
+      ...options,
+    ];
+  }
+
   const selectedIdx =
     currentValueKey !== undefined
       ? options.findIndex((o) => o.value === currentValueKey)
-      : -1;
+      : includeAllOption
+        ? 0
+        : -1;
   const focusIdx = selectedIdx >= 0 ? selectedIdx : 0;
 
   const optionHtml = options
@@ -533,8 +542,6 @@ function renderValuePicker(params: {
       const isSelected = i === selectedIdx;
       const tabindex = i === focusIdx ? "0" : "-1";
       const ariaSelected = isSelected ? "true" : "false";
-      // The selected option gets a check icon prefix; unselected options get a
-      // size-matched empty span so labels align across the column.
       const prefix = isSelected
         ? iconCheck("size-3 mr-1 inline-block shrink-0")
         : `<span class="size-3 mr-1 inline-block shrink-0"></span>`;
@@ -550,84 +557,48 @@ function renderValuePicker(params: {
 }
 
 /**
- * Render the "+ Filter" add-menu. Only includes dimensions that are not
- * already applied. Each dimension item carries data-dimension + data-picker
- * so JS can open the matching value picker. Items also expose
- * `aria-haspopup="listbox"` and `aria-expanded="false"` per AC-3.17.
+ * Render a single peer filter dropdown: a trigger button of the form
+ * `key · value ▼` + a value picker overlay that anchors below it. The trigger
+ * is always visible — no progressive disclosure — and includes an "Alle"
+ * option as the first picker item that clears the dimension.
  *
- * Without JS, clicking a dimension item navigates to the default-href URL
- * (the dimension's first legal value) — a graceful fallback per C-2.
+ * Active state (a filter is applied): border-primary + value in text-primary.
+ * Idle state: muted-foreground label, foreground value, border-border.
  */
-function renderAddFilterMenu(params: {
-  appliedDimensions: Set<Dimension>;
-  currentCategory: string | undefined;
-  currentTag: string | undefined;
-  currentQuery: string | undefined;
-  currentMode: string | undefined;
-  currentSince: SinceValue | undefined;
-  currentStatus: StatusValue | undefined;
-  currentStaleDays: number | undefined;
-  t: TFunction;
+function renderPeerDropdown(params: {
+  dimension: Dimension;
+  label: string;
+  valueLabel: string;
+  isActive: boolean;
+  picker: string;
 }): string {
-  const { appliedDimensions, t } = params;
-  const available = ADD_FILTER_DIMENSIONS.filter(
-    (d) => !appliedDimensions.has(d),
-  );
-  if (available.length === 0) return "";
-
-  const base = {
-    category: params.currentCategory,
-    tag: params.currentTag,
-    q: params.currentQuery,
-    mode: params.currentMode,
-    since: params.currentSince,
-    status: params.currentStatus,
-    stale_days: params.currentStaleDays,
-  };
-
-  function defaultHref(dim: Dimension): string {
-    if (dim === "status") {
-      const firstVal = statusOptions(params.currentCategory)[0]!;
-      return browseUrl({ ...base, status: firstVal });
-    }
-    if (dim === "since") {
-      return browseUrl({ ...base, since: "week" });
-    }
-    return browseUrl({ ...base, stale_days: 5 });
-  }
-
-  const itemHtml = available
-    .map(
-      (dim) =>
-        `<a href="${escapeHtml(defaultHref(dim))}" data-dimension="${escapeHtml(dim)}" data-picker="${escapeHtml(dim)}" aria-haspopup="listbox" aria-expanded="false" role="button" class="block px-3 py-1.5 text-xs hover:bg-secondary">${escapeHtml(dimensionLabel(dim, t))}</a>`,
-    )
-    .join("");
-
-  // The unapplied-dim pickers and this <details> share a single `relative`
-  // wrapper in renderFilterBar. The dropdown content is `absolute` and
-  // anchors to that wrapper. We deliberately do NOT mark <details> itself as
-  // `relative` so closest('.relative') from a dimension trigger reaches the
-  // wrapping span (the picker's already-correct positioned ancestor) rather
-  // than <details> — which would hide the picker on close per the HTML spec
-  // (a closed <details> hides every non-<summary> child).
+  const { dimension, label, valueLabel, isActive, picker } = params;
+  const borderCls = isActive
+    ? "border-primary hover:border-primary"
+    : "border-border hover:border-foreground";
+  const valueCls = isActive ? "text-primary font-medium" : "text-foreground";
   return `
-    <details data-filter-add-menu>
-      <summary class="cursor-pointer rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors">${escapeHtml(t("browse.filter.add"))}</summary>
-      <div class="absolute z-10 mt-1 rounded-md border border-border bg-card shadow-md min-w-32">${itemHtml}</div>
-    </details>`;
+    <span class="relative inline-block">
+      <button type="button" data-picker="${escapeHtml(dimension)}" aria-haspopup="listbox" aria-expanded="false" class="inline-flex items-center gap-1.5 rounded-md border ${borderCls} bg-card px-2.5 py-1 text-xs transition-colors">
+        <span class="text-muted-foreground">${escapeHtml(label.toLowerCase())}</span>
+        <span class="text-muted-foreground/60" aria-hidden="true">·</span>
+        <span class="${valueCls}">${escapeHtml(valueLabel.toLowerCase())}</span>
+        <span data-picker-chevron class="inline-flex items-center text-muted-foreground transition-transform">${iconChevronDown("size-3")}</span>
+      </button>
+      ${picker}
+    </span>`;
 }
 
-/** Render the filter bar: pills (with co-located pickers) + +Filter menu +
- *  unapplied-dimension pickers + clear + count.
+/**
+ * Render the peer-dropdown filter row: four always-visible dropdowns
+ * (Kategorie, Status, Seit, Stagniert) followed by a trailing result count.
  *
- *  Per the UX upgrade (AC-3.5, AC-3.18): each picker is rendered exactly once
- *  per dimension. Active-dimension pickers are co-located inside the pill's
- *  positioned wrapper. Unapplied-dimension pickers are rendered in their own
- *  positioned span so they have a `relative` ancestor; client JS may relocate
- *  them into the +Filter <details> at open time so they visually anchor to
- *  the +Filter button.
+ * Each dropdown shows its current value (or "alle" when no filter applied).
+ * Opening a dropdown shows a value picker; picking a value applies the filter;
+ * picking "alle" clears it. No "+ Filter" disclosure — every dimension is
+ * reachable in one click.
  */
-export function renderFilterBar(params: {
+export function renderFilterDropdowns(params: {
   category: string | undefined;
   tag: string | undefined;
   q: string | undefined;
@@ -636,8 +607,8 @@ export function renderFilterBar(params: {
   status: StatusValue | undefined;
   stale_days: number | undefined;
   resultCount: number;
+  unclassifiedCount: number;
   t: TFunction;
-  vertical?: boolean;
 }): string {
   const {
     category,
@@ -648,64 +619,11 @@ export function renderFilterBar(params: {
     status,
     stale_days: staleDays,
     resultCount,
+    unclassifiedCount,
     t,
-    vertical = false,
   } = params;
 
-  const base = { category, tag, q, mode, since, status, stale_days: staleDays };
-  const applied = new Set<Dimension>();
-  const pills: string[] = [];
-
-  function pickerFor(dim: Dimension): string {
-    return renderValuePicker({
-      dimension: dim,
-      currentCategory: category,
-      currentTag: tag,
-      currentQuery: q,
-      currentMode: mode,
-      currentSince: since,
-      currentStatus: status,
-      currentStaleDays: staleDays,
-      t,
-    });
-  }
-
-  if (since) {
-    applied.add("since");
-    pills.push(
-      renderPill({
-        dimension: "since",
-        pillText: pillTextFor("since", sinceLabel(since, t), t),
-        removeHref: browseUrl({ ...base, since: undefined }),
-        picker: pickerFor("since"),
-      }),
-    );
-  }
-  if (status) {
-    applied.add("status");
-    pills.push(
-      renderPill({
-        dimension: "status",
-        pillText: pillTextFor("status", statusLabel(status, t), t),
-        removeHref: browseUrl({ ...base, status: undefined }),
-        picker: pickerFor("status"),
-      }),
-    );
-  }
-  if (staleDays !== undefined) {
-    applied.add("stale_days");
-    pills.push(
-      renderPill({
-        dimension: "stale_days",
-        pillText: pillTextFor("stale_days", String(staleDays), t),
-        removeHref: browseUrl({ ...base, stale_days: undefined }),
-        picker: pickerFor("stale_days"),
-      }),
-    );
-  }
-
-  const addMenu = renderAddFilterMenu({
-    appliedDimensions: applied,
+  const pickerBase = {
     currentCategory: category,
     currentTag: tag,
     currentQuery: q,
@@ -714,29 +632,44 @@ export function renderFilterBar(params: {
     currentStatus: status,
     currentStaleDays: staleDays,
     t,
-  });
+    includeAllOption: true,
+    unclassifiedCount,
+  };
 
-  // Unapplied-dimension pickers: rendered as siblings of the +Filter <details>
-  // inside a single positioned wrapper. This places them in the same `relative`
-  // ancestor as <details> itself, so each picker's `absolute top-full left-0`
-  // anchors to the wrapper (visually beneath the +Filter button) without
-  // having to be a child of <details> — which would hide them when the
-  // disclosure is closed (the HTML <details> spec hides all non-<summary>
-  // children when closed).
-  const unappliedDims = ADD_FILTER_DIMENSIONS.filter((d) => !applied.has(d));
-  const addMenuBlock =
-    unappliedDims.length > 0
-      ? `<span class="relative inline-block">${addMenu}${unappliedDims
-          .map((dim) => pickerFor(dim))
-          .join("")}</span>`
-      : "";
+  const allLabel = t("browse.filter.all");
 
-  const hasAnyClearable =
-    !!tag || !!since || !!status || staleDays !== undefined;
-  const clearHref = browseUrl({ category, q });
-  const clearLink = hasAnyClearable
-    ? `<a href="${escapeHtml(clearHref)}" class="text-xs text-muted-foreground hover:text-primary transition-colors">${escapeHtml(t("browse.filter.clear"))}</a>`
-    : "";
+  const staleValueLabel =
+    staleDays === undefined
+      ? allLabel
+      : staleDays === 1
+        ? t("browse.filter.pill.stale_days_one", { count: staleDays })
+        : t("browse.filter.pill.stale_days_other", { count: staleDays });
+
+  const dropdowns = PEER_FILTER_DIMENSIONS.map((dim) => {
+    let valueLabel = allLabel;
+    let isActive = false;
+    if (dim === "category") {
+      valueLabel = category ? categoryValueLabel(category, t, false) : allLabel;
+      isActive = !!category;
+    } else if (dim === "status") {
+      valueLabel = status ? statusLabel(status, t) : allLabel;
+      isActive = !!status;
+    } else if (dim === "since") {
+      valueLabel = since ? sinceLabel(since, t) : allLabel;
+      isActive = !!since;
+    } else {
+      valueLabel = staleValueLabel;
+      isActive = staleDays !== undefined;
+    }
+    const picker = renderValuePicker({ dimension: dim, ...pickerBase });
+    return renderPeerDropdown({
+      dimension: dim,
+      label: dimensionLabel(dim, t),
+      valueLabel,
+      isActive,
+      picker,
+    });
+  }).join("");
 
   const countKey =
     resultCount === 0
@@ -746,24 +679,15 @@ export function renderFilterBar(params: {
         : "browse.filter.results_other";
   const countText = t(countKey, { count: resultCount });
 
-  const containerCls = vertical
-    ? "flex flex-col gap-1.5"
-    : "flex items-center gap-2 flex-wrap";
-  const countCls = vertical
-    ? "text-[10px] text-muted-foreground pt-1 px-1"
-    : "text-xs text-muted-foreground ml-auto";
-
   return `
-    <div data-filter-bar class="${containerCls}">
-      ${pills.join("")}
-      ${addMenuBlock}
-      ${clearLink}
-      <span class="${countCls}">${escapeHtml(countText)}</span>
+    <div data-filter-bar class="flex items-center gap-2 flex-wrap">
+      ${dropdowns}
+      <span class="ml-auto text-xs text-muted-foreground tabular-nums">${escapeHtml(countText)}</span>
     </div>`;
 }
 
 /**
- * Client-side script that powers the anchored-popover filter bar (Pattern A).
+ * Client-side script that powers the peer-dropdown pickers.
  *
  * Responsibilities (per AC-3.5, AC-3.13–AC-3.18):
  * - Open / close pickers on trigger click; open by relocating the picker into
@@ -1116,9 +1040,13 @@ export function createBrowseRoutes(sql: Sql): Hono {
     const hasQuery = !!q;
     const hasCategory = !!category;
     const hasAnyFilter =
-      !!tag || !!parsed.since || !!parsed.status || parsed.stale_days !== undefined;
+      !!category ||
+      !!tag ||
+      !!parsed.since ||
+      !!parsed.status ||
+      parsed.stale_days !== undefined;
 
-    const filterBarHtml = renderFilterBar({
+    const filterRowHtml = renderFilterDropdowns({
       category,
       tag,
       q,
@@ -1127,27 +1055,35 @@ export function createBrowseRoutes(sql: Sql): Hono {
       status: parsed.status,
       stale_days: parsed.stale_days,
       resultCount: entries.length,
+      unclassifiedCount,
       t,
-      vertical: true,
     });
 
-    const clearFiltersHref = hasAnyFilter
-      ? browseUrl({ category, q })
-      : undefined;
+    const isUnclassifiedActive =
+      category === "unclassified" && unclassifiedCount > 0;
+    const reclassifyControlHtml = isUnclassifiedActive
+      ? `
+        <div class="shrink-0 flex items-center gap-2 px-0.5">
+          <button type="button" id="reclassify-all-btn"
+            class="rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wider border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-30">
+            Reclassify all
+          </button>
+          <span id="reclassify-all-feedback" class="text-[11px]"></span>
+        </div>`
+      : "";
+
+    const clearFiltersHref = hasAnyFilter ? browseUrl({ q }) : undefined;
     const content = `
       <div class="flex-1 min-h-0 flex flex-col gap-3">
         <div class="shrink-0 flex flex-col gap-2">
           ${renderSearchBar(q, category, tag, "/browse", t)}
-          ${renderCategoryTabs(category, tag, q, mode, unclassifiedCount, "/browse", t)}
+          ${filterRowHtml}
+          ${reclassifyControlHtml}
         </div>
         <div class="flex-1 min-h-0 flex gap-3">
           <div class="w-44 shrink-0 flex flex-col rounded-md border border-border bg-card">
             <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
               ${renderSidebarTags(tagCounts, tag, category, q, mode, "/browse", t)}
-            </div>
-            <div class="border-t border-border shrink-0"></div>
-            <div class="shrink-0 px-3 py-3">
-              ${filterBarHtml}
             </div>
           </div>
           <div class="flex-1 min-h-0 flex flex-col gap-2">
