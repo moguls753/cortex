@@ -123,6 +123,111 @@ None blocking. Possible future improvements (explicitly out of scope per the beh
 - **NG-8 follow-up:** Decide whether to extend the filter bar to `/trash`. The current behavior (AC-4.7) is intentional scope narrowing.
 - **NG-1 follow-up:** Add a `sort=` control if the default `updated_at DESC` ordering proves insufficient for stalled-project workflows (currently most-recently-stale is first; users may want most-stale-first).
 
+## UX Upgrade (Pattern A) — 2026-04-22
+
+A second iteration upgraded the filter bar from a block-flow inline picker to an **anchored-popover** pattern with chevron affordance, selected-option indicator, ARIA, keyboard navigation, focus management, and viewport-overflow handling. The URL contract, query-param semantics, validation, and SQL predicates are unchanged — this iteration is pure UX polish on US-3.
+
+### Spec deltas
+
+- **Behavioral spec** (`browse-filters-specification.md`): AC-3.5 revised to specify the anchored-popover overlay + selected-option indicator. New ACs added: AC-3.12 (chevron affordance), AC-3.13 (`+ Filter` reuses overlay), AC-3.14 (keyboard nav: Tab/Arrow/Enter/Space/Escape), AC-3.15 (focus management + roving tabindex), AC-3.16 (viewport-overflow flip), AC-3.17 (ARIA: aria-haspopup/expanded/role=listbox/option/aria-selected, plus aria-label preservation), AC-3.18 (layout invariant: picker MUST NOT shift content below). New edge cases E-15 (right-edge flip), E-16 (no-navigate on selected option), E-17 (Tab from last option closes picker), E-18 (page scroll while picker open). New non-goals NG-12..NG-16 (no custom animations, no `position-anchor` CSS, no SR integration tests, no resize-flip, no portals).
+
+- **Test spec** (`browse-filters-test-specification.md`): Coverage matrix extended with rows for AC-3.5 (revised), AC-3.12..AC-3.18, E-15..E-18, NG-12..NG-16. 17 new test scenarios added under Group 3: TS-3.27 (overlay-anchor structural), TS-3.28 (selected-option marker), TS-3.29 (aria-selected matrix), TS-3.30 (selected-option href identity), TS-3.31..TS-3.32 (chevron presence + position), TS-3.33 (+Filter dimension overlay reuse), TS-3.34 (keyboard nav — manual + TS-3.34s structural sub-assertion on script source), TS-3.35 (focus mgmt — manual), TS-3.36 (roving tabindex), TS-3.37 (overflow flip — manual + TS-3.37s structural), TS-3.38..TS-3.42 (ARIA attribute matrix), TS-3.43 (overlay-positioning class assertions). 3 manual-verification scenarios are explicitly marked.
+
+- **Test-impl spec** (`browse-filters-test-implementation-specification.md`): File-organization table updated with the new TS IDs in `tests/unit/web-browse.test.ts`. Per-scenario implementation recipes added in Group 3 with concrete regex/assertion code. Layout-invariant testing approach documented: chosen alternative is **structural class assertions on the picker's CSS classes** (an `absolute top-full` element on a `relative` ancestor is removed from layout flow per the CSS box-model spec). True end-to-end "no scroll-position shift" verification is captured in the manual TS-3.34 / TS-3.35 sweep.
+
+### Test deltas
+
+- **Added 16 new unit tests** in `tests/unit/web-browse.test.ts` under a new `describe("Browse Filters — UX upgrade (Pattern A)")` block: TS-3.27, TS-3.28, TS-3.29, TS-3.30, TS-3.31, TS-3.32, TS-3.33, TS-3.34s, TS-3.36, TS-3.37s, TS-3.38, TS-3.39, TS-3.40, TS-3.41, TS-3.42, TS-3.43.
+- **Updated 1 pre-existing test** TS-3.13 (`+ Filter button is omitted when all three dimensions are active`): the new `renderFilterBarScript` references the literal string `data-filter-add-menu` in its DOM-selector code, so the test's bare-substring negation now uses an element-opener regex instead. The asserted behavior (no add-menu element when all dimensions are active) is unchanged.
+- **No new test files.** No integration-test changes (the URL contract / SQL predicates are unchanged).
+- **Manual verification scenarios** TS-3.34, TS-3.35, TS-3.37 are documented for browser QA. Their structural sub-assertions TS-3.34s and TS-3.37s (script-source token presence) are unit-tested.
+
+### Source deltas
+
+- `src/web/icons.ts` — added `iconChevronDown` (Lucide `chevron-down`, path `m6 9 6 6 6-6`).
+- `src/web/browse.ts`:
+  - `renderPill` rewritten — wrapper carries `relative inline-flex`; trigger `<span>` carries `data-picker`, `aria-haspopup="listbox"`, `aria-expanded="false"`, `role="button"`, `tabindex="0"`; chevron-down SVG sits between the value text and the × anchor; the value picker is co-located inside the pill wrapper as the last child.
+  - New helper `pillTextFor(dimension, rawValue, t)` extracted to centralise plural-form selection for `stale_days`.
+  - `renderValuePicker` rewritten — overlay classes `hidden absolute top-full left-0 mt-1 ... z-20`; element carries `role="listbox"`; each option carries `role="option"`, `aria-selected="true|false"`, `tabindex="0|-1"` (roving), and `flex items-center` layout; the matching option is prefixed with the Lucide check icon and styled `text-primary`; non-matching options carry a `size-3 mr-1 inline-block` empty placeholder so labels align across the column.
+  - `renderAddFilterMenu` updated — dimension items expose `aria-haspopup="listbox"`, `aria-expanded="false"`, `role="button"`. Default-href fallback for no-JS preserved (clicking "Status" without JS still navigates to `/browse?status=pending` per AC-2.2's first-legal-value rule).
+  - `renderFilterBar` restructured — pickers are no longer rendered as a single block at the end. Active-dimension pickers live inside their pills (the pill `<span class="relative inline-flex...">` IS the positioned ancestor). Unapplied-dimension pickers are siblings of the `+Filter <details>` inside a single `<span class="relative inline-block">` wrapper that bundles `<details>` + every unapplied picker. When all three dimensions are applied the wrapper is omitted entirely (no `+Filter` button). NOTE: `<details>` itself is no longer marked `relative` — see deep-review fix F-A below for the rationale.
+  - `renderAddFilterMenu` updated — `<details data-filter-add-menu>` no longer has `class="relative"`; positioning context comes from the surrounding wrapper in `renderFilterBar`. Dimension items expose `aria-haspopup="listbox"`, `aria-expanded="false"`, `role="button"` (in addition to the prior `data-dimension`, `data-picker`, default-href).
+  - `renderFilterBarScript` rewritten — handles trigger click + Enter/Space activation; opens picker by capturing `getBoundingClientRect` from the visual-anchor element (the trigger itself for pill triggers, or the `+Filter <summary>` for dimension triggers), closing the `+Filter <details>` if the trigger lives inside it, swapping `left-0` ↔ `right-0` based on `rect.right > window.innerWidth - 200`, removing `hidden`, setting `aria-expanded="true"`, rotating the chevron via `rotate-180`, and focusing the option that already carries `tabindex="0"`. **Pickers are NOT relocated at runtime** — they are server-rendered into the right positioned ancestor (pill wrapper or +Filter wrapper) and the JS just toggles visibility. Inside an open picker: ArrowDown/ArrowUp cycle focus with wrap-around; Tab from the last option (or Shift-Tab from the first) explicitly focuses the effective trigger then closes the picker, so the browser's default Tab moves on to the next/previous focusable element deterministically; Tab in the middle of the option list moves focus and updates the roving tabindex; Enter/Space activates a focused option (or closes the picker for `aria-selected="true"` options); Escape closes and returns focus to the effective trigger (the `+Filter <summary>` if the original trigger is inside a now-closed `<details>`); outside-click closes; click on the already-selected option calls `preventDefault` and closes (no-navigate per AC-3.5 / E-16).
+- `src/web/i18n/en.ts` and `de.ts` — **no changes**. The new ARIA attributes are machine-readable (not localized strings), and the existing `aria-label="Remove filter"` was already in source.
+- `src/web/dashboard.ts`, `src/web/browse-queries.ts` — **untouched**. URL contract and SQL predicates are unchanged.
+- No new dependencies added.
+
+### Acceptance results (UX upgrade)
+
+| Scope | Pass | Fail | Notes |
+|---|---|---|---|
+| Unit (UX-upgrade new) | 16/16 | 0 | All structural assertions pass |
+| Unit (existing) | 889/889 | 0 | No regressions; one pre-existing test (TS-3.13) updated to match new script-source content |
+| Unit total | 905/905 | 0 | Baseline 889 → 905 (+16 net) |
+| Integration (browse) | 31/31 | 0 | URL contract / SQL predicates untouched, all green |
+| Integration (dashboard) | 12/12 | 0 | Stat-card anchors untouched, all green |
+| TypeScript build | — | 0 | `tsc` exits 0 |
+| CSS build | — | 0 | Tailwind compiles cleanly |
+| Manual verification | — | — | TS-3.34 (keyboard nav), TS-3.35 (focus management), TS-3.37 (right-edge flip): not exercised in this session — documented as browser-QA followups |
+
+### Deviations from the brief
+
+1. **Test-implementation regex tolerance for URL composition.** TS-3.29 and TS-3.36 were initially written with strict regex patterns that pinned the `since=*` URLs as `/browse?since=*`. In practice the picker preserves the current filter context, so when the test fetches `/browse?status=pending`, the `since` picker URLs are `/browse?status=pending&since=*` (status is preserved). The tests now use loose substring matching (`href="[^"]*since=today[^"]*"`) for unapplied-dimension picker URLs, which still uniquely identifies the option but tolerates the preserved-context prefix. This is documented in the test-impl spec.
+
+2. **TS-3.13 pre-existing test rewrite.** The negation regex `/data-filter-add-menu/` matched the literal string in the new script source (the script's DOM-selector code references the attribute name). Rewrote the assertion to `/<details\b[^>]*data-filter-add-menu/` so it asserts the absence of the *element*, not the absence of the *substring*. The behavior under test (no `+Filter` button when all dimensions are active) is unchanged and still passes. Counted as case (b) in the brief's "every pre-existing test (a) continues to pass or (b) is rewritten to assert the new behavior".
+
+3. **Empty placeholder span in unselected options.** To keep label columns visually aligned (the selected option has a check-icon prefix; the others get a size-matched empty `<span>`), unselected options carry `<span class="size-3 mr-1 inline-block shrink-0"></span>` as the prefix. This is structural (no inline `style="..."`), uses Tailwind utilities, and was not specified in the brief — documented here for completeness.
+
+4. **`+Filter` dimension item retains default-href.** The brief said "the click handler intercepts via preventDefault". The implementation does call `preventDefault` on the click handler in JS, BUT the default `href` is also retained on the anchor so without JS the `+Filter` flow still works (navigates to the dimension's first legal value per AC-2.2). This is the existing progressive-enhancement behavior, preserved unchanged from the prior implementation.
+
+5. **No runtime picker relocation; pickers are server-rendered into their final positioned ancestor.** The brief recommended "JS relocates the picker's DOM node to become a child of the trigger's positioned container" with the note "(or rendered there at server-render time)" in NG-16. The implementation takes the second option: each picker is server-rendered inside the right `relative` ancestor (the pill wrapper for active dimensions, or the +Filter wrapper for unapplied dimensions). JS only toggles visibility, ARIA, classes, and focus — never moves DOM nodes. This avoided the F-A defect described in the deep-review section below (relocating the picker into `<details>` would cause the browser to hide it on disclosure-close per the HTML spec).
+
+### Deep-review findings (post-initial-pass, 2026-04-22)
+
+A second review pass found two real issues with the initial Phase-5 implementation that the structural tests did not catch. Both were fixed in place; tests still 905/905 + 43/43 green afterward.
+
+#### F-A (UX-breaking, latent): `+Filter` picker would be hidden by the closed `<details>`
+
+The initial implementation followed the brief literally — "JS relocates the picker's DOM node to become a child of the trigger's positioned container, then removes the `hidden` class". For the `+Filter` flow, the trigger's positioned container was `<details data-filter-add-menu class="relative">`, so the JS would `appendChild` the picker into `<details>` and then call `removeAttribute('open')` to close the dropdown.
+
+The subtle defect: per the HTML spec, a closed `<details>` element hides every child except `<summary>` (the browser's UA stylesheet does this). Once the picker became a child of `<details>` and `<details>` was closed, the picker was hidden by the browser regardless of our `classList.remove('hidden')` call. **The picker would never be visible after a `+Filter > Status` click.**
+
+Structural tests passed because they only inspected the server-rendered HTML; the relocation and the visibility battle happen at runtime.
+
+**Fix:**
+1. Removed `class="relative"` from `<details>` so `closest('.relative')` from a dimension trigger walks past it.
+2. Restructured `renderFilterBar` to wrap `<details>` AND the unapplied-dimension pickers in a single `<span class="relative inline-block">`. Each picker is now a *sibling* of `<details>`, both anchored to the wrapper.
+3. Removed the JS `picker.parentElement !== anchor` relocation logic — pickers are already in the right positioned ancestor at server-render time. JS now only toggles visibility, sets `aria-expanded`, swaps `left-0`/`right-0`, and (for `+Filter` triggers) closes the `<details>`.
+4. Updated the openPicker comment to explain *why* relocation is deliberately avoided.
+
+#### F-B (UX-degraded): Tab-out from picker left focus on the (now-hidden) option
+
+The initial Tab handler called `closeAll()` on Tab from the last option (or Shift-Tab from the first), but did NOT explicitly move focus first. When `closeAll()` runs, the picker becomes `display: none`, and the focused option is now in a hidden subtree. Browser fallback for default Tab from a hidden element is inconsistent — Firefox typically moves focus to body, then default Tab from body jumps to the first focusable element on the page (not the next-after-trigger element the user expects).
+
+**Fix:**
+1. Introduced an `effectiveFocusTarget(trigger)` helper that returns the trigger if visible, or the `+Filter <summary>` if the trigger lives inside a now-closed `<details>`.
+2. On Tab past last (or Shift-Tab past first), explicitly focus the effective target FIRST, then close the picker. The browser's default Tab now fires from the trigger (or `<summary>`), moving focus to the next/previous focusable in document order — the expected behavior per AC-3.14.
+
+#### F-C (overflow-flip accuracy): rect was captured from the dimension `<a>`, not the visual anchor
+
+The initial overflow-flip logic captured `getBoundingClientRect` from `trigger`. For `+Filter` dimension triggers, `trigger` is the `<a>` inside the dropdown (`<div class="absolute z-10 mt-1">`), which is positioned somewhere off in the floating dropdown — not where the picker visually anchors. The flip decision was therefore based on the wrong x-coordinate.
+
+**Fix:**
+1. Resolve `rectEl` to the `+Filter <summary>` when the trigger is inside `<details>`, otherwise to the trigger itself. The captured `rect` now reflects the picker's visual anchor location, and the overflow-flip decision is correct.
+
+#### Verification after deep-review fixes
+
+- `npm run test:unit` → 905/905 (unchanged count, no regressions).
+- `npx vitest run tests/integration/web-browse-integration.test.ts tests/integration/web-dashboard-integration.test.ts` → 43/43.
+- `npm run build` → clean.
+- HTML render dump (via a temporary debug test, since removed) confirmed: pill structure has correct picker sibling, +Filter wrapper structure renders correctly, picker URLs preserve current filter context, selected-option marker (check icon + text-primary + aria-selected="true" + tabindex="0") appears on the matching option.
+
+### Followups (deferred)
+
+- **Manual QA of TS-3.34 / TS-3.35 / TS-3.37.** Browser verification of: keyboard nav (Arrow keys cycle, Tab past last yields focus + closes, Enter on selected closes), focus management (Escape returns focus to trigger), and the right-edge flip on a narrow viewport. These are gated on the dev-server environment.
+- **Picker no-shift verification.** Structural assertions (`absolute top-full` classes) prove the picker is removed from layout flow. A live test that scrolls the entry list, opens a picker, and confirms scroll position is preserved is part of the same manual sweep above.
+- **Optional polish.** A `data-current` data-attribute on the selected option would be redundant given the existing `aria-selected="true"` selector — not implemented. Consider if needed for non-ARIA stylistic hooks later.
+
 ## Status
 
 **PASS.** All six phases of spec-dd are complete. The feature delivers:

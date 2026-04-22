@@ -25,7 +25,7 @@ All scenarios live in existing files. No new test files are introduced in this f
 | File | New / Updated | Scenarios |
 |---|---|---|
 | `tests/unit/web-dashboard.test.ts` | Updated | TS-1.1, TS-1.2, TS-1.3, TS-1.4, TS-1.5, TS-1.6, TS-1.9, TS-1.10, TS-1.11, TS-1.12, TS-5.10 |
-| `tests/unit/web-browse.test.ts` | Updated | TS-2.16, TS-2.17, TS-2.18, TS-2.19, TS-2.20, TS-2.21, TS-3.1, TS-3.2, TS-3.3, TS-3.4, TS-3.5, TS-3.6, TS-3.7, TS-3.8, TS-3.9, TS-3.10, TS-3.11, TS-3.12, TS-3.13, TS-3.14a, TS-3.14b, TS-3.14c, TS-3.15, TS-3.16, TS-3.17, TS-3.18, TS-3.19, TS-3.20, TS-3.21, TS-3.22, TS-3.23, TS-3.24, TS-3.25, TS-3.26, TS-4.1, TS-4.2, TS-4.3, TS-4.4, TS-4.5, TS-4.6, TS-5.1, TS-5.2, TS-5.3, TS-5.4, TS-5.5, TS-5.6, TS-5.8, TS-5.9 |
+| `tests/unit/web-browse.test.ts` | Updated | TS-2.16, TS-2.17, TS-2.18, TS-2.19, TS-2.20, TS-2.21, TS-3.1, TS-3.2, TS-3.3, TS-3.4, TS-3.5, TS-3.6, TS-3.7, TS-3.8, TS-3.9, TS-3.10, TS-3.11, TS-3.12, TS-3.13, TS-3.14a, TS-3.14b, TS-3.14c, TS-3.15, TS-3.16, TS-3.17, TS-3.18, TS-3.19, TS-3.20, TS-3.21, TS-3.22, TS-3.23, TS-3.24, TS-3.25, TS-3.26, TS-3.27, TS-3.28, TS-3.29, TS-3.30, TS-3.31, TS-3.32, TS-3.33, TS-3.34s, TS-3.36, TS-3.37s, TS-3.38, TS-3.39, TS-3.40, TS-3.41, TS-3.42, TS-3.43, TS-4.1, TS-4.2, TS-4.3, TS-4.4, TS-4.5, TS-4.6, TS-5.1, TS-5.2, TS-5.3, TS-5.4, TS-5.5, TS-5.6, TS-5.8, TS-5.9 |
 | `tests/unit/web-trash.test.ts` | Updated | TS-4.7 |
 | `tests/integration/web-dashboard-integration.test.ts` | Updated | TS-1.7, TS-1.8 |
 | `tests/integration/web-browse-integration.test.ts` | Updated | TS-2.1, TS-2.2, TS-2.3, TS-2.4, TS-2.5, TS-2.6, TS-2.7, TS-2.8, TS-2.9, TS-2.10, TS-2.11, TS-2.12, TS-2.13, TS-2.14, TS-2.15, TS-2.22, TS-2.23, TS-5.7 |
@@ -252,6 +252,22 @@ Unit tests because validation and HTML-rendering behavior is pure handler logic 
 | TS-3.24 | `it("Clear filters href preserves category and q; drops tag, since, status, stale_days")` |
 | TS-3.25 | `it("empty-state view includes a Clear filters link when a structured filter is active")` |
 | TS-3.26 | `it("empty-state view includes a Clear filters link when only a tag filter is active")` |
+| TS-3.27 | `it("picker is rendered as an absolute overlay anchored to a relative-positioned trigger container")` |
+| TS-3.28 | `it("renders a check-icon prefix and primary-tone color on the option matching the currently-applied value")` |
+| TS-3.29 | `it("aria-selected is true on the matching option, false on others, and false on every option in unapplied-dimension pickers")` |
+| TS-3.30 | `it("the currently-selected option's anchor href equals the current URL (no-navigate-on-selected)")` |
+| TS-3.31 | `it("each pill renders a chevron-down SVG between its value text and its × anchor")` |
+| TS-3.32 | `it("each pill contains exactly one chevron SVG and chevron sits between value-span and ×-anchor")` |
+| TS-3.33 | `it("+ Filter dimension items reuse the same overlay-positioned picker DOM")` |
+| TS-3.34s | `it("renderFilterBarScript source contains keyboard handlers (ArrowDown/ArrowUp/Enter/Space/Escape/Tab)")` |
+| TS-3.36 | `it("the picker option matching the currently-applied value carries tabindex=0; others carry tabindex=-1")` |
+| TS-3.37s | `it("renderFilterBarScript source contains a getBoundingClientRect-based right-edge overflow flip")` |
+| TS-3.38 | `it("each picker trigger carries aria-haspopup=listbox")` |
+| TS-3.39 | `it("each picker trigger carries initial aria-expanded=false")` |
+| TS-3.40 | `it("each value picker carries role=listbox")` |
+| TS-3.41 | `it("each picker option carries role=option")` |
+| TS-3.42 | `it("each pill × anchor retains aria-label=Remove filter")` |
+| TS-3.43 | `it("picker overlay-positioning class assertions: absolute + top-full + (left-0 or right-0) on a relative-positioned ancestor")` |
 | TS-4.1 | `it("category tabs render with unchanged hrefs")` |
 | TS-4.2 | `it("search form action=/browse method=GET with name=q input is preserved")` |
 | TS-4.3 | `it("tag pill row renders with discovery pills; active tag deselects on click")` |
@@ -329,6 +345,177 @@ Unit tests because validation and HTML-rendering behavior is pure handler logic 
 - **TS-3.25** — Override `browseEntries` to return `[]`. Query `?status=pending`. Assert response contains the empty-state markup AND a Clear filters link within it.
 
 - **TS-3.26** — Override to return `[]`. Query `?tag=nonexistent`. Assert empty state + Clear filters link with href `/browse`.
+
+- **TS-3.27** — Query `?status=pending`. Locate the pill value-trigger element via its `data-picker="status"` attribute. Walk up to its containing element (the pill `<span>` is wrapped by an outer `<span class="relative inline-block">` per the implementation). Assert that outer container has the `relative` class. Assert the picker element `[data-picker-values="status"]` carries `absolute` and `top-full` classes. Regex pattern (whichever shape the impl chooses):
+
+  ```ts
+  expect(body).toMatch(/<span\b[^>]*class="[^"]*\brelative\b[^"]*"[^>]*>[\s\S]*?data-picker="status"/);
+  expect(body).toMatch(/data-picker-values="status"[^>]*class="[^"]*\babsolute\b[^"]*\btop-full\b/);
+  ```
+
+- **TS-3.28** — Query `?status=pending`. Extract the picker for `status`. The matching option (href contains `status=pending` and not e.g. `status=pending-something`) must contain a Lucide check SVG and a `text-primary` class. The other status options must NOT contain the check SVG. Regex pattern:
+
+  ```ts
+  // Match the option element whose href is the active value
+  const matchOpt = body.match(
+    /<a\b[^>]*href="\/browse\?status=pending"[\s\S]*?<\/a>/,
+  );
+  expect(matchOpt).not.toBeNull();
+  expect(matchOpt![0]).toMatch(/<svg\b[^>]*viewBox="0 0 24 24"[\s\S]*?M20 6/); // Lucide check geometry
+  expect(matchOpt![0]).toMatch(/text-primary/);
+
+  // Match a non-active option
+  const nonMatchOpt = body.match(
+    /<a\b[^>]*href="\/browse\?status=done"[\s\S]*?<\/a>/,
+  );
+  expect(nonMatchOpt![0]).not.toMatch(/M20 6 9 17/); // No check icon
+  ```
+
+  The Lucide check icon's path is `<path d="M20 6 9 17l-5-5"/>` per `iconCheck` in `src/web/icons.ts`. Match on a sub-string from that path so the assertion is robust to attribute reordering.
+
+- **TS-3.29** — Query `?status=pending`. Assert the option with `href="/browse?status=pending"` carries `aria-selected="true"`. Assert other status options carry `aria-selected="false"`. Then assert the `since` picker (no current value) has every option `aria-selected="false"`:
+
+  ```ts
+  expect(body).toMatch(/href="\/browse\?status=pending"[^>]*aria-selected="true"|aria-selected="true"[^>]*href="\/browse\?status=pending"/);
+  expect(body).toMatch(/href="\/browse\?status=done"[^>]*aria-selected="false"|aria-selected="false"[^>]*href="\/browse\?status=done"/);
+  // Since picker — no value applied
+  expect(body).toMatch(/href="\/browse\?since=today"[^>]*aria-selected="false"|aria-selected="false"[^>]*href="\/browse\?since=today"/);
+  ```
+
+- **TS-3.30** — Query `?status=pending`. The currently-selected option's anchor href must equal the current URL (a same-URL navigation = no-op):
+
+  ```ts
+  // The picker option for the active value navigates to the same URL we're already on
+  expect(body).toMatch(/<a\b[^>]*href="\/browse\?status=pending"[^>]*aria-selected="true"/);
+  ```
+
+  Documented decision (replacing the test-spec's "your call" note): we test the *href identity* rather than instrumenting JS preventDefault. Rationale: the `href` is the no-JS contract; with JS, the picker script intercepts clicks on `aria-selected="true"` options via `e.preventDefault()`. A purely structural assertion on the href is sufficient because the same-URL navigation produces no observable effect even if JS fails.
+
+- **TS-3.31** — Query `?status=pending&since=week&stale_days=5`. Each pill must contain a chevron-down SVG between the value-span and the × anchor. Approach: find each pill's HTML, then assert the chevron SVG appears with the correct geometry between the trigger element and the × element:
+
+  ```ts
+  // The chevron path "m6 9 6 6 6-6" is the Lucide chevron-down geometry.
+  // Match within the pill region (between data-picker= and the next ×).
+  const pills = [...body.matchAll(/data-picker="(status|since|stale_days)"[\s\S]*?(×|&times;)/g)];
+  for (const pill of pills) {
+    expect(pill[0]).toMatch(/<svg\b[^>]*viewBox="0 0 24 24"[\s\S]*?m6 9 6 6 6-6|9 18 6-6/);
+  }
+  ```
+
+- **TS-3.32** — Query `?status=pending`. Within the single active pill, assert exactly one chevron SVG appears, and that its document position is after the value-span and before the × anchor. The cleanest expression is index-based on the matched pill region.
+
+  ```ts
+  const pillRegion = body.match(/data-picker="status"[\s\S]*?(×|&times;)/)?.[0] ?? "";
+  const chevronOccurrences = pillRegion.match(/m6 9 6 6 6-6|9 18 6-6/g) ?? [];
+  expect(chevronOccurrences.length).toBe(1);
+  // value-span ends at "</span>"; chevron starts at "<svg"; × is the last marker.
+  // Already implied by the matching scope (regex starts at value, ends at ×).
+  ```
+
+- **TS-3.33** — Query `/browse` (no active filters). The `+ Filter` add-menu's dimension items already carry `data-picker` per existing TS-3.14b. New assertion: the picker DOM `[data-picker-values="<dim>"]` is rendered exactly once per dimension (no duplicate copy was added for the add-menu trigger). Also assert the picker has the same overlay classes:
+
+  ```ts
+  const count = (s: string, sub: string) => (s.match(new RegExp(sub, "g")) || []).length;
+  for (const dim of ["status", "since", "stale_days"]) {
+    expect(count(body, `data-picker-values="${dim}"`)).toBe(1);
+  }
+  // Overlay classes apply to add-menu-triggered pickers too (same DOM)
+  expect(body).toMatch(/data-picker-values="status"[^>]*class="[^"]*\babsolute\b[^"]*\btop-full\b/);
+  ```
+
+- **TS-3.34s** — Source-level structural assertion that the inline filter-bar script registers the keyboard handlers. (Behavioral keyboard nav is verified manually per TS-3.34.)
+
+  ```ts
+  import { renderFilterBarScript } from "../../src/web/browse.js"; // export needed for this assertion
+  // OR inspect the rendered HTML containing the <script> block
+  const { body } = await fetchBrowse("/browse?status=pending");
+  // Script source must reference at least: ArrowDown, ArrowUp, Enter, Escape, Tab
+  expect(body).toMatch(/ArrowDown/);
+  expect(body).toMatch(/ArrowUp/);
+  expect(body).toMatch(/(?:'|\")Enter(?:'|\")/);
+  expect(body).toMatch(/(?:'|\")Escape(?:'|\")/);
+  expect(body).toMatch(/(?:'|\")Tab(?:'|\")/);
+  ```
+
+  This proves the implementation included keyboard handlers, without exercising
+  them via JSDOM (which cannot reliably run inline-script-attached event handlers
+  on dynamically-inserted DOM nodes).
+
+- **TS-3.36** — Query `?status=pending`. Assert the `aria-selected="true"` option also has `tabindex="0"`, and other options have `tabindex="-1"`. For an unapplied-dimension picker (`since` here), assert the first option has `tabindex="0"` and the rest `tabindex="-1"`:
+
+  ```ts
+  // Active option is tabindex=0
+  expect(body).toMatch(/href="\/browse\?status=pending"[^>]*tabindex="0"/);
+  // Inactive option is tabindex=-1
+  expect(body).toMatch(/href="\/browse\?status=done"[^>]*tabindex="-1"/);
+  // Unapplied dimension: first option is tabindex=0
+  expect(body).toMatch(/href="\/browse\?since=today"[^>]*tabindex="0"/);
+  expect(body).toMatch(/href="\/browse\?since=week"[^>]*tabindex="-1"/);
+  ```
+
+- **TS-3.37s** — Source-level structural assertion that the inline filter-bar script implements the right-edge flip:
+
+  ```ts
+  const { body } = await fetchBrowse("/browse");
+  // Script source must reference the viewport-edge logic
+  expect(body).toMatch(/getBoundingClientRect/);
+  expect(body).toMatch(/(?:'|\")right-0(?:'|\")/);
+  expect(body).toMatch(/(?:'|\")left-0(?:'|\")/);
+  // The threshold: implementation says "trigger.right > window.innerWidth - 200"
+  expect(body).toMatch(/innerWidth/);
+  ```
+
+- **TS-3.38** — Query `?status=pending&since=week`. Assert each pill's value-trigger element has `aria-haspopup="listbox"`. Assert the +Filter dimension items also carry it:
+
+  ```ts
+  const triggers = [...body.matchAll(/data-picker="(status|since)"/g)];
+  expect(triggers.length).toBeGreaterThanOrEqual(2);
+  // Both pill triggers carry aria-haspopup=listbox
+  expect(body).toMatch(/data-picker="status"[^>]*aria-haspopup="listbox"|aria-haspopup="listbox"[^>]*data-picker="status"/);
+  expect(body).toMatch(/data-picker="since"[^>]*aria-haspopup="listbox"|aria-haspopup="listbox"[^>]*data-picker="since"/);
+  // +Filter dimension items also carry it (stale_days is unapplied here)
+  expect(body).toMatch(/data-dimension="stale_days"[^>]*aria-haspopup="listbox"|aria-haspopup="listbox"[^>]*data-dimension="stale_days"/);
+  ```
+
+- **TS-3.39** — Query `?status=pending`. Assert each picker trigger has `aria-expanded="false"` initially:
+
+  ```ts
+  expect(body).toMatch(/data-picker="status"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*data-picker="status"/);
+  ```
+
+- **TS-3.40** — Query `/browse`. Assert each `[data-picker-values]` element carries `role="listbox"`:
+
+  ```ts
+  for (const dim of ["status", "since", "stale_days"]) {
+    expect(body).toMatch(new RegExp(`data-picker-values="${dim}"[^>]*role="listbox"|role="listbox"[^>]*data-picker-values="${dim}"`));
+  }
+  ```
+
+- **TS-3.41** — Query `?status=pending`. Assert every option in the status picker has `role="option"`:
+
+  ```ts
+  // For each known status value, the option anchor must have role="option"
+  for (const v of ["pending", "done", "active", "paused", "completed"]) {
+    expect(body).toMatch(new RegExp(`href="/browse\\?status=${v}"[^>]*role="option"|role="option"[^>]*href="/browse\\?status=${v}"`));
+  }
+  ```
+
+- **TS-3.42** — Query `?status=pending&since=week&stale_days=5`. Assert each × anchor still has `aria-label="Remove filter"` (regression assertion):
+
+  ```ts
+  const removeAnchors = body.match(/<a\b[^>]*aria-label="Remove filter"[^>]*>[\s]*×[\s]*<\/a>/g) ?? [];
+  expect(removeAnchors.length).toBeGreaterThanOrEqual(3); // one per pill
+  ```
+
+- **TS-3.43** — Query `?status=pending`. Assert overlay-positioning classes on each picker:
+
+  ```ts
+  for (const dim of ["status", "since", "stale_days"]) {
+    expect(body).toMatch(new RegExp(`data-picker-values="${dim}"[^>]*class="[^"]*\\babsolute\\b[^"]*\\btop-full\\b`));
+    // Initial server render uses left-0 (JS may swap to right-0 at open time)
+    expect(body).toMatch(new RegExp(`data-picker-values="${dim}"[^>]*class="[^"]*\\bleft-0\\b`));
+  }
+  ```
 
 - **TS-4.1** — Assert response contains the existing category-tab anchors (`/browse?category=people`, `/browse?category=projects`, etc.) — regression assertion using the existing expected substrings from current tests.
 
@@ -464,17 +651,26 @@ Every test scenario in the test specification maps to a concrete test function a
 |---|---|---|
 | Group 1 (Dashboard stat cards) | TS-1.1 … TS-1.12 | TS-1.1–1.6, 1.9–1.12 in unit; TS-1.7, 1.8 in integration |
 | Group 2 (Query params) | TS-2.1 … TS-2.23 | TS-2.16–21 in unit (validation); TS-2.1–15, 22, 23 in integration |
-| Group 3 (Filter bar UI) | TS-3.1 … TS-3.26 | All in unit (`web-browse.test.ts`); TS-3.14 split into 3.14a/b/c |
+| Group 3 (Filter bar UI) | TS-3.1 … TS-3.43 | All structural tests in unit (`web-browse.test.ts`); TS-3.14 split into 3.14a/b/c; TS-3.34 / TS-3.35 / TS-3.37 are manual-verification scenarios with structural sub-assertions TS-3.34s and TS-3.37s in unit |
 | Group 4 (Existing behavior) | TS-4.1 … TS-4.7 | TS-4.1–6 in `web-browse.test.ts` unit; TS-4.7 in `web-trash.test.ts` unit |
 | Group 5 (Constraints) | TS-5.1 … TS-5.10 | TS-5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.8, 5.9 in `web-browse.test.ts` unit; TS-5.7 in browse integration; TS-5.10 in `web-dashboard.test.ts` unit |
 
 **Coverage verification:** No scenario is left unaddressed. Regression-only items (AC-2.6, C-1, C-6, C-7, NG-5, NG-7, NG-9 — covered by pre-existing suites, package.json diffs, or Phase 6 review) are not mapped to new test code but are explicitly documented in the test spec's coverage matrix.
 
 **Unit / integration split summary:**
-- Unit: ~49 scenarios (dashboard rendering, validation, filter bar UI, existing-behavior regressions, constraints)
-- Integration: ~20 scenarios (SQL predicate correctness, semantic/text search composition, count-match across endpoints)
+- Unit: ~49 original scenarios + 19 new UX-upgrade scenarios (TS-3.27..33, 3.34s, 3.36, 3.37s, 3.38..43) = ~68 unit scenarios.
+- Integration: ~20 scenarios (unchanged — the URL contract / SQL predicates / count-match invariants are unchanged by the UX upgrade).
+- Manual: 3 scenarios (TS-3.34, TS-3.35, TS-3.37) verified by `npm run dev` + browser interaction; structural-only sub-assertions exist as TS-3.34s / TS-3.37s.
 
 All new tests must FAIL on the current `main` branch before Phase 5 implementation begins.
+
+### Layout-invariant testing approach (AC-3.18)
+
+The behavioral spec asserts that opening a picker MUST NOT shift the entry list below. JSDOM does not compute layout; there is no way to assert "the entry list's bounding box is unchanged" inside vitest. The chosen alternative is **structural assertions on the picker's CSS classes**: an element with `class="absolute top-full left-0 ..."` is removed from layout flow per the CSS box-model specification, so siblings below it cannot be affected by its visibility state.
+
+TS-3.43 is the canonical structural assertion. TS-3.27 is the related per-pill assertion that the picker's parent container has `relative` (so the overlay anchors to the trigger and not to a far ancestor — without this, the picker could appear in unexpected screen positions but still wouldn't shift layout).
+
+True end-to-end verification (open picker, confirm entry list scroll position is preserved) is captured as part of the manual TS-3.34 / TS-3.35 sweep — the manual reviewer is asked to scroll the entry list, open and close pickers, and verify scroll position survives.
 
 ---
 

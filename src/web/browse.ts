@@ -14,7 +14,7 @@ import {
 } from "./browse-queries.js";
 import { generateEmbedding } from "../embed.js";
 import type { EntryRow } from "./dashboard-queries.js";
-import { iconSearch, iconEye } from "./icons.js";
+import { iconSearch, iconEye, iconChevronDown, iconCheck } from "./icons.js";
 import type { TFunction } from "i18next";
 import { i18next, type Locale } from "./i18n/index.js";
 import { CATEGORIES, CATEGORY_LABELS, escapeHtml } from "./shared.js";
@@ -350,51 +350,65 @@ function dimensionLabel(dim: Dimension, t: TFunction): string {
 }
 
 /**
- * Render a single filter pill (label + removable ×). The label value portion
- * carries data-picker="<dim>" so client JS can hook it up to a popover picker.
+ * Resolve the localized pill text for a given dimension + raw value.
+ * The stale_days dimension uses the singular catalog key for count=1 and the
+ * plural key otherwise, mirroring i18next's plural-suffix convention.
+ */
+function pillTextFor(
+  dimension: Dimension,
+  rawValue: string,
+  t: TFunction,
+): string {
+  if (dimension === "status") {
+    // rawValue here is the localized status label (e.g., "Pending")
+    return t("browse.filter.pill.status", { value: rawValue });
+  }
+  if (dimension === "since") {
+    return t("browse.filter.pill.since", { value: rawValue });
+  }
+  const count = parseInt(rawValue, 10);
+  return count === 1
+    ? t("browse.filter.pill.stale_days_one", { count })
+    : t("browse.filter.pill.stale_days_other", { count });
+}
+
+/**
+ * Render a single filter pill: a positioned wrapper containing the trigger
+ * (value + chevron), the × remove anchor, and the value picker overlay.
+ *
+ * The wrapper carries `relative` so the picker (`absolute top-full`) anchors
+ * to the pill itself per AC-3.18 (layout invariant). The trigger exposes
+ * `data-picker`, `aria-haspopup="listbox"`, `aria-expanded="false"`, and a
+ * chevron-down SVG between the value text and the × anchor (AC-3.12).
  */
 function renderPill(params: {
   dimension: Dimension;
-  value: string; // localized display value
+  pillText: string;
   removeHref: string;
-  t: TFunction;
+  picker: string; // pre-rendered picker HTML (renderValuePicker output)
 }): string {
-  const { dimension, value, removeHref, t } = params;
-  let pillText: string;
-  if (dimension === "status") {
-    pillText = t("browse.filter.pill.status", { value });
-  } else if (dimension === "since") {
-    pillText = t("browse.filter.pill.since", { value });
-  } else {
-    // stale_days — value is the numeric count; use plural catalog lookups
-    const count = parseInt(value, 10);
-    pillText = t("browse.filter.pill.stale_days", {
-      count,
-      defaultValue_one: t("browse.filter.pill.stale_days_one", { count }),
-      defaultValue_other: t("browse.filter.pill.stale_days_other", { count }),
-    });
-    // i18next pluralization fallback: manually pick the branch if the above
-    // doesn't resolve due to namespace/flat-key differences in the catalog.
-    if (
-      pillText === "browse.filter.pill.stale_days" ||
-      pillText === t("browse.filter.pill.stale_days")
-    ) {
-      pillText =
-        count === 1
-          ? t("browse.filter.pill.stale_days_one", { count })
-          : t("browse.filter.pill.stale_days_other", { count });
-    }
-  }
+  const { dimension, pillText, removeHref, picker } = params;
   return `
-    <span class="inline-flex items-center gap-1 rounded-full border border-primary px-2 py-0.5 text-[10px] text-primary">
-      <span data-picker="${escapeHtml(dimension)}" class="cursor-pointer">${escapeHtml(pillText)}</span>
-      <a href="${escapeHtml(removeHref)}" class="text-muted-foreground hover:text-foreground" aria-label="Remove filter">×</a>
+    <span class="relative inline-flex items-center gap-1 rounded-full border border-primary px-2 py-0.5 text-[10px] text-primary">
+      <span data-picker="${escapeHtml(dimension)}" aria-haspopup="listbox" aria-expanded="false" role="button" tabindex="0" class="cursor-pointer inline-flex items-center gap-1">
+        <span>${escapeHtml(pillText)}</span>
+        <span data-picker-chevron class="inline-flex items-center transition-transform">${iconChevronDown("size-3")}</span>
+      </span>
+      <a href="${escapeHtml(removeHref)}" aria-label="Remove filter" class="text-muted-foreground hover:text-foreground">×</a>
+      ${picker}
     </span>`;
 }
 
 /**
- * Render the hidden value picker panel for a single dimension. Each value is
- * a plain anchor that navigates to the updated URL — works without JS.
+ * Render the value picker overlay for a single dimension.
+ *
+ * The picker is an `absolute`-positioned `role="listbox"` containing one
+ * `role="option"` anchor per legal value. The option matching the currently-
+ * applied value is marked with `aria-selected="true"`, prefixed with a
+ * Lucide check icon, and styled with `text-primary`. All other options carry
+ * `aria-selected="false"`. Per AC-3.15 (roving tabindex), the matching
+ * option (or the first option if no value is applied) carries `tabindex="0"`;
+ * all other options carry `tabindex="-1"`.
  */
 function renderValuePicker(params: {
   dimension: Dimension;
@@ -429,17 +443,22 @@ function renderValuePicker(params: {
     stale_days: currentStaleDays,
   };
 
-  let options: Array<{ href: string; label: string }> = [];
+  let options: Array<{ href: string; label: string; value: string }> = [];
+  let currentValueKey: string | undefined;
   if (dimension === "status") {
     options = statusOptions(currentCategory).map((v) => ({
       href: browseUrl({ ...base, status: v }),
       label: statusLabel(v, t),
+      value: v,
     }));
+    currentValueKey = currentStatus;
   } else if (dimension === "since") {
     options = SINCE_VALUES.map((v) => ({
       href: browseUrl({ ...base, since: v }),
       label: sinceLabel(v, t),
+      value: v,
     }));
+    currentValueKey = currentSince;
   } else {
     options = STALE_DAYS_PRESETS.map((n) => ({
       href: browseUrl({ ...base, stale_days: n }),
@@ -447,18 +466,35 @@ function renderValuePicker(params: {
         n === 1
           ? t("browse.filter.pill.stale_days_one", { count: n })
           : t("browse.filter.pill.stale_days_other", { count: n }),
+      value: String(n),
     }));
+    currentValueKey =
+      currentStaleDays !== undefined ? String(currentStaleDays) : undefined;
   }
 
+  const selectedIdx =
+    currentValueKey !== undefined
+      ? options.findIndex((o) => o.value === currentValueKey)
+      : -1;
+  const focusIdx = selectedIdx >= 0 ? selectedIdx : 0;
+
   const optionHtml = options
-    .map(
-      (o) =>
-        `<a href="${escapeHtml(o.href)}" class="block px-3 py-1.5 text-xs hover:bg-secondary">${escapeHtml(o.label)}</a>`,
-    )
+    .map((o, i) => {
+      const isSelected = i === selectedIdx;
+      const tabindex = i === focusIdx ? "0" : "-1";
+      const ariaSelected = isSelected ? "true" : "false";
+      // The selected option gets a check icon prefix; unselected options get a
+      // size-matched empty span so labels align across the column.
+      const prefix = isSelected
+        ? iconCheck("size-3 mr-1 inline-block shrink-0")
+        : `<span class="size-3 mr-1 inline-block shrink-0"></span>`;
+      const colorCls = isSelected ? "text-primary" : "";
+      return `<a href="${escapeHtml(o.href)}" role="option" aria-selected="${ariaSelected}" tabindex="${tabindex}" class="flex items-center px-3 py-1.5 text-xs hover:bg-secondary ${colorCls}">${prefix}${escapeHtml(o.label)}</a>`;
+    })
     .join("");
 
   return `
-    <div data-picker-values="${escapeHtml(dimension)}" class="hidden rounded-md border border-border bg-card shadow-md mt-1 min-w-32 w-fit">
+    <div data-picker-values="${escapeHtml(dimension)}" role="listbox" class="hidden absolute top-full left-0 mt-1 rounded-md border border-border bg-card shadow-md min-w-32 z-20">
       ${optionHtml}
     </div>`;
 }
@@ -466,7 +502,11 @@ function renderValuePicker(params: {
 /**
  * Render the "+ Filter" add-menu. Only includes dimensions that are not
  * already applied. Each dimension item carries data-dimension + data-picker
- * so JS can open the matching value picker.
+ * so JS can open the matching value picker. Items also expose
+ * `aria-haspopup="listbox"` and `aria-expanded="false"` per AC-3.17.
+ *
+ * Without JS, clicking a dimension item navigates to the default-href URL
+ * (the dimension's first legal value) — a graceful fallback per C-2.
  */
 function renderAddFilterMenu(params: {
   appliedDimensions: Set<Dimension>;
@@ -495,8 +535,6 @@ function renderAddFilterMenu(params: {
     stale_days: params.currentStaleDays,
   };
 
-  // For each available dimension, the default no-JS href adds the FIRST legal
-  // value so the filter is reachable without running the picker JS.
   function defaultHref(dim: Dimension): string {
     if (dim === "status") {
       const firstVal = statusOptions(params.currentCategory)[0]!;
@@ -511,18 +549,34 @@ function renderAddFilterMenu(params: {
   const itemHtml = available
     .map(
       (dim) =>
-        `<a href="${escapeHtml(defaultHref(dim))}" data-dimension="${escapeHtml(dim)}" data-picker="${escapeHtml(dim)}" class="block px-3 py-1.5 text-xs hover:bg-secondary">${escapeHtml(dimensionLabel(dim, t))}</a>`,
+        `<a href="${escapeHtml(defaultHref(dim))}" data-dimension="${escapeHtml(dim)}" data-picker="${escapeHtml(dim)}" aria-haspopup="listbox" aria-expanded="false" role="button" class="block px-3 py-1.5 text-xs hover:bg-secondary">${escapeHtml(dimensionLabel(dim, t))}</a>`,
     )
     .join("");
 
+  // The unapplied-dim pickers and this <details> share a single `relative`
+  // wrapper in renderFilterBar. The dropdown content is `absolute` and
+  // anchors to that wrapper. We deliberately do NOT mark <details> itself as
+  // `relative` so closest('.relative') from a dimension trigger reaches the
+  // wrapping span (the picker's already-correct positioned ancestor) rather
+  // than <details> — which would hide the picker on close per the HTML spec
+  // (a closed <details> hides every non-<summary> child).
   return `
-    <details data-filter-add-menu class="relative">
+    <details data-filter-add-menu>
       <summary class="cursor-pointer rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors">${escapeHtml(t("browse.filter.add"))}</summary>
       <div class="absolute z-10 mt-1 rounded-md border border-border bg-card shadow-md min-w-32">${itemHtml}</div>
     </details>`;
 }
 
-/** Render the filter bar: pills + +Filter menu + pickers + clear + count. */
+/** Render the filter bar: pills (with co-located pickers) + +Filter menu +
+ *  unapplied-dimension pickers + clear + count.
+ *
+ *  Per the UX upgrade (AC-3.5, AC-3.18): each picker is rendered exactly once
+ *  per dimension. Active-dimension pickers are co-located inside the pill's
+ *  positioned wrapper. Unapplied-dimension pickers are rendered in their own
+ *  positioned span so they have a `relative` ancestor; client JS may relocate
+ *  them into the +Filter <details> at open time so they visually anchor to
+ *  the +Filter button.
+ */
 export function renderFilterBar(params: {
   category: string | undefined;
   tag: string | undefined;
@@ -550,14 +604,28 @@ export function renderFilterBar(params: {
   const applied = new Set<Dimension>();
   const pills: string[] = [];
 
+  function pickerFor(dim: Dimension): string {
+    return renderValuePicker({
+      dimension: dim,
+      currentCategory: category,
+      currentTag: tag,
+      currentQuery: q,
+      currentMode: mode,
+      currentSince: since,
+      currentStatus: status,
+      currentStaleDays: staleDays,
+      t,
+    });
+  }
+
   if (since) {
     applied.add("since");
     pills.push(
       renderPill({
         dimension: "since",
-        value: sinceLabel(since, t),
+        pillText: pillTextFor("since", sinceLabel(since, t), t),
         removeHref: browseUrl({ ...base, since: undefined }),
-        t,
+        picker: pickerFor("since"),
       }),
     );
   }
@@ -566,9 +634,9 @@ export function renderFilterBar(params: {
     pills.push(
       renderPill({
         dimension: "status",
-        value: statusLabel(status, t),
+        pillText: pillTextFor("status", statusLabel(status, t), t),
         removeHref: browseUrl({ ...base, status: undefined }),
-        t,
+        picker: pickerFor("status"),
       }),
     );
   }
@@ -577,9 +645,9 @@ export function renderFilterBar(params: {
     pills.push(
       renderPill({
         dimension: "stale_days",
-        value: String(staleDays),
+        pillText: pillTextFor("stale_days", String(staleDays), t),
         removeHref: browseUrl({ ...base, stale_days: undefined }),
-        t,
+        picker: pickerFor("stale_days"),
       }),
     );
   }
@@ -596,22 +664,21 @@ export function renderFilterBar(params: {
     t,
   });
 
-  // Value pickers: always rendered (hidden). JS may toggle visibility.
-  const pickerHtml = ADD_FILTER_DIMENSIONS.map((dim) =>
-    renderValuePicker({
-      dimension: dim,
-      currentCategory: category,
-      currentTag: tag,
-      currentQuery: q,
-      currentMode: mode,
-      currentSince: since,
-      currentStatus: status,
-      currentStaleDays: staleDays,
-      t,
-    }),
-  ).join("");
+  // Unapplied-dimension pickers: rendered as siblings of the +Filter <details>
+  // inside a single positioned wrapper. This places them in the same `relative`
+  // ancestor as <details> itself, so each picker's `absolute top-full left-0`
+  // anchors to the wrapper (visually beneath the +Filter button) without
+  // having to be a child of <details> — which would hide them when the
+  // disclosure is closed (the HTML <details> spec hides all non-<summary>
+  // children when closed).
+  const unappliedDims = ADD_FILTER_DIMENSIONS.filter((d) => !applied.has(d));
+  const addMenuBlock =
+    unappliedDims.length > 0
+      ? `<span class="relative inline-block">${addMenu}${unappliedDims
+          .map((dim) => pickerFor(dim))
+          .join("")}</span>`
+      : "";
 
-  // Clear filters link: shown when at least one of tag/since/status/stale_days is active.
   const hasAnyClearable =
     !!tag || !!since || !!status || staleDays !== undefined;
   const clearHref = browseUrl({ category, q });
@@ -619,7 +686,6 @@ export function renderFilterBar(params: {
     ? `<a href="${escapeHtml(clearHref)}" class="text-xs text-muted-foreground hover:text-primary transition-colors">${escapeHtml(t("browse.filter.clear"))}</a>`
     : "";
 
-  // Result count
   const countKey =
     resultCount === 0
       ? "browse.filter.results_zero"
@@ -631,53 +697,226 @@ export function renderFilterBar(params: {
   return `
     <div data-filter-bar class="flex items-center gap-2 flex-wrap">
       ${pills.join("")}
-      ${addMenu}
+      ${addMenuBlock}
       ${clearLink}
       <span class="text-xs text-muted-foreground ml-auto">${escapeHtml(countText)}</span>
-      ${pickerHtml}
     </div>`;
 }
 
 /**
- * Client-side vanilla JS that makes the filter bar pickers openable. Without
- * this, the `.hidden` pickers would never surface to the user.
+ * Client-side script that powers the anchored-popover filter bar (Pattern A).
  *
- * Behavior:
- * - Click a `[data-picker="<dim>"]` element → toggle the matching
- *   `[data-picker-values="<dim>"]` element's `hidden` class; close others.
- * - Click outside any picker trigger or panel → close all pickers.
- * - Press Escape → close all pickers.
- *
- * Without JS, users can still remove filters via the × anchor and add
- * filters via the `<details data-filter-add-menu>` default-href navigation.
+ * Responsibilities (per AC-3.5, AC-3.13–AC-3.18):
+ * - Open / close pickers on trigger click; open by relocating the picker into
+ *   the trigger's nearest positioned ancestor so it visually anchors there.
+ * - Toggle `aria-expanded` on triggers; rotate the chevron via `rotate-180`.
+ * - Manage roving-tabindex focus inside the picker (ArrowUp/Down cycle with
+ *   wrap; Tab from last / Shift-Tab from first close + yield focus).
+ * - Treat clicks on the currently-selected option (`aria-selected="true"`) as
+ *   a no-op (close picker, no navigation) per AC-3.5 / E-16.
+ * - Auto-flip overlay alignment to `right-0` when the trigger sits within
+ *   200px of the right viewport edge (AC-3.16, E-15).
+ * - Escape closes the open picker and returns focus to the trigger.
+ * - Without JS, the × anchors and the +Filter dimension items still navigate
+ *   via their default hrefs (progressive enhancement, C-2).
  */
 function renderFilterBarScript(): string {
   return `
 <script>
 (function() {
+  function setExpanded(trigger, open) {
+    if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function chevronIn(trigger) {
+    return trigger ? trigger.querySelector('[data-picker-chevron]') : null;
+  }
+  function getPicker(dim) {
+    return document.querySelector('[data-picker-values="' + dim + '"]');
+  }
+  function getOptions(picker) {
+    return Array.prototype.slice.call(picker.querySelectorAll('[role="option"]'));
+  }
+  function focusOption(options, idx) {
+    options.forEach(function(o, i) {
+      o.setAttribute('tabindex', i === idx ? '0' : '-1');
+    });
+    var target = options[idx];
+    if (target) target.focus();
+  }
   function closeAll() {
-    document.querySelectorAll('[data-picker-values]').forEach(function(el) {
-      el.classList.add('hidden');
+    document.querySelectorAll('[data-picker-values]').forEach(function(p) {
+      p.classList.add('hidden');
+    });
+    document.querySelectorAll('[data-picker]').forEach(function(t) {
+      setExpanded(t, false);
+      var c = chevronIn(t);
+      if (c) c.classList.remove('rotate-180');
     });
   }
+  function triggerFor(dim) {
+    return document.querySelector('[data-picker="' + dim + '"]');
+  }
+  function openPicker(trigger) {
+    var dim = trigger.getAttribute('data-picker');
+    if (!dim) return;
+    var picker = getPicker(dim);
+    if (!picker) return;
+    // Resolve the element the picker visually anchors to. For a pill trigger
+    // that's the trigger itself; for a +Filter dimension item the picker
+    // anchors to the wrapping span (visually under the +Filter <summary>),
+    // so use the <summary>'s rect for the overflow-flip decision.
+    var addMenu = trigger.closest('details[data-filter-add-menu]');
+    var rectEl = addMenu ? addMenu.querySelector('summary') : trigger;
+    var rect = (rectEl || trigger).getBoundingClientRect();
+    closeAll();
+    // If the trigger is a +Filter dimension item, close the <details>
+    // disclosure so the dropdown does not visually compete with the picker.
+    // We do NOT relocate the picker into <details> — the HTML spec hides
+    // all non-<summary> children when <details> is closed, so the picker
+    // would vanish. Pickers are already siblings of <details> inside the
+    // shared positioned wrapper, server-rendered in the right place.
+    if (addMenu) addMenu.removeAttribute('open');
+    // Overflow flip: align right when the trigger is within 200px of the edge.
+    picker.classList.remove('left-0', 'right-0');
+    if (rect.right > window.innerWidth - 200) {
+      picker.classList.add('right-0');
+    } else {
+      picker.classList.add('left-0');
+    }
+    picker.classList.remove('hidden');
+    setExpanded(trigger, true);
+    var c = chevronIn(trigger);
+    if (c) c.classList.add('rotate-180');
+    // Focus the option that already carries tabindex="0" — that's the
+    // currently-selected option, or the first option if no value is applied.
+    var focused = picker.querySelector('[role="option"][tabindex="0"]');
+    if (focused) focused.focus();
+  }
+  function effectiveFocusTarget(trigger) {
+    // If trigger lives inside a now-closed +Filter <details>, the trigger
+    // itself is hidden — focus the visible <summary> instead so keyboard
+    // focus lands somewhere usable.
+    if (!trigger) return null;
+    var addMenu = trigger.closest('details[data-filter-add-menu]');
+    if (addMenu && !addMenu.hasAttribute('open')) {
+      var summary = addMenu.querySelector('summary');
+      if (summary) return summary;
+    }
+    return trigger;
+  }
+  function closeAndFocus(trigger) {
+    closeAll();
+    var target = effectiveFocusTarget(trigger);
+    if (target) target.focus();
+  }
+  // Wire trigger click + keyboard activation
   document.querySelectorAll('[data-picker]').forEach(function(trigger) {
     trigger.addEventListener('click', function(e) {
-      var dim = trigger.getAttribute('data-picker');
-      if (!dim) return;
-      var picker = document.querySelector('[data-picker-values="' + dim + '"]');
-      if (!picker) return;
-      var isOpen = !picker.classList.contains('hidden');
       e.preventDefault();
       e.stopPropagation();
-      closeAll();
-      if (!isOpen) picker.classList.remove('hidden');
+      var picker = getPicker(trigger.getAttribute('data-picker'));
+      if (!picker) return;
+      if (!picker.classList.contains('hidden')) {
+        closeAll();
+      } else {
+        openPicker(trigger);
+      }
+    });
+    trigger.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        var picker = getPicker(trigger.getAttribute('data-picker'));
+        if (!picker) return;
+        if (!picker.classList.contains('hidden')) closeAll();
+        else openPicker(trigger);
+      }
     });
   });
+  // Wire picker-level keyboard nav + selected-option click interception
+  document.querySelectorAll('[data-picker-values]').forEach(function(picker) {
+    picker.addEventListener('keydown', function(e) {
+      var options = getOptions(picker);
+      if (options.length === 0) return;
+      var dim = picker.getAttribute('data-picker-values');
+      var trigger = triggerFor(dim);
+      var currentIdx = options.indexOf(document.activeElement);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeAndFocus(trigger);
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        var next = currentIdx < 0 ? 0 : (currentIdx + 1) % options.length;
+        focusOption(options, next);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        var prev = currentIdx <= 0 ? options.length - 1 : currentIdx - 1;
+        focusOption(options, prev);
+        return;
+      }
+      if (e.key === 'Tab') {
+        if (!e.shiftKey) {
+          if (currentIdx >= options.length - 1 || currentIdx < 0) {
+            // Tab past last option (or unfocused): focus the (effective)
+            // trigger so the browser's default Tab moves on to the next
+            // focusable element after the trigger, then close. Without the
+            // explicit focus, focus would be on a now-hidden option and the
+            // browser's tab order recovery is inconsistent across engines.
+            var fwdTarget = effectiveFocusTarget(trigger);
+            if (fwdTarget) fwdTarget.focus();
+            closeAll();
+          } else {
+            e.preventDefault();
+            focusOption(options, currentIdx + 1);
+          }
+        } else {
+          if (currentIdx <= 0) {
+            // Shift-Tab past first option: focus the trigger so default
+            // Shift-Tab moves to the previous focusable element.
+            var backTarget = effectiveFocusTarget(trigger);
+            if (backTarget) backTarget.focus();
+            closeAll();
+          } else {
+            e.preventDefault();
+            focusOption(options, currentIdx - 1);
+          }
+        }
+        return;
+      }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        var current = options[currentIdx];
+        if (!current) return;
+        if (current.getAttribute('aria-selected') === 'true') {
+          closeAndFocus(trigger);
+        } else {
+          var href = current.getAttribute('href');
+          if (href) window.location.href = href;
+        }
+      }
+    });
+    // Click on the already-selected option → close picker, no navigation
+    picker.addEventListener('click', function(e) {
+      var target = e.target;
+      var opt = target && target.closest && target.closest('[role="option"]');
+      if (opt && opt.getAttribute('aria-selected') === 'true') {
+        e.preventDefault();
+        e.stopPropagation();
+        var dim = picker.getAttribute('data-picker-values');
+        closeAndFocus(triggerFor(dim));
+      }
+    });
+  });
+  // Click outside any trigger or picker → close
   document.addEventListener('click', function(e) {
     var target = e.target;
     if (target && target.closest && target.closest('[data-picker], [data-picker-values]')) return;
     closeAll();
   });
+  // Global Escape → close
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeAll();
   });

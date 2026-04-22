@@ -1070,8 +1070,11 @@ describe("Web Browse", () => {
       const { body } = await fetchBrowse(
         "/browse?status=pending&since=week&stale_days=5",
       );
-      // No data-filter-add-menu attribute present
-      expect(body).not.toMatch(/data-filter-add-menu/);
+      // The <details data-filter-add-menu> element is absent. We check for an
+      // element opener rather than a bare substring because the new
+      // renderFilterBarScript references the attribute name in its DOM
+      // selector code.
+      expect(body).not.toMatch(/<details\b[^>]*data-filter-add-menu/);
     });
 
     // TS-3.14a
@@ -1533,6 +1536,264 @@ describe("Web Browse", () => {
       const filters = callArgs?.[1];
       if (filters) {
         expect((filters as any).sort).toBeUndefined();
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Browse Filters — UX Upgrade (Pattern A)
+  // Anchored popover, chevron, selected-option indicator, ARIA, focus.
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Browse Filters — UX upgrade (Pattern A)", () => {
+    async function fetchBrowse(
+      url: string,
+      mockEntries: Entry[] = [],
+    ): Promise<{ status: number; body: string }> {
+      const { browseEntries, semanticSearch, textSearch, getFilterTags } =
+        await import("../../src/web/browse-queries.js");
+      vi.mocked(browseEntries).mockResolvedValue(mockEntries);
+      vi.mocked(semanticSearch).mockResolvedValue(mockEntries);
+      vi.mocked(textSearch).mockResolvedValue(mockEntries);
+      vi.mocked(getFilterTags).mockResolvedValue([]);
+
+      const { app } = await createTestBrowse();
+      const cookie = await loginAndGetCookie(app);
+      const res = await app.request(url, { headers: { Cookie: cookie } });
+      const body = await res.text();
+      return { status: res.status, body };
+    }
+
+    // TS-3.27 — picker is an overlay anchored to a relative-positioned trigger container
+    it("picker is rendered as an absolute overlay anchored to a relative-positioned trigger container", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      // The pill's value-trigger is wrapped in an outer span with class "relative"
+      expect(body).toMatch(
+        /<span\b[^>]*class="[^"]*\brelative\b[^"]*"[^>]*>[\s\S]*?data-picker=["']status["']/,
+      );
+      // Picker carries `absolute` and `top-full` overlay classes
+      expect(body).toMatch(
+        /data-picker-values=["']status["'][^>]*class="[^"]*\babsolute\b[^"]*"/,
+      );
+      expect(body).toMatch(
+        /data-picker-values=["']status["'][^>]*class="[^"]*\btop-full\b[^"]*"/,
+      );
+    });
+
+    // TS-3.28 — selected-option indicator (check icon + text-primary on the matching value)
+    it("renders a check-icon prefix and primary-tone color on the option matching the currently-applied value", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      // Locate the matching option's anchor
+      const matchOpt = body.match(
+        /<a\b[^>]*href="\/browse\?status=pending"[\s\S]*?<\/a>/,
+      );
+      expect(matchOpt).not.toBeNull();
+      // The Lucide check icon path is "M20 6 9 17l-5-5" — match a robust substring
+      expect(matchOpt![0]).toMatch(/M20 6 9 17/);
+      expect(matchOpt![0]).toMatch(/text-primary/);
+
+      // The other status options must NOT include a check icon
+      const otherOpt = body.match(
+        /<a\b[^>]*href="\/browse\?status=done"[\s\S]*?<\/a>/,
+      );
+      expect(otherOpt).not.toBeNull();
+      expect(otherOpt![0]).not.toMatch(/M20 6 9 17/);
+    });
+
+    // TS-3.29 — aria-selected reflects current value; false on others; false everywhere when no value applied
+    it("aria-selected is true on the matching option, false on others, and false on every option in unapplied-dimension pickers", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      // Active value carries aria-selected="true". The href is exactly the
+      // current URL (because the picker preserves all current params).
+      expect(body).toMatch(
+        /href="\/browse\?status=pending"[^>]*aria-selected=["']true["']|aria-selected=["']true["'][^>]*href="\/browse\?status=pending"/,
+      );
+      // Inactive value (status=done) carries aria-selected="false". URL also
+      // begins with /browse?status=done since status replaces itself.
+      expect(body).toMatch(
+        /href="\/browse\?status=done"[^>]*aria-selected=["']false["']|aria-selected=["']false["'][^>]*href="\/browse\?status=done"/,
+      );
+      // Since picker has no value applied; its options preserve status=pending.
+      // Match loosely on the since=today substring rather than pinning the
+      // full URL composition.
+      expect(body).toMatch(
+        /href="[^"]*since=today[^"]*"[^>]*aria-selected=["']false["']|aria-selected=["']false["'][^>]*href="[^"]*since=today[^"]*"/,
+      );
+      expect(body).toMatch(
+        /href="[^"]*since=week[^"]*"[^>]*aria-selected=["']false["']|aria-selected=["']false["'][^>]*href="[^"]*since=week[^"]*"/,
+      );
+    });
+
+    // TS-3.30 — currently-selected option's anchor href equals the current URL (no-navigate guarantee)
+    it("the currently-selected option's anchor href equals the current URL (no-navigate-on-selected)", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      // The selected option carries aria-selected="true" AND its href is the current URL
+      expect(body).toMatch(
+        /<a\b[^>]*href="\/browse\?status=pending"[^>]*aria-selected=["']true["']|<a\b[^>]*aria-selected=["']true["'][^>]*href="\/browse\?status=pending"/,
+      );
+    });
+
+    // TS-3.31 — chevron-down SVG between value text and × anchor
+    it("each pill renders a chevron-down SVG between its value text and its × anchor", async () => {
+      const { body } = await fetchBrowse(
+        "/browse?status=pending&since=week&stale_days=5",
+      );
+      // For each active filter pill, between data-picker and the next ×, a chevron SVG must appear
+      const dims = ["status", "since", "stale_days"];
+      for (const dim of dims) {
+        const re = new RegExp(
+          `data-picker=["']${dim}["'][\\s\\S]*?(?:×|&times;)`,
+        );
+        const region = body.match(re)?.[0];
+        expect(region).toBeDefined();
+        // Lucide chevron-down geometry: <path d="m6 9 6 6 6-6"/>
+        expect(region!).toMatch(/m6 9 6 6 6-6/);
+      }
+    });
+
+    // TS-3.32 — exactly one chevron SVG per pill, positioned between value-span and ×-anchor
+    it("each pill contains exactly one chevron SVG and chevron sits between value-span and ×-anchor", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      const region = body.match(
+        /data-picker=["']status["'][\s\S]*?(?:×|&times;)/,
+      )?.[0];
+      expect(region).toBeDefined();
+      const occurrences = region!.match(/m6 9 6 6 6-6/g) ?? [];
+      expect(occurrences.length).toBe(1);
+    });
+
+    // TS-3.33 — + Filter dimension items reuse the same overlay-positioned picker DOM
+    it("+ Filter dimension items reuse the same overlay-positioned picker DOM", async () => {
+      const { body } = await fetchBrowse("/browse");
+      const count = (s: string, sub: string) =>
+        (s.match(new RegExp(sub, "g")) || []).length;
+      // Each picker is rendered exactly once
+      for (const dim of ["status", "since", "stale_days"]) {
+        expect(count(body, `data-picker-values=["']${dim}["']`)).toBe(1);
+      }
+      // Overlay classes apply
+      for (const dim of ["status", "since", "stale_days"]) {
+        expect(body).toMatch(
+          new RegExp(
+            `data-picker-values=["']${dim}["'][^>]*class="[^"]*\\babsolute\\b`,
+          ),
+        );
+      }
+    });
+
+    // TS-3.34s — keyboard handler tokens in inline script
+    it("renderFilterBarScript source contains keyboard handlers (ArrowDown/ArrowUp/Enter/Space/Escape/Tab)", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      expect(body).toMatch(/ArrowDown/);
+      expect(body).toMatch(/ArrowUp/);
+      expect(body).toMatch(/(?:'|")Enter(?:'|")/);
+      expect(body).toMatch(/(?:'|")Escape(?:'|")/);
+      expect(body).toMatch(/(?:'|")Tab(?:'|")/);
+    });
+
+    // TS-3.36 — roving tabindex pattern
+    it("the picker option matching the currently-applied value carries tabindex=0; others carry tabindex=-1", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      // Matching option (status=pending) has tabindex=0
+      expect(body).toMatch(
+        /href="\/browse\?status=pending"[^>]*tabindex=["']0["']|tabindex=["']0["'][^>]*href="\/browse\?status=pending"/,
+      );
+      // Inactive option (status=done) has tabindex=-1
+      expect(body).toMatch(
+        /href="\/browse\?status=done"[^>]*tabindex=["']-1["']|tabindex=["']-1["'][^>]*href="\/browse\?status=done"/,
+      );
+      // Unapplied dimension: first option of the since picker has tabindex=0.
+      // since= URL composition includes status=pending preserved as well.
+      expect(body).toMatch(
+        /href="[^"]*since=today[^"]*"[^>]*tabindex=["']0["']|tabindex=["']0["'][^>]*href="[^"]*since=today[^"]*"/,
+      );
+      expect(body).toMatch(
+        /href="[^"]*since=week[^"]*"[^>]*tabindex=["']-1["']|tabindex=["']-1["'][^>]*href="[^"]*since=week[^"]*"/,
+      );
+    });
+
+    // TS-3.37s — viewport overflow flip logic in script source
+    it("renderFilterBarScript source contains a getBoundingClientRect-based right-edge overflow flip", async () => {
+      const { body } = await fetchBrowse("/browse");
+      expect(body).toMatch(/getBoundingClientRect/);
+      expect(body).toMatch(/(?:'|")right-0(?:'|")/);
+      expect(body).toMatch(/(?:'|")left-0(?:'|")/);
+      expect(body).toMatch(/innerWidth/);
+    });
+
+    // TS-3.38 — aria-haspopup="listbox"
+    it("each picker trigger carries aria-haspopup=listbox", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending&since=week");
+      // Both pill triggers carry aria-haspopup=listbox
+      expect(body).toMatch(
+        /data-picker=["']status["'][^>]*aria-haspopup=["']listbox["']|aria-haspopup=["']listbox["'][^>]*data-picker=["']status["']/,
+      );
+      expect(body).toMatch(
+        /data-picker=["']since["'][^>]*aria-haspopup=["']listbox["']|aria-haspopup=["']listbox["'][^>]*data-picker=["']since["']/,
+      );
+      // +Filter dimension item for the unapplied dimension also carries it
+      expect(body).toMatch(
+        /data-dimension=["']stale_days["'][^>]*aria-haspopup=["']listbox["']|aria-haspopup=["']listbox["'][^>]*data-dimension=["']stale_days["']/,
+      );
+    });
+
+    // TS-3.39 — initial aria-expanded="false"
+    it("each picker trigger carries initial aria-expanded=false", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      expect(body).toMatch(
+        /data-picker=["']status["'][^>]*aria-expanded=["']false["']|aria-expanded=["']false["'][^>]*data-picker=["']status["']/,
+      );
+    });
+
+    // TS-3.40 — role="listbox" on each value picker
+    it("each value picker carries role=listbox", async () => {
+      const { body } = await fetchBrowse("/browse");
+      for (const dim of ["status", "since", "stale_days"]) {
+        expect(body).toMatch(
+          new RegExp(
+            `data-picker-values=["']${dim}["'][^>]*role=["']listbox["']|role=["']listbox["'][^>]*data-picker-values=["']${dim}["']`,
+          ),
+        );
+      }
+    });
+
+    // TS-3.41 — role="option" on each picker option
+    it("each picker option carries role=option", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      for (const v of ["pending", "done", "active", "paused", "completed"]) {
+        expect(body).toMatch(
+          new RegExp(
+            `href="/browse\\?status=${v}"[^>]*role=["']option["']|role=["']option["'][^>]*href="/browse\\?status=${v}"`,
+          ),
+        );
+      }
+    });
+
+    // TS-3.42 — × anchor retains aria-label="Remove filter"
+    it("each pill × anchor retains aria-label=Remove filter", async () => {
+      const { body } = await fetchBrowse(
+        "/browse?status=pending&since=week&stale_days=5",
+      );
+      // At least three remove-filter anchors (one per active pill)
+      const removeAnchors = body.match(
+        /<a\b[^>]*aria-label=["']Remove filter["'][^>]*>[\s\S]*?<\/a>/g,
+      );
+      expect(removeAnchors).not.toBeNull();
+      expect(removeAnchors!.length).toBeGreaterThanOrEqual(3);
+    });
+
+    // TS-3.43 — overlay-positioning class assertions
+    it("picker overlay-positioning class assertions: absolute + top-full + (left-0 or right-0) on a relative-positioned ancestor", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending");
+      for (const dim of ["status", "since", "stale_days"]) {
+        const re = new RegExp(
+          `data-picker-values=["']${dim}["'][^>]*class="([^"]+)"`,
+        );
+        const match = body.match(re);
+        expect(match).not.toBeNull();
+        const cls = match![1]!;
+        expect(cls).toMatch(/\babsolute\b/);
+        expect(cls).toMatch(/\btop-full\b/);
+        expect(cls).toMatch(/\b(?:left-0|right-0)\b/);
       }
     });
   });

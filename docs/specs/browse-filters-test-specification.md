@@ -29,6 +29,14 @@
 | AC-3.9 Result count with localized pluralization | TS-3.20, TS-3.21, TS-3.22 |
 | AC-3.10 "Clear filters" link when ≥1 filter active, preserves category + q | TS-3.23, TS-3.24 |
 | AC-3.11 Empty state includes "Clear filters" when filters active | TS-3.25, TS-3.26 |
+| AC-3.5 (rev.) Anchored popover + selected-option indicator + no-navigate-on-selected | TS-3.27, TS-3.28, TS-3.29, TS-3.30 |
+| AC-3.12 Chevron `chevron-down` in each pill | TS-3.31, TS-3.32 |
+| AC-3.13 `+ Filter` dimension items open the same overlay (already covered structurally) | TS-3.14b (existing), TS-3.33 |
+| AC-3.14 Keyboard nav: Tab/Arrow/Enter/Space/Escape inside picker | TS-3.34 (manual) |
+| AC-3.15 Focus management: open → first/selected option, Escape → trigger | TS-3.35 (manual), TS-3.36 (roving tabindex structural) |
+| AC-3.16 Viewport overflow: right-0 vs left-0 class swap on overflow | TS-3.37 (manual / structural-script-only) |
+| AC-3.17 ARIA: aria-haspopup, aria-expanded, role=listbox, role=option, aria-selected | TS-3.38, TS-3.39, TS-3.40, TS-3.41, TS-3.42 |
+| AC-3.18 Layout invariant: picker overlay does not occupy layout flow | TS-3.43 (structural class assertions) |
 | AC-4.1 Category tabs unchanged | TS-4.1 |
 | AC-4.2 Search input unchanged | TS-4.2 |
 | AC-4.3 Tag pill row unchanged (discovery + deselect) | TS-4.3 |
@@ -58,6 +66,10 @@
 | E-12 Browser back/forward | Browser behavior — not testable in vitest |
 | E-13 SSE still updates `[data-stat]` inside anchor | TS-1.12 |
 | E-14 `fields` JSONB missing `status` → excluded from `status=` filter | TS-2.15 |
+| E-15 Picker near right edge → right-align flip | TS-3.37 (manual / script-only) |
+| E-16 Selecting the currently-applied option → no navigation | TS-3.30 |
+| E-17 Tab from last option → picker closes + focus yields | TS-3.34 (manual) |
+| E-18 Page scroll while picker open → picker stays attached | Manual verification — JSDOM has no real layout |
 | NG-1 No sort controls | TS-5.9 (sort=… param has no effect — asserts absence) |
 | NG-2 No multi-select — covered by E-7 | TS-5.8 |
 | NG-3 No free-form dates — covered by AC-2.5 | TS-2.16 |
@@ -69,6 +81,11 @@
 | NG-9 No persisted default filters | No setting introduced — verified in Phase 6 |
 | NG-10 `stale_days` is a post-filter on semantic ranking | TS-2.22 (integration) |
 | NG-11 Only the 4 stat cards become anchors | TS-5.10 |
+| NG-12 No custom open/close animations | Verified by absence in source review |
+| NG-13 No `position-anchor` CSS spec | Verified by absence in source review |
+| NG-14 No screen-reader integration tests | Documented exclusion |
+| NG-15 No re-flip on viewport resize while picker open | Manual verification |
+| NG-16 No portal / dialog element for picker DOM | Verified by absence — picker DOM is a sibling/child of the trigger container |
 
 ## Test Scenarios
 
@@ -666,6 +683,229 @@ When GET /browse?tag=nonexistent is issued
 Then the empty-state view includes a "Clear filters" link
 And its href is "/browse"
 ```
+
+**TS-3.27: Picker is rendered as an overlay anchored to its trigger (AC-3.5, AC-3.18)**
+
+```
+Given /browse?status=pending is rendered
+When the rendered HTML is parsed
+Then the pill value's data-picker trigger is wrapped in a container element
+  with the Tailwind class `relative` (positioned ancestor)
+And the picker element ([data-picker-values="status"]) carries the Tailwind
+  classes `absolute` and `top-full` (overlay positioning, not block flow)
+```
+
+**TS-3.28: Selected-option indicator renders inside the picker for the matching value (AC-3.5)**
+
+```
+Given /browse?status=pending is rendered
+When the value picker for `status` is parsed
+Then the option whose href contains `status=pending` is visually distinguished
+And it includes the Lucide `check` SVG (e.g., a <svg> with the check path) as a prefix
+And it carries a `text-primary` Tailwind class (or otherwise-visibly-different style)
+And the other options (e.g., status=done) do NOT include the check prefix
+```
+
+**TS-3.29: Selected option carries aria-selected="true"; others carry aria-selected="false" (AC-3.17)**
+
+```
+Given /browse?status=pending is rendered
+When the value picker for `status` is parsed
+Then the option whose href contains `status=pending` carries `aria-selected="true"`
+And every other option in that picker carries `aria-selected="false"`
+And in a picker with no currently-applied value (e.g., the picker for `since`
+  on the same URL), every option carries `aria-selected="false"`
+```
+
+**TS-3.30: Currently-selected option's anchor href equals the current URL (AC-3.5, E-16)**
+
+```
+Given /browse?status=pending is rendered
+When the value picker for `status` is parsed
+Then the option whose label is "Pending" has an href equal to "/browse?status=pending"
+  (i.e., navigating to that href is a same-URL navigation — no navigation occurs)
+```
+
+This is the structural assertion of the "no-navigate on selected option" behavior:
+without JS, clicking the same-value option produces a same-URL navigation (no-op
+from the user's perspective). With JS, the trigger handler intercepts via
+preventDefault on options carrying the selected-state marker.
+
+**TS-3.31: Each pill renders a chevron-down SVG between value text and × anchor (AC-3.12)**
+
+```
+Given /browse?status=pending&since=week&stale_days=5 is rendered
+When each filter pill is parsed
+Then the pill structure is, in document order: value-span, chevron-svg, ×-anchor
+And the chevron-svg is a Lucide `chevron-down` icon (matches the `iconChevronDown`
+  output: an <svg> with stroke="currentColor" and a `path` containing "9 18 6-6"
+  or similar Lucide-encoded chevron geometry)
+```
+
+**TS-3.32: Chevron is a single SVG inside the pill (AC-3.12)**
+
+```
+Given /browse?status=pending is rendered
+When the rendered pill markup is parsed
+Then the pill contains exactly one chevron SVG (no duplicates)
+And the chevron is positioned visually between the value span and the × anchor
+  (asserted by index/order of HTML elements within the pill)
+```
+
+**TS-3.33: `+ Filter` dimension item also opens the same overlay (AC-3.13)**
+
+```
+Given /browse is rendered (no active filters)
+When the +Filter add-menu is parsed
+Then each dimension item still carries `data-picker="<dim>"` (existing assertion)
+And the picker DOM ([data-picker-values="<dim>"]) is rendered with overlay-positioning
+  classes (`absolute top-full`) just like the pill-triggered picker
+And no second copy of the picker is rendered for the +Filter trigger
+```
+
+**TS-3.34: Keyboard navigation inside picker (AC-3.14) — manual verification**
+
+```
+Given a /browse page rendered in a real browser with at least one filter pill
+When the user opens a picker via the pill value
+Then the following keyboard interactions work:
+  - Tab → moves focus to the next option
+  - Shift-Tab → moves focus to the previous option
+  - ArrowDown → cycles to the next option (wraps from last → first)
+  - ArrowUp → cycles to the previous option (wraps from first → last)
+  - Enter or Space on an option → activates the option's href
+  - Escape → closes the picker and returns focus to the trigger
+  - Tab from the last option → closes the picker and yields focus to the next
+    document tab target
+```
+
+**This scenario is verified manually via `npm run dev` + browser interaction.**
+JSDOM does not faithfully simulate keyboard event propagation through inline
+script handlers attached at runtime. A structural sub-assertion (the inline
+script source contains the relevant event-listener bindings) is added as
+TS-3.34s in the test-impl spec.
+
+**TS-3.35: Focus management on picker open / close (AC-3.15) — manual verification**
+
+```
+Given a /browse?status=pending page rendered in a real browser
+When the user clicks the pill value to open the picker
+Then keyboard focus moves to the option matching the currently-applied value
+  (here: the "Pending" option)
+
+When the user presses Escape
+Then the picker closes
+And keyboard focus returns to the pill value trigger element
+
+When the user opens a picker for a dimension that has no current filter
+  (e.g., the +Filter → Status flow when no status is set)
+Then focus lands on the first option in the picker
+```
+
+**This scenario is verified manually.** A structural sub-assertion (TS-3.36 below)
+covers the roving tabindex pattern.
+
+**TS-3.36: Roving tabindex pattern on picker options (AC-3.15)**
+
+```
+Given /browse?status=pending is rendered
+When the value picker for `status` is parsed
+Then the option matching the currently-applied value carries `tabindex="0"`
+And every other option in that picker carries `tabindex="-1"`
+
+When a picker has no currently-applied value (e.g., the picker for `since` on
+  /browse?status=pending)
+Then the first option carries `tabindex="0"` and the others carry `tabindex="-1"`
+```
+
+**TS-3.37: Viewport overflow flip (AC-3.16) — manual verification + script-source check**
+
+```
+Given /browse rendered in a narrow viewport (≤ 480px wide) with at least one
+  pill near the right edge
+When the user opens that pill's picker
+Then the picker visually appears flush against the right edge of the trigger
+  (Tailwind `right-0` class applied) and not against the left edge
+And the picker content is fully visible (not clipped off-screen)
+```
+
+**Verified manually.** A structural sub-assertion (the renderFilterBarScript
+source contains a getBoundingClientRect-based right/left class swap) is added
+as TS-3.37s in the test-impl spec. Note: the *initial* server render uses
+`left-0`; the JS upgrades to `right-0` when overflow is detected at open time.
+
+**TS-3.38: Each picker trigger carries `aria-haspopup="listbox"` (AC-3.17)**
+
+```
+Given /browse?status=pending&since=week is rendered (two pills active)
+When each pill's value-trigger element is parsed
+Then it carries the attribute `aria-haspopup="listbox"`
+
+When the +Filter dimension items are parsed
+Then each one also carries `aria-haspopup="listbox"`
+```
+
+**TS-3.39: Each picker trigger carries `aria-expanded` reflecting open state (AC-3.17)**
+
+```
+Given /browse?status=pending is rendered
+When each pill's value-trigger element is parsed
+Then it carries the attribute `aria-expanded="false"` (initial state — no picker open)
+
+When a picker is opened in a real browser (manual)
+Then the matching trigger's `aria-expanded` value is updated to `"true"` by JS
+And when the picker closes, the attribute is updated back to `"false"`
+```
+
+**Initial-state aria-expanded="false" is verified in vitest. The dynamic toggle
+on open/close is verified in the manual TS-3.34 / TS-3.35 sweep.**
+
+**TS-3.40: Each value picker has `role="listbox"` (AC-3.17)**
+
+```
+Given /browse?status=pending is rendered
+When each [data-picker-values] element is parsed
+Then it carries the attribute `role="listbox"`
+```
+
+**TS-3.41: Each picker option has `role="option"` (AC-3.17)**
+
+```
+Given /browse?status=pending is rendered
+When the picker for `status` is parsed
+Then every option element inside it carries `role="option"`
+
+And the +Filter dimension items inside the add-menu carry the appropriate role
+  for that menu (these are not part of a listbox; they are anchors inside the
+  existing <details> disclosure — no role override is added there)
+```
+
+**TS-3.42: × anchor retains `aria-label="Remove filter"` (AC-3.17)**
+
+```
+Given /browse?status=pending&since=week&stale_days=5 is rendered
+When each pill's × anchor is parsed
+Then it carries `aria-label="Remove filter"` (preserved from prior implementation)
+```
+
+**TS-3.43: Picker overlay-positioning class assertions (AC-3.18)**
+
+```
+Given /browse?status=pending is rendered
+When the value picker [data-picker-values="status"] element is parsed
+Then it carries the Tailwind classes `absolute`, `top-full`, and one of `left-0`
+  or `right-0` (the initial server render uses `left-0`; JS may swap to `right-0`)
+And its parent container is positioned (`relative` class) so the overlay anchors
+  to the trigger and not to a far ancestor
+
+When the +Filter dimension's picker is parsed
+Then the same overlay-positioning classes apply
+```
+
+These structural assertions stand in for a true "layout does not shift" runtime
+test, which JSDOM cannot faithfully reproduce. The reasoning: an `absolute`-positioned
+element anchored to a `relative` ancestor is removed from layout flow, so siblings
+below the filter bar are unaffected by the picker's visibility state.
 
 ### Group 4 — Preserve existing behavior (US-4)
 

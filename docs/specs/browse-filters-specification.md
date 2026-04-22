@@ -83,7 +83,7 @@ Validation runs before any database query. A single request with multiple invali
 
 **AC-3.4:** Clicking the × on a pill removes that filter from the URL and triggers a navigation. All other query parameters (including other filter pills, the category tab, the tag, the search query) are preserved.
 
-**AC-3.5:** Clicking the pill value (not the ×) opens an inline value picker listing the legal values for that dimension. Selecting a value triggers navigation to `/browse` with the parameter updated; selecting the same value is a no-op (no navigation). The picker can be dismissed by clicking outside it or pressing Esc.
+**AC-3.5:** Clicking the pill value (not the ×) opens an *anchored value picker overlay* positioned directly beneath the pill. The picker lists the legal values for that dimension. Inside the picker, the option whose value matches the currently-applied filter value for that dimension is visually distinguished from the other options — concretely, it is prefixed with a Lucide `check` icon and styled with the `text-primary` color token. When no filter is currently applied for a dimension (e.g., the user opened the picker via the `+ Filter` menu), no option is marked. Selecting a value *other than* the currently-applied one triggers navigation to `/browse` with the parameter updated; selecting the option that is already applied is a no-op (no navigation occurs and the picker closes). The picker can be dismissed by clicking outside it, by pressing Escape, or by re-clicking the trigger. The picker is rendered as an overlay (CSS `absolute`-positioned) and does not occupy layout flow — see **AC-3.17** for the layout-invariant guarantee.
 
 **AC-3.6:** A "+ Filter" button renders at the end of the pill row. Clicking it opens a menu listing the filter dimensions that are *not* already applied. The menu contains exactly these options (in this order):
 
@@ -112,6 +112,38 @@ The count reflects the full filtered result set size (the number of rows returne
 **AC-3.10:** When at least one of `tag`, `since`, `status`, `stale_days` is active, a "Clear filters" text link appears in the filter bar area. Clicking it navigates to `/browse` retaining only `category` and `q` if present (those have their own dedicated UIs and mental models). Category is not cleared; search query is not cleared.
 
 **AC-3.11:** The empty-state view (rendered by `renderEmptyState`) includes a "Clear filters" link when at least one filterable parameter (`tag`, `since`, `status`, `stale_days`) is active and the result set is empty. The existing empty-state copy is preserved alongside the new link.
+
+**AC-3.12:** Each pill renders a small chevron affordance (Lucide `chevron-down` SVG) between the pill's value text and the × remove anchor, signalling that the value portion opens a menu. When the picker for a pill is open, the chevron rotates 180 degrees (visually pointing up) — implemented via JS toggling a `rotate-180` Tailwind class on the chevron element. The × anchor remains a plain anchor and its position relative to the chevron is preserved.
+
+**AC-3.13:** A `+ Filter` menu dimension item also opens a value picker as an anchored overlay positioned beneath that menu item (the same overlay component used by AC-3.5, just with a different trigger). The selected-option indicator from AC-3.5 does not apply here because no value is yet applied for that dimension.
+
+**AC-3.14:** Keyboard navigation inside an open value picker:
+
+- `Tab` moves focus to the next option; `Shift-Tab` moves to the previous option.
+- `ArrowDown` cycles focus to the next option, wrapping from the last option back to the first; `ArrowUp` cycles to the previous option, wrapping from the first to the last.
+- `Enter` or `Space` on a focused option activates it (navigates to its `href`, or closes the picker if it is the currently-selected value per AC-3.5).
+- `Escape` closes the picker and returns focus to the trigger element that opened it.
+- `Tab` from the *last* option (forward) closes the picker AND yields focus to whatever element follows the trigger in the document tab order. `Shift-Tab` from the *first* option closes the picker AND yields focus to whatever precedes the trigger.
+
+The picker behaves as a focus trap that yields on Tab-out at either end.
+
+**AC-3.15:** Focus management:
+
+- Opening a picker moves keyboard focus to the picker. If a value is already applied for that dimension, focus lands on the matching option. Otherwise, focus lands on the first option.
+- Closing via Escape returns focus to the trigger element that opened the picker (the pill value `<span>` or the `+ Filter` dimension `<a>`).
+- Closing via outside-click or via re-clicking the trigger leaves focus where the user clicked.
+- Inactive options carry `tabindex="-1"`; the option currently in focus carries `tabindex="0"` (roving tabindex pattern).
+
+**AC-3.16:** Viewport overflow handling: when a trigger element sits within 200 pixels of the viewport's right edge, the picker auto-aligns to the *right* edge of the trigger (Tailwind `right-0`) instead of the left (`left-0`) so it does not clip off-screen. The class swap is applied at picker-open time via JS — no inline `style="..."` attributes are used.
+
+**AC-3.17:** Accessibility attributes:
+
+- Each picker trigger (pill value `<span>` and `+ Filter` dimension item `<a>`) carries `aria-haspopup="listbox"` and `aria-expanded="true|false"`. JS toggles `aria-expanded` whenever the corresponding picker opens or closes.
+- Each value picker has `role="listbox"`.
+- Each option inside a value picker has `role="option"`. The option matching the currently-applied filter value carries `aria-selected="true"`; all others carry `aria-selected="false"`.
+- The × remove anchor on each pill retains its existing `aria-label="Remove filter"` (per the prior implementation).
+
+**AC-3.18:** Layout invariant: opening or closing a value picker does NOT shift any element below the filter bar. The picker is rendered as a CSS `absolute`-positioned overlay that does not occupy layout flow. The entry list's vertical position and scroll offset MUST be preserved across picker open/close events.
 
 ### US-4: As a user of the existing browse surface, I want the feature to preserve behaviors I already rely on.
 
@@ -177,6 +209,14 @@ The count reflects the full filtered result set size (the number of rows returne
 
 **E-14:** **`fields` JSONB is `{}` or missing the `status` key for an entry in a category that normally has status.** The entry is excluded from `status=<any>` filters. Not a bug: a task without a status (e.g., pre-classification or legacy data) is not "open" under the dashboard's definition either.
 
+**E-15:** **Picker trigger is near the viewport's right edge.** The picker auto-flips to right-align (Tailwind `right-0`) instead of left-align (`left-0`) per AC-3.16. The flip is decided at picker-open time using `getBoundingClientRect()`; subsequent viewport resizes do not re-evaluate (acceptable — opening another picker re-decides).
+
+**E-16:** **User selects the option that is already applied.** No navigation occurs and no history entry is created (per AC-3.5). The picker closes. This avoids a same-URL navigation that would otherwise behave like a soft refresh.
+
+**E-17:** **Tab from last option of an open picker.** The picker closes and focus moves to whatever element follows the trigger in document tab order (per AC-3.14). Shift-Tab from the first option behaves symmetrically.
+
+**E-18:** **Page is scrolled while a picker is open.** Because the picker is `absolute`-positioned relative to its trigger's container (not `fixed`), it scrolls along with the page. The visual relationship between trigger and picker is preserved.
+
 ## Non-Goals
 
 **NG-1:** **Sort controls.** The default sort order (`updated_at DESC`, or `similarity DESC` for semantic search) is preserved. This feature does not introduce `sort=` or UI to change ordering. Sorting stalled projects by most-stale-first is not provided in this iteration.
@@ -200,6 +240,16 @@ The count reflects the full filtered result set size (the number of rows returne
 **NG-10:** **Combining `stale_days` with semantic search ranking.** `stale_days` acts as a post-filter on the similarity-ranked list; the ranking itself is not biased by staleness. (This falls out of AC-2.7's "filters apply identically to both paths.")
 
 **NG-11:** **Linkifying non-stat cells on the dashboard.** Only the four stat cards become anchors. The digest panel, capture input, recent-entries list, and service-status rows are unchanged.
+
+**NG-12:** **Custom open / close animations on pickers.** Tailwind `transition-colors` and similar utility classes are permitted on hover/focus state changes, but no custom keyframe animations or motion code (no `framer-motion`-style libraries — see C-1, no new deps anyway). Pickers appear and disappear instantly on open/close.
+
+**NG-13:** **CSS `position-anchor` / anchor-positioning spec.** Browser support is incomplete; the popover positioning relies on plain CSS (`absolute`, `top-full`, `left-0` / `right-0`) plus a JS-driven class swap. This keeps the implementation portable across all browsers Cortex targets.
+
+**NG-14:** **Full screen-reader test coverage.** ARIA attributes are asserted via JSDOM-based vitest assertions (per AC-3.17). End-to-end QA with NVDA / JAWS / VoiceOver is out of scope for this iteration.
+
+**NG-15:** **Re-deciding picker overflow flip on viewport resize.** The `right-0` vs `left-0` decision is made at picker-open time (per AC-3.16). If the user resizes the window while a picker is open, the picker is not re-positioned. Acceptable trade-off — closing and reopening the picker re-evaluates.
+
+**NG-16:** **Shifting the picker DOM into a portal.** The picker DOM is relocated into the trigger's positioned container at open time (or rendered there at server-render time). No React-style portals or `dialog` elements — keeping this implementation in the same DOM subtree as the trigger simplifies focus management and avoids z-index battles.
 
 ## Open Questions
 

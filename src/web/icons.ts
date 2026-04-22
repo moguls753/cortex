@@ -86,6 +86,10 @@ export function iconChevronRight(className?: string): string {
   return `<svg ${attrs(className)}><path d="m9 18 6-6-6-6"/></svg>`;
 }
 
+export function iconChevronDown(className?: string): string {
+  return `<svg ${attrs(className)}><path d="m6 9 6 6 6-6"/></svg>`;
+}
+
 export function iconMail(className?: string): string {
   return `<svg ${attrs(className)}><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`;
 }
