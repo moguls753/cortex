@@ -130,7 +130,21 @@ export function createDisplayRoutes(sql: Sql): Hono {
         return c.text("Not Found", 404);
       }
 
+      // `/api/display` returns the PNG URL with the token embedded as a query
+      // param (that's how e-ink clients authenticate against /api/display.png).
+      // Since this endpoint is excluded from session auth, a caller that hits
+      // it without the token would otherwise exfiltrate the secret. Require
+      // the same timing-safe token check that /api/display.png uses.
       const token = settings.display_token;
+      if (token) {
+        const provided = c.req.query("token") || "";
+        const a = Buffer.from(provided);
+        const b = Buffer.from(token);
+        if (a.length !== b.length || !timingSafeEqual(a, b)) {
+          return c.text("Forbidden", 403);
+        }
+      }
+
       const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
 
       let imageUrl: string;

@@ -79,6 +79,26 @@ describe("src/web/session.ts", () => {
     expect(result).toBeNull();
   });
 
+  // Regression: a malformed percent-encoded session cookie must not throw a
+  // URIError that bubbles up into the auth middleware and becomes a 500.
+  // getSessionData should treat it as an invalid session and return null.
+  it("getSessionData returns null (never throws) on malformed percent-encoding", async () => {
+    const { getSessionData, COOKIE_NAME } = await import(
+      "../../src/web/session.js"
+    );
+
+    // `%zz` is not valid percent-encoding → decodeURIComponent throws.
+    const cookieHeader = `${COOKIE_NAME}=%zz`;
+
+    expect(() => getSessionData(cookieHeader, TEST_SECRET)).not.toThrow();
+    expect(getSessionData(cookieHeader, TEST_SECRET)).toBeNull();
+
+    // Lone `%` is also malformed.
+    const cookieHeader2 = `${COOKIE_NAME}=abc%`;
+    expect(() => getSessionData(cookieHeader2, TEST_SECRET)).not.toThrow();
+    expect(getSessionData(cookieHeader2, TEST_SECRET)).toBeNull();
+  });
+
   // TS-2.6
   it("issueSessionCookie writes a Set-Cookie header with HttpOnly, SameSite=Lax, Path=/, and 30-day Max-Age", async () => {
     const { issueSessionCookie, THIRTY_DAYS_SECONDS } = await import(

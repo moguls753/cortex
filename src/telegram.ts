@@ -183,8 +183,8 @@ export async function handleTextMessage(
       const unclassifiedVisibility: Visibility =
         classResult?.visibility ?? "private";
       await (sql as any)`
-        INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
-        VALUES (${"Untitled"}, ${text}, ${null}, ${null}, ${{}}, ${[]}, ${"telegram"}, ${"text"}, ${unclassifiedVisibility})
+        INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility, source_chat_id)
+        VALUES (${"Untitled"}, ${text}, ${null}, ${null}, ${{}}, ${[]}, ${"telegram"}, ${"text"}, ${unclassifiedVisibility}, ${chatId})
         RETURNING id
       `;
       const reply = (ctx.reply as Function).bind(ctx) as (text: string, options?: unknown) => Promise<unknown>;
@@ -205,8 +205,8 @@ export async function handleTextMessage(
 
     // Store entry
     const rows = await (sql as any)`
-      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
-      VALUES (${classResult.name}, ${text}, ${classResult.category}, ${classResult.confidence}, ${classResult.fields}, ${classResult.tags}, ${"telegram"}, ${"text"}, ${visibility})
+      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility, source_chat_id)
+      VALUES (${classResult.name}, ${text}, ${classResult.category}, ${classResult.confidence}, ${classResult.fields}, ${classResult.tags}, ${"telegram"}, ${"text"}, ${visibility}, ${chatId})
       RETURNING id
     `;
     const entryId = rows[0]?.id as string;
@@ -387,8 +387,8 @@ export async function handleVoiceMessage(
       const unclassifiedVisibility: Visibility =
         classResult?.visibility ?? "private";
       await (sql as any)`
-        INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
-        VALUES (${"Untitled"}, ${transcript}, ${null}, ${null}, ${{}}, ${[]}, ${"telegram"}, ${"voice"}, ${unclassifiedVisibility})
+        INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility, source_chat_id)
+        VALUES (${"Untitled"}, ${transcript}, ${null}, ${null}, ${{}}, ${[]}, ${"telegram"}, ${"voice"}, ${unclassifiedVisibility}, ${chatId})
         RETURNING id
       `;
       await reply("Stored but could not classify — will retry");
@@ -405,8 +405,8 @@ export async function handleVoiceMessage(
 
     // Store entry
     const rows = await (sql as any)`
-      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility)
-      VALUES (${classResult.name}, ${transcript}, ${classResult.category}, ${classResult.confidence}, ${classResult.fields}, ${classResult.tags}, ${"telegram"}, ${"voice"}, ${visibility})
+      INSERT INTO entries (name, content, category, confidence, fields, tags, source, source_type, visibility, source_chat_id)
+      VALUES (${classResult.name}, ${transcript}, ${classResult.category}, ${classResult.confidence}, ${classResult.fields}, ${classResult.tags}, ${"telegram"}, ${"voice"}, ${visibility}, ${chatId})
       RETURNING id
     `;
     const entryId = rows[0]?.id as string;
@@ -800,10 +800,15 @@ export async function handleFixCommand(
       return;
     }
 
-    // Find most recent telegram entry
+    // Find most recent telegram entry for this sender. Rows written before
+    // the source_chat_id migration have NULL; we let those through so legacy
+    // entries remain fixable by any authorized chat. New entries written
+    // after the migration are strictly scoped to their originating chat.
     const rows = await (sql as any)`
       SELECT id, content, category, source FROM entries
-      WHERE source = 'telegram' AND deleted_at IS NULL
+      WHERE source = 'telegram'
+        AND deleted_at IS NULL
+        AND (source_chat_id = ${chatId} OR source_chat_id IS NULL)
       ORDER BY created_at DESC
       LIMIT 1
     `;

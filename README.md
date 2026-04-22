@@ -20,7 +20,7 @@
 
 - **Capture** - Telegram bot with text and voice (faster-whisper), web dashboard with quick capture and full editor, MCP server
 - **Intelligence** - LLM classification into 5 categories with confidence scoring, context-aware (uses recent + similar entries), inline Telegram buttons for low-confidence entries, `/fix` to reclassify, automatic task completion detection
-- **Search** - semantic search via pgvector + qwen3-embedding with text fallback, filter by category/tags/date, multilingual (EN/DE)
+- **Search** - semantic search via pgvector + qwen3-embedding with text fallback, peer-dropdown filters (category, tag, status, activity), multilingual (EN/DE)
 - **Google Calendar** - automatic event creation from classified entries, multi-calendar support with LLM-based routing
 - **Digests** - daily briefing and weekly review, delivered by email and shown on the dashboard
 - **Display** - PNG endpoint for e-ink devices (e.g. TRMNL) showing today's calendar, pending tasks, and weather

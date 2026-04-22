@@ -527,6 +527,33 @@ describe("Google Calendar", () => {
 
       expect(config.calendarId).toBe("settings@group.calendar.google.com");
     });
+
+    it("picks up timezone from settings.timezone instead of process.env.TZ", async () => {
+      // Regression: createEvent used to hard-code process.env.TZ || "Europe/Berlin",
+      // so a user who set timezone=America/Los_Angeles in /settings still got
+      // events created in the server's TZ.
+      const resolveCalendarConfig = realResolveCalendarConfig;
+      mockGetAllSettings.mockResolvedValue({
+        google_calendar_id: "cal@g.com",
+        timezone: "America/Los_Angeles",
+      });
+      const config = await resolveCalendarConfig(mockSql);
+      expect(config.timezone).toBe("America/Los_Angeles");
+    });
+
+    it("falls back to process.env.TZ when settings.timezone is unset", async () => {
+      const resolveCalendarConfig = realResolveCalendarConfig;
+      const prevTz = process.env.TZ;
+      process.env.TZ = "Asia/Tokyo";
+      try {
+        mockGetAllSettings.mockResolvedValue({ google_calendar_id: "cal@g.com" });
+        const config = await resolveCalendarConfig(mockSql);
+        expect(config.timezone).toBe("Asia/Tokyo");
+      } finally {
+        if (prevTz === undefined) delete process.env.TZ;
+        else process.env.TZ = prevTz;
+      }
+    });
   });
 
   // ─── Group 3: Confirmation Messages ────────────────────────────

@@ -206,7 +206,7 @@ describe("display routes", () => {
       expect(res.status).toBe(404);
     });
 
-    it("includes token param in image_url when token is set", async () => {
+    it("includes token param in image_url when token is set (and caller provided the token)", async () => {
       mockGetAllSettings.mockResolvedValue({
         display_enabled: "true",
         display_token: "mytoken",
@@ -214,7 +214,7 @@ describe("display routes", () => {
       });
 
       const app = buildApp();
-      const res = await app.request("/api/display", {
+      const res = await app.request("/api/display?token=mytoken", {
         headers: { host: "cortex.local" },
       });
 
@@ -394,19 +394,32 @@ describe("display routes", () => {
       expect(source).toContain('from "node:crypto"');
     });
 
-    it("TS-3.6 — /api/display does not enforce the token", async () => {
+    it("TS-3.6 — /api/display enforces the token when one is set", async () => {
       mockGetAllSettings.mockResolvedValue({
         display_enabled: "true",
         display_token: "correct",
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      const res = await app.request("/api/display", {
+
+      // No token → 403
+      const noToken = await app.request("/api/display", {
         headers: { host: "cortex.local" },
       });
+      expect(noToken.status).toBe(403);
 
-      expect(res.status).toBe(200);
-      const json = (await res.json()) as Record<string, unknown>;
+      // Wrong token → 403
+      const wrong = await app.request("/api/display?token=wrong", {
+        headers: { host: "cortex.local" },
+      });
+      expect(wrong.status).toBe(403);
+
+      // Correct token → 200 with image_url (which embeds the same token)
+      const ok = await app.request("/api/display?token=correct", {
+        headers: { host: "cortex.local" },
+      });
+      expect(ok.status).toBe(200);
+      const json = (await ok.json()) as Record<string, unknown>;
       expect(json).toHaveProperty("image_url");
     });
   });
@@ -484,7 +497,7 @@ describe("display routes", () => {
         timezone: "Europe/Berlin",
       });
       const app = buildApp();
-      const res = await app.request("/api/display", {
+      const res = await app.request("/api/display?token=secret-123", {
         headers: { host: "cortex.local" },
       });
       const json = (await res.json()) as { image_url: string };

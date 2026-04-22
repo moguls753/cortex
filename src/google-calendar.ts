@@ -19,6 +19,13 @@ interface CalendarConfig {
   clientId: string;
   clientSecret: string;
   defaultDuration: number;
+  /**
+   * IANA timezone identifier used for timed events. Resolved from
+   * `settings.timezone` with a fall-back chain: setting → `process.env.TZ`
+   * → "Europe/Berlin". A caller who changes the timezone in /settings must
+   * see new events land in that zone immediately.
+   */
+  timezone: string;
   calendars?: Record<string, string>;
   defaultCalendar?: string;
 }
@@ -31,6 +38,7 @@ export async function resolveCalendarConfig(sql?: postgres.Sql): Promise<Calenda
   const refreshToken = settings.google_refresh_token || "";
   const clientId = settings.google_client_id || "";
   const clientSecret = settings.google_client_secret || "";
+  const timezone = settings.timezone || process.env.TZ || "Europe/Berlin";
 
   let defaultDuration = 60;
   const durationStr = settings.google_calendar_default_duration;
@@ -61,7 +69,7 @@ export async function resolveCalendarConfig(sql?: postgres.Sql): Promise<Calenda
         }
       } else if (entries.length === 1) {
         // Single entry in google_calendars = single-calendar mode
-        return { calendarId: entries[0][1], accessToken, refreshToken, clientId, clientSecret, defaultDuration };
+        return { calendarId: entries[0][1], accessToken, refreshToken, clientId, clientSecret, defaultDuration, timezone };
       }
     } catch {
       // Invalid JSON — fall through to single-calendar
@@ -69,10 +77,10 @@ export async function resolveCalendarConfig(sql?: postgres.Sql): Promise<Calenda
   }
 
   if (calendars) {
-    return { calendarId: calendars[defaultCalendar!], accessToken, refreshToken, clientId, clientSecret, defaultDuration, calendars, defaultCalendar };
+    return { calendarId: calendars[defaultCalendar!], accessToken, refreshToken, clientId, clientSecret, defaultDuration, timezone, calendars, defaultCalendar };
   }
 
-  return { calendarId, accessToken, refreshToken, clientId, clientSecret, defaultDuration };
+  return { calendarId, accessToken, refreshToken, clientId, clientSecret, defaultDuration, timezone };
 }
 
 export async function isCalendarConfigured(sql?: postgres.Sql): Promise<boolean> {
@@ -130,8 +138,9 @@ function buildEventBody(params: {
   calendarDate: string;
   calendarTime: string | null;
   defaultDuration: number;
+  timezone: string;
 }) {
-  const { name, content, calendarDate, calendarTime, defaultDuration } = params;
+  const { name, content, calendarDate, calendarTime, defaultDuration, timezone } = params;
   const validTime = calendarTime && TIME_RE.test(calendarTime) ? calendarTime : null;
 
   const body: Record<string, unknown> = {
@@ -139,11 +148,9 @@ function buildEventBody(params: {
     description: content,
   };
 
-  const tz = process.env.TZ || "Europe/Berlin";
-
   if (validTime) {
-    body.start = { dateTime: `${calendarDate}T${validTime}:00`, timeZone: tz };
-    body.end = { dateTime: addMinutes(calendarDate, validTime, defaultDuration), timeZone: tz };
+    body.start = { dateTime: `${calendarDate}T${validTime}:00`, timeZone: timezone };
+    body.end = { dateTime: addMinutes(calendarDate, validTime, defaultDuration), timeZone: timezone };
   } else {
     // All-day event: end date is next day
     const endDate = new Date(calendarDate + "T00:00:00Z");
@@ -160,7 +167,7 @@ export async function createCalendarEvent(
   config: CalendarConfig,
   params: { name: string; content: string; calendarDate: string; calendarTime: string | null },
 ): Promise<{ id: string }> {
-  const body = buildEventBody({ ...params, defaultDuration: config.defaultDuration });
+  const body = buildEventBody({ ...params, defaultDuration: config.defaultDuration, timezone: config.timezone });
   const url = `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(config.calendarId)}/events`;
 
   const res = await fetch(url, {
@@ -186,7 +193,7 @@ export async function updateCalendarEvent(
   eventId: string,
   params: { name: string; content: string; calendarDate: string; calendarTime: string | null },
 ): Promise<{ id: string }> {
-  const body = buildEventBody({ ...params, defaultDuration: config.defaultDuration });
+  const body = buildEventBody({ ...params, defaultDuration: config.defaultDuration, timezone: config.timezone });
   const url = `${CALENDAR_API_BASE}/calendars/${encodeURIComponent(config.calendarId)}/events/${encodeURIComponent(eventId)}`;
 
   const res = await fetch(url, {

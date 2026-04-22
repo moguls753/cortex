@@ -90,7 +90,15 @@ export function getSessionData(
   const token = cookies[COOKIE_NAME];
   if (!token) return null;
 
-  const decoded = decodeURIComponent(token);
+  // Malformed percent-encoding throws URIError. Treat as an invalid session
+  // rather than letting it bubble up and turn into a 500 in the auth
+  // middleware — the browser may send a tampered or truncated cookie.
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(token);
+  } catch {
+    return null;
+  }
   const payload = verify(decoded, secret);
   if (!payload) return null;
 

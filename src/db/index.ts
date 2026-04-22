@@ -123,6 +123,15 @@ export async function runMigrations(url: string): Promise<void> {
       ALTER TABLE entries ADD COLUMN IF NOT EXISTS google_calendar_event_id TEXT;
       ALTER TABLE entries ADD COLUMN IF NOT EXISTS google_calendar_target TEXT;
       ALTER TABLE entries ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'private';
+      -- Per-entry Telegram sender identity. Telegram entries created after
+      -- this migration carry the originating chat_id so the /fix handler can
+      -- scope its "most recent entry" lookup to the sender. Pre-migration
+      -- telegram rows are NULL; the /fix query allows NULL through for
+      -- legacy reachability (see handleFixCommand in src/telegram.ts).
+      ALTER TABLE entries ADD COLUMN IF NOT EXISTS source_chat_id BIGINT;
+      CREATE INDEX IF NOT EXISTS entries_source_chat_id_idx
+        ON entries (source_chat_id)
+        WHERE source = 'telegram' AND deleted_at IS NULL;
       DO $do$ BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM pg_constraint

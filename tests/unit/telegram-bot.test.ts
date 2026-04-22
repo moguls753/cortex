@@ -831,6 +831,42 @@ describe("Telegram Bot", () => {
         "Usage: /fix <correction description>",
       );
     });
+
+    it("scopes 'most recent entry' lookup to the sender's chat_id", async () => {
+      // Regression guard: a second authorized chat_id could previously rewrite
+      // another user's most-recent Telegram entry because the SELECT used
+      // WHERE source='telegram' with no sender filter. The fix stores
+      // source_chat_id on INSERT and narrows the /fix SELECT to
+      // (source_chat_id = <sender> OR source_chat_id IS NULL).
+      const { ctx } = createMockContext({ text: "/fix some change" });
+      mockSql.mockResolvedValueOnce([
+        {
+          id: "uuid-99",
+          content: "x",
+          category: "tasks",
+          source: "telegram",
+        },
+      ]);
+      mockReclassifyEntry.mockResolvedValue(
+        createClassificationResult({ category: "projects" }),
+      );
+
+      await handleFixCommand(ctx, mockSql);
+
+      // First SQL call is the SELECT. Inspect the template strings joined
+      // back together to assert the query shape.
+      const firstCall = mockSql.mock.calls[0];
+      const strings = firstCall?.[0] as readonly string[] | undefined;
+      expect(strings).toBeDefined();
+      const joined = strings!.join("?");
+      expect(joined).toMatch(/source\s*=\s*'telegram'/i);
+      expect(joined).toMatch(/source_chat_id\s*=/i);
+      expect(joined).toMatch(/source_chat_id\s+IS\s+NULL/i);
+      // Assert the parameter slot for source_chat_id is the caller's chat id
+      // (mock context uses chat id 123456).
+      const params = firstCall!.slice(1);
+      expect(params).toContain(123456);
+    });
   });
 
   // =========================================================================

@@ -1,6 +1,6 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { generateEmbedding } from "./embed.js";
+import { generateEmbedding, prepareEmbeddingInput } from "./embed.js";
 import { classifyText, assembleContext } from "./classify.js";
 import {
   searchBySimilarity,
@@ -412,13 +412,28 @@ export async function handleUpdateEntry(sql: any, params: {
     });
   }
 
-  // Re-embed if content or name changed
-  const needsReembed = "content" in updates || "name" in updates;
+  // Re-embed whenever any field that feeds prepareEmbeddingInput changes.
+  // Embeddings mix [category] + name + content + tags + fields — updating
+  // only the "content-or-name" subset left category/tags/fields edits silently
+  // drifting, and the old code also bypassed prepareEmbeddingInput so
+  // MCP-written embeddings lacked the enriched context other writers use.
+  const needsReembed =
+    "name" in updates ||
+    "content" in updates ||
+    "category" in updates ||
+    "tags" in updates ||
+    "fields" in updates;
   if (needsReembed) {
-    const textForEmbed = (updates.content as string) ?? entry.content ?? (updates.name as string) ?? entry.name;
+    const merged = {
+      name: (updates.name as string | undefined) ?? entry.name,
+      content: (updates.content as string | null | undefined) ?? entry.content,
+      category: (updates.category as string | null | undefined) ?? entry.category,
+      tags: (updates.tags as string[] | null | undefined) ?? entry.tags,
+      fields: (updates.fields as Record<string, unknown> | null | undefined) ?? entry.fields,
+    };
+    const text = prepareEmbeddingInput(merged);
     try {
-      const embedding = await generateEmbedding(textForEmbed);
-      updates.embedding = embedding;
+      updates.embedding = text ? await generateEmbedding(text) : null;
     } catch {
       updates.embedding = null;
     }

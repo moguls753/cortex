@@ -34,6 +34,26 @@ vi.mock("../../src/mcp-queries.js", () => ({
 
 vi.mock("../../src/embed.js", () => ({
   generateEmbedding: vi.fn(),
+  // Real prepareEmbeddingInput is pure; re-implement the minimal shape here
+  // so the mock is self-contained and returns a non-null text whenever the
+  // entry has a name or content (mirroring the real function's contract).
+  prepareEmbeddingInput: (entry: {
+    name: string;
+    content: string | null;
+    category?: string | null;
+    tags?: string[] | null;
+    fields?: Record<string, unknown> | null;
+  }): string | null => {
+    const name = entry.name?.trim() || "";
+    const content = entry.content?.trim() || "";
+    if (!name && !content) return null;
+    const parts: string[] = [];
+    if (entry.category) parts.push(`[${entry.category}]`);
+    if (name) parts.push(name);
+    if (content) parts.push(content);
+    if (entry.tags && entry.tags.length > 0) parts.push(entry.tags.join(", "));
+    return parts.join(" ");
+  },
 }));
 
 vi.mock("../../src/classify.js", () => ({
@@ -711,7 +731,7 @@ describe("MCP Server", () => {
       expect(result.content[0].text).toContain("Invalid category");
     });
 
-    it("does not re-embed when only tags change", async () => {
+    it("re-embeds when only tags change (tags feed prepareEmbeddingInput)", async () => {
       const { getEntryById, updateEntryFields } = await import("../../src/mcp-queries.js");
       const { generateEmbedding } = await import("../../src/embed.js");
       const { handleUpdateEntry } = await import("../../src/mcp-tools.js");
@@ -720,10 +740,36 @@ describe("MCP Server", () => {
       vi.mocked(updateEntryFields).mockResolvedValue(
         createMockEntry({ tags: ["new-tag"] }),
       );
+      vi.mocked(generateEmbedding).mockResolvedValue(createFakeEmbedding());
 
       await handleUpdateEntry(mockSql, { id: VALID_UUID, tags: ["new-tag"] });
 
-      expect(vi.mocked(generateEmbedding)).not.toHaveBeenCalled();
+      // Tags are part of the embedded text, so a tag-only update must refresh
+      // the embedding (previously this silently drifted).
+      expect(vi.mocked(generateEmbedding)).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(generateEmbedding).mock.calls[0]![0] as string;
+      expect(call).toContain("new-tag");
+    });
+
+    it("re-embeds when only category changes and the embed text includes [category]", async () => {
+      // Regression: prior code bypassed prepareEmbeddingInput entirely, so
+      // MCP-written embeddings were content-only and category/tags/fields
+      // edits left the embedding stale.
+      const { getEntryById, updateEntryFields } = await import("../../src/mcp-queries.js");
+      const { generateEmbedding } = await import("../../src/embed.js");
+      const { handleUpdateEntry } = await import("../../src/mcp-tools.js");
+
+      vi.mocked(getEntryById).mockResolvedValue(createMockEntry());
+      vi.mocked(updateEntryFields).mockResolvedValue(
+        createMockEntry({ category: "ideas" }),
+      );
+      vi.mocked(generateEmbedding).mockResolvedValue(createFakeEmbedding());
+
+      await handleUpdateEntry(mockSql, { id: VALID_UUID, category: "ideas" });
+
+      expect(vi.mocked(generateEmbedding)).toHaveBeenCalledTimes(1);
+      const call = vi.mocked(generateEmbedding).mock.calls[0]![0] as string;
+      expect(call).toContain("[ideas]");
     });
 
     it("returns entry unchanged for empty update", async () => {

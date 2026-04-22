@@ -150,7 +150,9 @@ Query: "how do I deal with LeChuck"
 /browse?mode=text&q=grog
 ```
 
-Filter pills above the list narrow by category and by tag. Click a tag pill again to remove the filter.
+Four dropdowns above the list — **Kategorie**, **Tag**, **Status**, **Aktivität** — narrow the results. Each is idle by default (`dropdown ▼`) and becomes active when you pick a value (`dropdown: value ×`). Click the chip body to change the value; click × to clear.
+
+`Aktivität` is one axis covering both recency and staleness: `today`, `this week`, `this month`, `stale 5+ days`, `stale 14+ days`, `stale 30+ days`. Picking a recency value clears any stale value and vice versa.
 
 ---
 
