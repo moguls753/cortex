@@ -523,4 +523,159 @@ describe("Web Dashboard Integration", () => {
       expect(text2).toContain("multi-tab-test");
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Browse Filters — dashboard card → browse count match (feature: browse-filters)
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Browse Filters — dashboard/browse count match", () => {
+    /**
+     * Seed entry with JSONB fields stored as a proper JSONB object.
+     * The file-local seedEntry uses JSON.stringify which stores the value
+     * as a JSON-string — unqueryable via fields->>'status'.
+     */
+    async function seedJsonbEntry(
+      sql: postgres.Sql,
+      overrides: EntryData = {},
+    ): Promise<string> {
+      const entry = createMockEntry(overrides);
+      await sql`
+        INSERT INTO entries (
+          id, name, category, content, fields, tags, confidence,
+          source, source_type, deleted_at, created_at, updated_at
+        ) VALUES (
+          ${entry.id}, ${entry.name}, ${entry.category}, ${entry.content},
+          ${sql.json(entry.fields as unknown as Parameters<typeof sql.json>[0])},
+          ${entry.tags}, ${entry.confidence},
+          ${entry.source}, ${entry.source_type}, ${entry.deleted_at},
+          ${entry.created_at}, ${entry.updated_at}
+        )
+      `;
+      return entry.id;
+    }
+
+    /**
+     * Create a Hono app that mounts BOTH the dashboard and browse routes so
+     * a single integration test can fetch from both endpoints with the same
+     * session cookie and SQL connection.
+     */
+    async function createDashboardAndBrowse(
+      sql: postgres.Sql,
+    ): Promise<{ app: Hono }> {
+      const { createAuthMiddleware, createAuthRoutes } = await import(
+        "../../src/web/auth.js"
+      );
+      const { createDashboardRoutes } = await import(
+        "../../src/web/dashboard.js"
+      );
+      const { createBrowseRoutes } = await import(
+        "../../src/web/browse.js"
+      );
+      const { createSSEBroadcaster } = await import("../../src/web/sse.js");
+      const broadcaster = createSSEBroadcaster();
+      const app = new Hono();
+      app.use("*", createAuthMiddleware(TEST_SECRET));
+      app.route("/", createAuthRoutes(TEST_PASSWORD, TEST_SECRET));
+      app.route("/", createDashboardRoutes(sql, broadcaster));
+      app.route("/", createBrowseRoutes(sql));
+      return { app };
+    }
+
+    function extractStatValue(html: string, key: string): number {
+      const m = html.match(new RegExp(`data-stat="${key}"[^>]*>\\s*([\\d]+)\\s*<`));
+      return m ? parseInt(m[1]!, 10) : -1;
+    }
+
+    function countEntryLinks(html: string): number {
+      return (html.match(/<a href="\/entry\//g) || []).length;
+    }
+
+    // TS-1.7
+    it("open-tasks card count matches /browse?category=tasks&status=pending count", async () => {
+      // Seed: 3 pending tasks, 2 done tasks, 4 non-task entries
+      for (let i = 0; i < 3; i++) {
+        await seedJsonbEntry(db.sql, {
+          name: `Pending task ${i}`,
+          category: "tasks",
+          fields: { status: "pending" },
+        });
+      }
+      for (let i = 0; i < 2; i++) {
+        await seedJsonbEntry(db.sql, {
+          name: `Done task ${i}`,
+          category: "tasks",
+          fields: { status: "done" },
+        });
+      }
+      for (let i = 0; i < 4; i++) {
+        await seedJsonbEntry(db.sql, {
+          name: `Other ${i}`,
+          category: "ideas",
+          fields: { oneliner: "x" },
+        });
+      }
+
+      const { app } = await createDashboardAndBrowse(db.sql);
+      const cookie = await loginAndGetCookie(app);
+
+      const dashRes = await app.request("/", { headers: { Cookie: cookie } });
+      const dashHtml = await dashRes.text();
+      const cardValue = extractStatValue(dashHtml, "open-tasks");
+
+      const browseRes = await app.request(
+        "/browse?category=tasks&status=pending",
+        { headers: { Cookie: cookie } },
+      );
+      const browseHtml = await browseRes.text();
+      const browseCount = countEntryLinks(browseHtml);
+
+      expect(cardValue).toBe(3);
+      expect(browseCount).toBe(3);
+      expect(cardValue).toBe(browseCount);
+    });
+
+    // TS-1.8
+    it("stalled card count matches /browse?category=projects&status=active&stale_days=5 count", async () => {
+      const now = Date.now();
+      // 2 active projects updated recently (not stalled)
+      for (let i = 0; i < 2; i++) {
+        await seedJsonbEntry(db.sql, {
+          name: `Active recent ${i}`,
+          category: "projects",
+          fields: { status: "active" },
+          updated_at: new Date(now - 1 * 86_400_000),
+        });
+      }
+      // 1 active project stalled (>5 days)
+      await seedJsonbEntry(db.sql, {
+        name: "Active stalled",
+        category: "projects",
+        fields: { status: "active" },
+        updated_at: new Date(now - 10 * 86_400_000),
+      });
+      // 1 paused project stalled long ago (does not match — status != active)
+      await seedJsonbEntry(db.sql, {
+        name: "Paused long ago",
+        category: "projects",
+        fields: { status: "paused" },
+        updated_at: new Date(now - 30 * 86_400_000),
+      });
+
+      const { app } = await createDashboardAndBrowse(db.sql);
+      const cookie = await loginAndGetCookie(app);
+
+      const dashRes = await app.request("/", { headers: { Cookie: cookie } });
+      const dashHtml = await dashRes.text();
+      const cardValue = extractStatValue(dashHtml, "stalled");
+
+      const browseRes = await app.request(
+        "/browse?category=projects&status=active&stale_days=5",
+        { headers: { Cookie: cookie } },
+      );
+      const browseHtml = await browseRes.text();
+      const browseCount = countEntryLinks(browseHtml);
+
+      expect(cardValue).toBe(1);
+      expect(browseCount).toBe(1);
+    });
+  });
 });

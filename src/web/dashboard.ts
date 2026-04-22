@@ -319,20 +319,20 @@ function renderStats(
   t: TFunction,
 ): string {
   const items = [
-    { value: stats.entriesThisWeek, label: t("dashboard.stats.entries_this_week"), icon: iconZap("size-3"), colorCls: "text-primary", statKey: "entries-week" },
-    { value: stats.totalEntries ?? 0, label: t("dashboard.stats.total_entries"), icon: iconBrain("size-3"), colorCls: "text-foreground", statKey: "entries-total" },
-    { value: stats.openTasks, label: t("dashboard.stats.open_tasks"), icon: iconCheckSquare("size-3"), colorCls: "text-accent", statKey: "open-tasks" },
-    { value: stats.stalledProjects, label: t("dashboard.stats.stalled_projects"), icon: iconAlertTriangle("size-3"), colorCls: "text-destructive", statKey: "stalled" },
+    { value: stats.entriesThisWeek, label: t("dashboard.stats.entries_this_week"), icon: iconZap("size-3"), colorCls: "text-primary", statKey: "entries-week", href: "/browse?since=week" },
+    { value: stats.totalEntries ?? 0, label: t("dashboard.stats.total_entries"), icon: iconBrain("size-3"), colorCls: "text-foreground", statKey: "entries-total", href: "/browse" },
+    { value: stats.openTasks, label: t("dashboard.stats.open_tasks"), icon: iconCheckSquare("size-3"), colorCls: "text-accent", statKey: "open-tasks", href: "/browse?category=tasks&status=pending" },
+    { value: stats.stalledProjects, label: t("dashboard.stats.stalled_projects"), icon: iconAlertTriangle("size-3"), colorCls: "text-destructive", statKey: "stalled", href: "/browse?category=projects&status=active&stale_days=5" },
   ];
 
   const cards = items
     .map(
       (s) => `
-      <div class="flex flex-col items-center justify-center gap-0.5 rounded-md border border-border bg-card px-2 py-2">
+      <a href="${s.href}" class="flex flex-col items-center justify-center gap-0.5 rounded-md border border-border bg-card px-2 py-2 hover:border-primary hover:bg-secondary transition-colors">
         <span class="${s.colorCls}">${s.icon}</span>
         <span data-stat="${s.statKey}" class="${s.colorCls} text-base font-medium leading-none">${s.value}</span>
         <span class="text-[9px] uppercase tracking-wider text-muted-foreground">${s.label}</span>
-      </div>`,
+      </a>`,
     )
     .join("");
 

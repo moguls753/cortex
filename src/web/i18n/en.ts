@@ -80,6 +80,38 @@ export const en = {
     text_fallback: "Semantic search unavailable — showing text results.",
     result_count_one: "{{count}} result",
     result_count_other: "{{count}} results",
+    filter: {
+      add: "+ Filter",
+      clear: "Clear filters",
+      dimension: {
+        status: "Status",
+        since: "Updated",
+        stale_days: "Inactive",
+      },
+      value: {
+        status: {
+          pending: "Pending",
+          done: "Done",
+          active: "Active",
+          paused: "Paused",
+          completed: "Completed",
+        },
+        since: {
+          today: "Today",
+          week: "This week",
+          month: "This month",
+        },
+      },
+      pill: {
+        status: "Status: {{value}}",
+        since: "Updated: {{value}}",
+        stale_days_one: "Inactive: {{count}}+ day",
+        stale_days_other: "Inactive: {{count}}+ days",
+      },
+      results_zero: "No entries match",
+      results_one: "{{count}} entry matches",
+      results_other: "{{count}} entries match",
+    },
   },
 
   entry: {

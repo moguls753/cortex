@@ -680,4 +680,31 @@ describe("Web Trash", () => {
       expect(body).not.toMatch(/data-visibility=["']shared["']/);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Browse Filters — trash ignores new params (feature: browse-filters)
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Browse Filters — trash ignores new params", () => {
+    // TS-4.7
+    it("/trash ignores since/status/stale_days params and returns 200 without the filter bar", async () => {
+      const { browseEntries } = await import(
+        "../../src/web/browse-queries.js"
+      );
+      vi.mocked(browseEntries).mockResolvedValue([]);
+
+      const { app } = await createTestTrash();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request(
+        "/trash?since=week&status=pending&stale_days=5",
+        { headers: { Cookie: cookie } },
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      // The browse-filters feature introduces a data-filter-bar marker on
+      // /browse. /trash must NOT include it — the two surfaces are distinct.
+      expect(body).not.toContain("data-filter-bar");
+    });
+  });
 });

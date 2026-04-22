@@ -1,6 +1,6 @@
 # Spec-DD Progress Tracker
 
-Last updated: 2026-04-20 (entry-visibility complete)
+Last updated: 2026-04-21 (browse-filters complete — all 6 phases)
 
 ## Feature Status
 
@@ -25,6 +25,7 @@ Last updated: 2026-04-20 (entry-visibility complete)
 | ui-language | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | auth-refactor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | entry-visibility | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| browse-filters | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Legend: ✅ = complete, ⬜ = not started, 🔄 = in progress
 

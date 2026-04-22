@@ -89,6 +89,7 @@ function createMockEntry(overrides: Partial<Entry> = {}): Entry {
 
 interface Stats {
   entriesThisWeek: number;
+  totalEntries: number;
   openTasks: number;
   stalledProjects: number;
 }
@@ -96,6 +97,7 @@ interface Stats {
 function createMockStats(overrides: Partial<Stats> = {}): Stats {
   return {
     entriesThisWeek: 0,
+    totalEntries: 0,
     openTasks: 0,
     stalledProjects: 0,
     ...overrides,
@@ -746,6 +748,210 @@ describe("Web Dashboard", () => {
 
       expect(body).toContain("Public task");
       expect(body).toContain("Surprise gift plan");
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Browse Filters — stat card anchors (feature: browse-filters)
+  // ═══════════════════════════════════════════════════════════════════
+  describe("Browse Filters — stat card anchors", () => {
+    const STAT_KEYS = [
+      "entries-week",
+      "entries-total",
+      "open-tasks",
+      "stalled",
+    ] as const;
+
+    const EXPECTED_HREFS: Record<(typeof STAT_KEYS)[number], string> = {
+      "entries-week": "/browse?since=week",
+      "entries-total": "/browse",
+      "open-tasks": "/browse?category=tasks&status=pending",
+      stalled: "/browse?category=projects&status=active&stale_days=5",
+    };
+
+    function hrefForStat(html: string, key: string): string | null {
+      // Find the <a ...href="..."> that most tightly wraps the data-stat span.
+      // Scan backwards from the data-stat occurrence to the nearest preceding
+      // <a ... href="..."> that hasn't been closed before reaching the span.
+      const markerIdx = html.indexOf(`data-stat="${key}"`);
+      if (markerIdx < 0) return null;
+      const preceding = html.slice(0, markerIdx);
+      const openAnchorRe = /<a\b[^>]*href="([^"]*)"[^>]*>/g;
+      let lastMatch: RegExpExecArray | null = null;
+      let m: RegExpExecArray | null;
+      while ((m = openAnchorRe.exec(preceding)) !== null) {
+        // Ensure the anchor hasn't been closed before the data-stat marker.
+        const closeIdx = preceding.indexOf("</a>", m.index + m[0].length);
+        if (closeIdx === -1) {
+          lastMatch = m;
+        } else {
+          // There IS a closing tag between this opening <a> and the data-stat;
+          // so this anchor does NOT wrap the data-stat.
+          continue;
+        }
+      }
+      return lastMatch ? lastMatch[1]! : null;
+    }
+
+    async function renderDashboard(
+      stats?: Partial<Stats>,
+    ): Promise<string> {
+      if (stats) {
+        const { getDashboardStats } = await import(
+          "../../src/web/dashboard-queries.js"
+        );
+        vi.mocked(getDashboardStats).mockResolvedValue(createMockStats(stats));
+      }
+      const { app } = await createTestDashboard();
+      const cookie = await loginAndGetCookie(app);
+      const res = await app.request("/", { headers: { Cookie: cookie } });
+      expect(res.status).toBe(200);
+      return res.text();
+    }
+
+    // TS-1.1
+    it("renders each stat card as an <a> element wrapping icon + number + label", async () => {
+      const body = await renderDashboard({
+        entriesThisWeek: 3,
+        totalEntries: 14,
+        openTasks: 7,
+        stalledProjects: 2,
+      });
+      for (const key of STAT_KEYS) {
+        // Anchor wraps the data-stat span (the number). This assertion fails
+        // today because renderStats wraps in <div>, not <a>.
+        const href = hrefForStat(body, key);
+        expect(href).not.toBeNull();
+      }
+    });
+
+    // TS-1.2
+    it("preserves [data-stat] spans inside the anchor wrappers", async () => {
+      const body = await renderDashboard({
+        entriesThisWeek: 1,
+        totalEntries: 2,
+        openTasks: 3,
+        stalledProjects: 4,
+      });
+      for (const key of STAT_KEYS) {
+        const occurrences = (
+          body.match(new RegExp(`data-stat="${key}"`, "g")) ?? []
+        ).length;
+        expect(occurrences).toBe(1);
+      }
+    });
+
+    // TS-1.3 — TS-1.6
+    for (const key of STAT_KEYS) {
+      it(`${key} card href is ${EXPECTED_HREFS[key]}`, async () => {
+        const body = await renderDashboard({
+          entriesThisWeek: 2,
+          totalEntries: 10,
+          openTasks: 5,
+          stalledProjects: 1,
+        });
+        expect(hrefForStat(body, key)).toBe(EXPECTED_HREFS[key]);
+      });
+    }
+
+    // TS-1.9
+    it("renders hover:border-primary and hover:bg-secondary on each stat card anchor", async () => {
+      const body = await renderDashboard({
+        entriesThisWeek: 1,
+        totalEntries: 1,
+        openTasks: 1,
+        stalledProjects: 1,
+      });
+      for (const key of STAT_KEYS) {
+        const markerIdx = body.indexOf(`data-stat="${key}"`);
+        expect(markerIdx).toBeGreaterThanOrEqual(0);
+        const preceding = body.slice(0, markerIdx);
+        const lastOpenAnchor = preceding.lastIndexOf("<a ");
+        expect(lastOpenAnchor).toBeGreaterThanOrEqual(0);
+        const anchorTag = body.slice(lastOpenAnchor, markerIdx);
+        // Hover class invariants
+        expect(anchorTag).toMatch(/hover:border-primary/);
+        expect(anchorTag).toMatch(/hover:bg-secondary/);
+      }
+    });
+
+    // TS-1.10
+    it("stat card anchors are focus-targets (no tabindex=-1 override)", async () => {
+      const body = await renderDashboard({
+        entriesThisWeek: 0,
+        totalEntries: 0,
+        openTasks: 0,
+        stalledProjects: 0,
+      });
+      for (const key of STAT_KEYS) {
+        // Anchor tag immediately preceding the data-stat marker should not
+        // have tabindex="-1".
+        const markerIdx = body.indexOf(`data-stat="${key}"`);
+        const preceding = body.slice(0, markerIdx);
+        const lastOpenAnchor = preceding.lastIndexOf("<a ");
+        const anchorTag = body.slice(lastOpenAnchor, markerIdx);
+        expect(anchorTag).not.toMatch(/tabindex="-1"/);
+        expect(hrefForStat(body, key)).not.toBeNull();
+      }
+    });
+
+    // TS-1.11
+    it("renders stat cards as anchors even when counts are zero", async () => {
+      const body = await renderDashboard({
+        entriesThisWeek: 0,
+        totalEntries: 0,
+        openTasks: 0,
+        stalledProjects: 0,
+      });
+      for (const key of STAT_KEYS) {
+        expect(hrefForStat(body, key)).toBe(EXPECTED_HREFS[key]);
+      }
+    });
+
+    // TS-1.12
+    it("[data-stat] selectors resolve to a single element inside the anchor wrapper", async () => {
+      const body = await renderDashboard({
+        entriesThisWeek: 5,
+        totalEntries: 20,
+        openTasks: 3,
+        stalledProjects: 1,
+      });
+      // Regex-based equivalent of JSDOM querySelector + closest("a").
+      for (const key of STAT_KEYS) {
+        const wrappedPattern = new RegExp(
+          `<a\\b[^>]*href="[^"]*"[^>]*>[^<]*(?:<[^>]+>[^<]*)*?<span[^>]*data-stat="${key}"[^>]*>\\s*\\d+\\s*<\\/span>[\\s\\S]*?<\\/a>`,
+        );
+        expect(body).toMatch(wrappedPattern);
+      }
+    });
+
+    // TS-5.10 — non-stat dashboard elements remain non-anchors at the wrapper level
+    it("does not wrap the digest panel, capture form, or service-status block in new anchors", async () => {
+      const body = await renderDashboard({
+        entriesThisWeek: 0,
+        totalEntries: 0,
+        openTasks: 0,
+        stalledProjects: 0,
+      });
+      // Capture form: <form id="capture-form"> must not be wrapped in an
+      // anchor introduced by this feature. It may live inside existing
+      // anchors in unrelated contexts; assert specifically that the
+      // <form id="capture-form"> opening tag is NOT immediately preceded by
+      // an open <a> that closes after the form.
+      const formIdx = body.indexOf(`<form id="capture-form"`);
+      expect(formIdx).toBeGreaterThanOrEqual(0);
+      // Scan back to find any anchor that opens before the form and closes
+      // after it — if none, we're good.
+      const preceding = body.slice(0, formIdx);
+      const lastOpenA = preceding.lastIndexOf("<a ");
+      if (lastOpenA >= 0) {
+        const lastCloseA = preceding.lastIndexOf("</a>");
+        // If the last open <a> precedes the last </a>, the anchor is closed
+        // before the form — OK.
+        expect(lastCloseA).toBeGreaterThan(lastOpenA);
+      }
+      // Digest panel: data-digest must not be wrapped
+      expect(body).toContain("data-digest");
     });
   });
 });

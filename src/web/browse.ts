@@ -9,6 +9,8 @@ import {
   textSearch,
   getFilterTags,
   type BrowseFilters,
+  type SinceValue,
+  type StatusValue,
 } from "./browse-queries.js";
 import { generateEmbedding } from "../embed.js";
 import type { EntryRow } from "./dashboard-queries.js";
@@ -21,6 +23,23 @@ type Sql = postgres.Sql;
 
 const MAX_VISIBLE_TAGS = 10;
 const MAX_QUERY_LENGTH = 500;
+
+const SINCE_VALUES: readonly SinceValue[] = ["today", "week", "month"] as const;
+const STATUS_VALUES: readonly StatusValue[] = [
+  "pending",
+  "done",
+  "active",
+  "paused",
+  "completed",
+] as const;
+const STALE_DAYS_PRESETS: readonly number[] = [5, 14, 30] as const;
+
+type Dimension = "status" | "since" | "stale_days";
+const ADD_FILTER_DIMENSIONS: readonly Dimension[] = [
+  "status",
+  "since",
+  "stale_days",
+] as const;
 
 export function categoryBadgeClass(category: string | null): string {
   if (!category) return "badge-unclassified";
@@ -253,25 +272,468 @@ export function renderEmptyState(
   hasQuery: boolean,
   hasCategory: boolean,
   t?: TFunction,
+  clearFiltersHref?: string,
 ): string {
   const emptyGlobal = t ? t("browse.empty") : "No entries yet. Start capturing thoughts via the dashboard or Telegram.";
   const emptySearch = t ? t("browse.empty_search") : "No results found. Try different search terms or broaden your filters.";
   const emptyCategory = t ? t("browse.empty_category") : "No entries in this category.";
+  const clearLinkText = t ? t("browse.filter.clear") : "Clear filters";
+  const clearLink = clearFiltersHref
+    ? `<a href="${escapeHtml(clearFiltersHref)}" class="mt-3 text-xs text-muted-foreground hover:text-primary transition-colors">${escapeHtml(clearLinkText)}</a>`
+    : "";
+
   if (hasQuery) {
     return `<div class="flex-1 flex items-center justify-center">
-      <div class="text-center">
+      <div class="flex flex-col items-center text-center">
         <p class="text-sm text-muted-foreground">${escapeHtml(emptySearch)}</p>
+        ${clearLink}
       </div>
     </div>`;
   }
   if (hasCategory) {
     return `<div class="flex-1 flex items-center justify-center">
-      <p class="text-sm text-muted-foreground">${escapeHtml(emptyCategory)}</p>
+      <div class="flex flex-col items-center text-center">
+        <p class="text-sm text-muted-foreground">${escapeHtml(emptyCategory)}</p>
+        ${clearLink}
+      </div>
     </div>`;
   }
   return `<div class="flex-1 flex items-center justify-center">
-    <p class="text-sm text-muted-foreground">${escapeHtml(emptyGlobal)}</p>
+    <div class="flex flex-col items-center text-center">
+      <p class="text-sm text-muted-foreground">${escapeHtml(emptyGlobal)}</p>
+      ${clearLink}
+    </div>
   </div>`;
+}
+
+/**
+ * Build a /browse URL from a parameter bag. Omitted/undefined values are
+ * dropped from the query string. Values are URI-encoded.
+ */
+function browseUrl(params: {
+  category?: string;
+  tag?: string;
+  q?: string;
+  mode?: string;
+  since?: SinceValue;
+  status?: StatusValue;
+  stale_days?: number;
+}): string {
+  const parts: string[] = [];
+  if (params.category) parts.push(`category=${encodeURIComponent(params.category)}`);
+  if (params.tag) parts.push(`tag=${encodeURIComponent(params.tag)}`);
+  if (params.q) parts.push(`q=${encodeURIComponent(params.q)}`);
+  if (params.mode) parts.push(`mode=${encodeURIComponent(params.mode)}`);
+  if (params.since) parts.push(`since=${encodeURIComponent(params.since)}`);
+  if (params.status) parts.push(`status=${encodeURIComponent(params.status)}`);
+  if (params.stale_days !== undefined) parts.push(`stale_days=${params.stale_days}`);
+  return parts.length > 0 ? `/browse?${parts.join("&")}` : "/browse";
+}
+
+/** Status values available for a given category. Context-aware per AC-3.8. */
+function statusOptions(category: string | undefined): readonly StatusValue[] {
+  if (category === "tasks") return ["pending", "done"] as const;
+  if (category === "projects") return ["active", "paused", "completed"] as const;
+  return STATUS_VALUES;
+}
+
+function statusLabel(value: StatusValue, t: TFunction): string {
+  return t(`browse.filter.value.status.${value}`);
+}
+
+function sinceLabel(value: SinceValue, t: TFunction): string {
+  return t(`browse.filter.value.since.${value}`);
+}
+
+function dimensionLabel(dim: Dimension, t: TFunction): string {
+  return t(`browse.filter.dimension.${dim}`);
+}
+
+/**
+ * Render a single filter pill (label + removable ×). The label value portion
+ * carries data-picker="<dim>" so client JS can hook it up to a popover picker.
+ */
+function renderPill(params: {
+  dimension: Dimension;
+  value: string; // localized display value
+  removeHref: string;
+  t: TFunction;
+}): string {
+  const { dimension, value, removeHref, t } = params;
+  let pillText: string;
+  if (dimension === "status") {
+    pillText = t("browse.filter.pill.status", { value });
+  } else if (dimension === "since") {
+    pillText = t("browse.filter.pill.since", { value });
+  } else {
+    // stale_days — value is the numeric count; use plural catalog lookups
+    const count = parseInt(value, 10);
+    pillText = t("browse.filter.pill.stale_days", {
+      count,
+      defaultValue_one: t("browse.filter.pill.stale_days_one", { count }),
+      defaultValue_other: t("browse.filter.pill.stale_days_other", { count }),
+    });
+    // i18next pluralization fallback: manually pick the branch if the above
+    // doesn't resolve due to namespace/flat-key differences in the catalog.
+    if (
+      pillText === "browse.filter.pill.stale_days" ||
+      pillText === t("browse.filter.pill.stale_days")
+    ) {
+      pillText =
+        count === 1
+          ? t("browse.filter.pill.stale_days_one", { count })
+          : t("browse.filter.pill.stale_days_other", { count });
+    }
+  }
+  return `
+    <span class="inline-flex items-center gap-1 rounded-full border border-primary px-2 py-0.5 text-[10px] text-primary">
+      <span data-picker="${escapeHtml(dimension)}" class="cursor-pointer">${escapeHtml(pillText)}</span>
+      <a href="${escapeHtml(removeHref)}" class="text-muted-foreground hover:text-foreground" aria-label="Remove filter">×</a>
+    </span>`;
+}
+
+/**
+ * Render the hidden value picker panel for a single dimension. Each value is
+ * a plain anchor that navigates to the updated URL — works without JS.
+ */
+function renderValuePicker(params: {
+  dimension: Dimension;
+  currentCategory: string | undefined;
+  currentTag: string | undefined;
+  currentQuery: string | undefined;
+  currentMode: string | undefined;
+  currentSince: SinceValue | undefined;
+  currentStatus: StatusValue | undefined;
+  currentStaleDays: number | undefined;
+  t: TFunction;
+}): string {
+  const {
+    dimension,
+    currentCategory,
+    currentTag,
+    currentQuery,
+    currentMode,
+    currentSince,
+    currentStatus,
+    currentStaleDays,
+    t,
+  } = params;
+
+  const base = {
+    category: currentCategory,
+    tag: currentTag,
+    q: currentQuery,
+    mode: currentMode,
+    since: currentSince,
+    status: currentStatus,
+    stale_days: currentStaleDays,
+  };
+
+  let options: Array<{ href: string; label: string }> = [];
+  if (dimension === "status") {
+    options = statusOptions(currentCategory).map((v) => ({
+      href: browseUrl({ ...base, status: v }),
+      label: statusLabel(v, t),
+    }));
+  } else if (dimension === "since") {
+    options = SINCE_VALUES.map((v) => ({
+      href: browseUrl({ ...base, since: v }),
+      label: sinceLabel(v, t),
+    }));
+  } else {
+    options = STALE_DAYS_PRESETS.map((n) => ({
+      href: browseUrl({ ...base, stale_days: n }),
+      label:
+        n === 1
+          ? t("browse.filter.pill.stale_days_one", { count: n })
+          : t("browse.filter.pill.stale_days_other", { count: n }),
+    }));
+  }
+
+  const optionHtml = options
+    .map(
+      (o) =>
+        `<a href="${escapeHtml(o.href)}" class="block px-3 py-1.5 text-xs hover:bg-secondary">${escapeHtml(o.label)}</a>`,
+    )
+    .join("");
+
+  return `
+    <div data-picker-values="${escapeHtml(dimension)}" class="hidden rounded-md border border-border bg-card shadow-md mt-1 min-w-32 w-fit">
+      ${optionHtml}
+    </div>`;
+}
+
+/**
+ * Render the "+ Filter" add-menu. Only includes dimensions that are not
+ * already applied. Each dimension item carries data-dimension + data-picker
+ * so JS can open the matching value picker.
+ */
+function renderAddFilterMenu(params: {
+  appliedDimensions: Set<Dimension>;
+  currentCategory: string | undefined;
+  currentTag: string | undefined;
+  currentQuery: string | undefined;
+  currentMode: string | undefined;
+  currentSince: SinceValue | undefined;
+  currentStatus: StatusValue | undefined;
+  currentStaleDays: number | undefined;
+  t: TFunction;
+}): string {
+  const { appliedDimensions, t } = params;
+  const available = ADD_FILTER_DIMENSIONS.filter(
+    (d) => !appliedDimensions.has(d),
+  );
+  if (available.length === 0) return "";
+
+  const base = {
+    category: params.currentCategory,
+    tag: params.currentTag,
+    q: params.currentQuery,
+    mode: params.currentMode,
+    since: params.currentSince,
+    status: params.currentStatus,
+    stale_days: params.currentStaleDays,
+  };
+
+  // For each available dimension, the default no-JS href adds the FIRST legal
+  // value so the filter is reachable without running the picker JS.
+  function defaultHref(dim: Dimension): string {
+    if (dim === "status") {
+      const firstVal = statusOptions(params.currentCategory)[0]!;
+      return browseUrl({ ...base, status: firstVal });
+    }
+    if (dim === "since") {
+      return browseUrl({ ...base, since: "week" });
+    }
+    return browseUrl({ ...base, stale_days: 5 });
+  }
+
+  const itemHtml = available
+    .map(
+      (dim) =>
+        `<a href="${escapeHtml(defaultHref(dim))}" data-dimension="${escapeHtml(dim)}" data-picker="${escapeHtml(dim)}" class="block px-3 py-1.5 text-xs hover:bg-secondary">${escapeHtml(dimensionLabel(dim, t))}</a>`,
+    )
+    .join("");
+
+  return `
+    <details data-filter-add-menu class="relative">
+      <summary class="cursor-pointer rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors">${escapeHtml(t("browse.filter.add"))}</summary>
+      <div class="absolute z-10 mt-1 rounded-md border border-border bg-card shadow-md min-w-32">${itemHtml}</div>
+    </details>`;
+}
+
+/** Render the filter bar: pills + +Filter menu + pickers + clear + count. */
+export function renderFilterBar(params: {
+  category: string | undefined;
+  tag: string | undefined;
+  q: string | undefined;
+  mode: string | undefined;
+  since: SinceValue | undefined;
+  status: StatusValue | undefined;
+  stale_days: number | undefined;
+  resultCount: number;
+  t: TFunction;
+}): string {
+  const {
+    category,
+    tag,
+    q,
+    mode,
+    since,
+    status,
+    stale_days: staleDays,
+    resultCount,
+    t,
+  } = params;
+
+  const base = { category, tag, q, mode, since, status, stale_days: staleDays };
+  const applied = new Set<Dimension>();
+  const pills: string[] = [];
+
+  if (since) {
+    applied.add("since");
+    pills.push(
+      renderPill({
+        dimension: "since",
+        value: sinceLabel(since, t),
+        removeHref: browseUrl({ ...base, since: undefined }),
+        t,
+      }),
+    );
+  }
+  if (status) {
+    applied.add("status");
+    pills.push(
+      renderPill({
+        dimension: "status",
+        value: statusLabel(status, t),
+        removeHref: browseUrl({ ...base, status: undefined }),
+        t,
+      }),
+    );
+  }
+  if (staleDays !== undefined) {
+    applied.add("stale_days");
+    pills.push(
+      renderPill({
+        dimension: "stale_days",
+        value: String(staleDays),
+        removeHref: browseUrl({ ...base, stale_days: undefined }),
+        t,
+      }),
+    );
+  }
+
+  const addMenu = renderAddFilterMenu({
+    appliedDimensions: applied,
+    currentCategory: category,
+    currentTag: tag,
+    currentQuery: q,
+    currentMode: mode,
+    currentSince: since,
+    currentStatus: status,
+    currentStaleDays: staleDays,
+    t,
+  });
+
+  // Value pickers: always rendered (hidden). JS may toggle visibility.
+  const pickerHtml = ADD_FILTER_DIMENSIONS.map((dim) =>
+    renderValuePicker({
+      dimension: dim,
+      currentCategory: category,
+      currentTag: tag,
+      currentQuery: q,
+      currentMode: mode,
+      currentSince: since,
+      currentStatus: status,
+      currentStaleDays: staleDays,
+      t,
+    }),
+  ).join("");
+
+  // Clear filters link: shown when at least one of tag/since/status/stale_days is active.
+  const hasAnyClearable =
+    !!tag || !!since || !!status || staleDays !== undefined;
+  const clearHref = browseUrl({ category, q });
+  const clearLink = hasAnyClearable
+    ? `<a href="${escapeHtml(clearHref)}" class="text-xs text-muted-foreground hover:text-primary transition-colors">${escapeHtml(t("browse.filter.clear"))}</a>`
+    : "";
+
+  // Result count
+  const countKey =
+    resultCount === 0
+      ? "browse.filter.results_zero"
+      : resultCount === 1
+        ? "browse.filter.results_one"
+        : "browse.filter.results_other";
+  const countText = t(countKey, { count: resultCount });
+
+  return `
+    <div data-filter-bar class="flex items-center gap-2 flex-wrap">
+      ${pills.join("")}
+      ${addMenu}
+      ${clearLink}
+      <span class="text-xs text-muted-foreground ml-auto">${escapeHtml(countText)}</span>
+      ${pickerHtml}
+    </div>`;
+}
+
+/**
+ * Client-side vanilla JS that makes the filter bar pickers openable. Without
+ * this, the `.hidden` pickers would never surface to the user.
+ *
+ * Behavior:
+ * - Click a `[data-picker="<dim>"]` element → toggle the matching
+ *   `[data-picker-values="<dim>"]` element's `hidden` class; close others.
+ * - Click outside any picker trigger or panel → close all pickers.
+ * - Press Escape → close all pickers.
+ *
+ * Without JS, users can still remove filters via the × anchor and add
+ * filters via the `<details data-filter-add-menu>` default-href navigation.
+ */
+function renderFilterBarScript(): string {
+  return `
+<script>
+(function() {
+  function closeAll() {
+    document.querySelectorAll('[data-picker-values]').forEach(function(el) {
+      el.classList.add('hidden');
+    });
+  }
+  document.querySelectorAll('[data-picker]').forEach(function(trigger) {
+    trigger.addEventListener('click', function(e) {
+      var dim = trigger.getAttribute('data-picker');
+      if (!dim) return;
+      var picker = document.querySelector('[data-picker-values="' + dim + '"]');
+      if (!picker) return;
+      var isOpen = !picker.classList.contains('hidden');
+      e.preventDefault();
+      e.stopPropagation();
+      closeAll();
+      if (!isOpen) picker.classList.remove('hidden');
+    });
+  });
+  document.addEventListener('click', function(e) {
+    var target = e.target;
+    if (target && target.closest && target.closest('[data-picker], [data-picker-values]')) return;
+    closeAll();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeAll();
+  });
+})();
+</script>`;
+}
+
+/**
+ * Parse and validate the new filter query params. Returns either the
+ * validated filter bag or a `{ error }` object describing which param was
+ * invalid — the handler turns that into HTTP 400.
+ */
+function parseFilterParams(
+  url: URL,
+):
+  | {
+      ok: true;
+      since: SinceValue | undefined;
+      status: StatusValue | undefined;
+      stale_days: number | undefined;
+    }
+  | { ok: false; param: "since" | "status" | "stale_days" } {
+  const sinceRaw = url.searchParams.get("since") ?? undefined;
+  const statusRaw = url.searchParams.get("status") ?? undefined;
+  const staleRaw = url.searchParams.get("stale_days") ?? undefined;
+
+  let since: SinceValue | undefined;
+  if (sinceRaw !== undefined) {
+    if (!SINCE_VALUES.includes(sinceRaw as SinceValue)) {
+      return { ok: false, param: "since" };
+    }
+    since = sinceRaw as SinceValue;
+  }
+
+  let status: StatusValue | undefined;
+  if (statusRaw !== undefined) {
+    if (!STATUS_VALUES.includes(statusRaw as StatusValue)) {
+      return { ok: false, param: "status" };
+    }
+    status = statusRaw as StatusValue;
+  }
+
+  let staleDays: number | undefined;
+  if (staleRaw !== undefined) {
+    // Must be a positive integer ≥ 1. Reject empty string, non-numeric, float, zero, negative.
+    if (!/^\d+$/.test(staleRaw)) {
+      return { ok: false, param: "stale_days" };
+    }
+    const n = parseInt(staleRaw, 10);
+    if (!Number.isFinite(n) || n < 1) {
+      return { ok: false, param: "stale_days" };
+    }
+    staleDays = n;
+  }
+
+  return { ok: true, since, status, stale_days: staleDays };
 }
 
 export function createBrowseRoutes(sql: Sql): Hono {
@@ -283,9 +745,6 @@ export function createBrowseRoutes(sql: Sql): Hono {
       (c.get("t") as TFunction | undefined) ??
       (i18next.getFixedT(locale) as TFunction);
 
-    // Start health check early so it runs in parallel with DB queries below.
-    const healthPromise = getServiceStatus(sql, { isBotRunning });
-
     const url = new URL(c.req.url);
     const rawQuery = url.searchParams.get("q") ?? undefined;
     const category = url.searchParams.get("category") ?? undefined;
@@ -294,9 +753,25 @@ export function createBrowseRoutes(sql: Sql): Hono {
 
     const q = rawQuery ? rawQuery.slice(0, MAX_QUERY_LENGTH) : undefined;
 
+    // AC-2.5 / C-5: Validate new filter params BEFORE any database query.
+    // Parsing happens before getServiceStatus so the health check is not
+    // issued for an otherwise-invalid request.
+    const parsed = parseFilterParams(url);
+    if (!parsed.ok) {
+      const body = `<div class="p-4"><p class="text-sm text-destructive">Invalid ${escapeHtml(parsed.param)} parameter.</p></div>`;
+      c.status(400);
+      return c.html(renderLayout("Browse", body, "/browse", undefined, c));
+    }
+
+    // Start health check after validation so it only runs for valid requests.
+    const healthPromise = getServiceStatus(sql, { isBotRunning });
+
     const filters: BrowseFilters = {};
     if (category) filters.category = category;
     if (tag) filters.tag = tag;
+    if (parsed.since) filters.since = parsed.since;
+    if (parsed.status) filters.status = parsed.status;
+    if (parsed.stale_days !== undefined) filters.stale_days = parsed.stale_days;
 
     let entries: EntryRow[] = [];
     let notice: string | undefined;
@@ -342,19 +817,38 @@ export function createBrowseRoutes(sql: Sql): Hono {
     const hasResults = entries.length > 0;
     const hasQuery = !!q;
     const hasCategory = !!category;
+    const hasAnyFilter =
+      !!tag || !!parsed.since || !!parsed.status || parsed.stale_days !== undefined;
 
+    const filterBarHtml = renderFilterBar({
+      category,
+      tag,
+      q,
+      mode,
+      since: parsed.since,
+      status: parsed.status,
+      stale_days: parsed.stale_days,
+      resultCount: entries.length,
+      t,
+    });
+
+    const clearFiltersHref = hasAnyFilter
+      ? browseUrl({ category, q })
+      : undefined;
     const content = `
       <div class="flex-1 min-h-0 flex flex-col gap-3">
         <div class="shrink-0 flex flex-col gap-2">
           ${renderSearchBar(q, category, tag, "/browse", t)}
           ${renderCategoryTabs(category, tag, q, mode, unclassifiedCount, "/browse", t)}
           ${renderTagPills(tags, tag, category, q, mode)}
+          ${filterBarHtml}
         </div>
         ${notice ? renderNotice(notice) : ""}
         <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin rounded-md border border-border bg-card px-4 py-3">
-          ${hasResults ? renderEntryList(entries) : renderEmptyState(hasQuery, hasCategory, t)}
+          ${hasResults ? renderEntryList(entries) : renderEmptyState(hasQuery, hasCategory, t, clearFiltersHref)}
         </div>
       </div>
+      ${renderFilterBarScript()}
       ${category === "unclassified" && unclassifiedCount > 0 ? `
       <script>
       (function() {

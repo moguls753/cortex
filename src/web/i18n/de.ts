@@ -68,6 +68,38 @@ export const de: Widen<typeof en> = {
       "Semantische Suche nicht verfügbar — zeige Textergebnisse.",
     result_count_one: "{{count}} Treffer",
     result_count_other: "{{count}} Treffer",
+    filter: {
+      add: "+ Filter",
+      clear: "Filter zurücksetzen",
+      dimension: {
+        status: "Status",
+        since: "Aktualisiert",
+        stale_days: "Inaktiv",
+      },
+      value: {
+        status: {
+          pending: "Offen",
+          done: "Erledigt",
+          active: "Aktiv",
+          paused: "Pausiert",
+          completed: "Abgeschlossen",
+        },
+        since: {
+          today: "Heute",
+          week: "Diese Woche",
+          month: "Dieser Monat",
+        },
+      },
+      pill: {
+        status: "Status: {{value}}",
+        since: "Aktualisiert: {{value}}",
+        stale_days_one: "Inaktiv: {{count}}+ Tag",
+        stale_days_other: "Inaktiv: {{count}}+ Tage",
+      },
+      results_zero: "Keine Einträge gefunden",
+      results_one: "{{count}} Eintrag gefunden",
+      results_other: "{{count}} Einträge gefunden",
+    },
   },
 
   entry: {
