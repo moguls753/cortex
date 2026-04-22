@@ -69,14 +69,13 @@ export const de: Widen<typeof en> = {
     result_count_one: "{{count}} Treffer",
     result_count_other: "{{count}} Treffer",
     filter: {
-      add: "+ Filter",
       clear: "Filter zurücksetzen",
-      all: "Alle",
+      any: "beliebig",
       dimension: {
         category: "Kategorie",
+        tag: "Tag",
         status: "Status",
-        since: "Aktualisiert",
-        stale_days: "Inaktiv",
+        activity: "Aktivität",
       },
       value: {
         status: {
@@ -86,21 +85,18 @@ export const de: Widen<typeof en> = {
           paused: "Pausiert",
           completed: "Abgeschlossen",
         },
-        since: {
-          today: "Heute",
-          week: "Diese Woche",
-          month: "Dieser Monat",
+        activity: {
+          today: "heute",
+          week: "diese Woche",
+          month: "dieser Monat",
+          stale5: "stagniert seit 5+ Tagen",
+          stale14: "stagniert seit 14+ Tagen",
+          stale30: "stagniert seit 30+ Tagen",
         },
       },
-      pill: {
-        status: "Status: {{value}}",
-        since: "Aktualisiert: {{value}}",
-        stale_days_one: "Inaktiv: {{count}}+ Tag",
-        stale_days_other: "Inaktiv: {{count}}+ Tage",
-      },
-      results_zero: "Keine Einträge gefunden",
-      results_one: "{{count}} Eintrag gefunden",
-      results_other: "{{count}} Einträge gefunden",
+      results_zero: "keine Einträge",
+      results_one: "{{count}} Eintrag",
+      results_other: "{{count}} Einträge",
     },
   },
 

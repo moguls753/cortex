@@ -81,14 +81,13 @@ export const en = {
     result_count_one: "{{count}} result",
     result_count_other: "{{count}} results",
     filter: {
-      add: "+ Filter",
       clear: "Clear filters",
-      all: "All",
+      any: "any",
       dimension: {
         category: "Category",
+        tag: "Tag",
         status: "Status",
-        since: "Updated",
-        stale_days: "Inactive",
+        activity: "Activity",
       },
       value: {
         status: {
@@ -98,21 +97,18 @@ export const en = {
           paused: "Paused",
           completed: "Completed",
         },
-        since: {
-          today: "Today",
-          week: "This week",
-          month: "This month",
+        activity: {
+          today: "today",
+          week: "this week",
+          month: "this month",
+          stale5: "stale 5+ days",
+          stale14: "stale 14+ days",
+          stale30: "stale 30+ days",
         },
       },
-      pill: {
-        status: "Status: {{value}}",
-        since: "Updated: {{value}}",
-        stale_days_one: "Inactive: {{count}}+ day",
-        stale_days_other: "Inactive: {{count}}+ days",
-      },
-      results_zero: "No entries match",
-      results_one: "{{count}} entry matches",
-      results_other: "{{count}} entries match",
+      results_zero: "no entries",
+      results_one: "{{count}} entry",
+      results_other: "{{count}} entries",
     },
   },
 

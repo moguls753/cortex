@@ -16,7 +16,13 @@ import {
 } from "./browse-queries.js";
 import { generateEmbedding } from "../embed.js";
 import type { EntryRow } from "./dashboard-queries.js";
-import { iconSearch, iconEye, iconChevronDown, iconCheck } from "./icons.js";
+import {
+  iconSearch,
+  iconEye,
+  iconChevronDown,
+  iconCheck,
+  iconX,
+} from "./icons.js";
 import type { TFunction } from "i18next";
 import { i18next, type Locale } from "./i18n/index.js";
 import { CATEGORIES, CATEGORY_LABELS, escapeHtml } from "./shared.js";
@@ -36,13 +42,71 @@ const STATUS_VALUES: readonly StatusValue[] = [
 ] as const;
 const STALE_DAYS_PRESETS: readonly number[] = [5, 14, 30] as const;
 
-type Dimension = "category" | "status" | "since" | "stale_days";
+/**
+ * Unified "activity" values — one axis covering both recency (updated-within)
+ * and staleness (not-updated-for) instead of two split dimensions. Each value
+ * maps to exactly one of the two underlying URL params (`since=` or
+ * `stale_days=`) so the back-end query logic is unchanged.
+ */
+type ActivityValue =
+  | "today"
+  | "week"
+  | "month"
+  | "stale5"
+  | "stale14"
+  | "stale30";
+const ACTIVITY_VALUES: readonly ActivityValue[] = [
+  "today",
+  "week",
+  "month",
+  "stale5",
+  "stale14",
+  "stale30",
+] as const;
+
+type Dimension = "category" | "tag" | "status" | "activity";
 const PEER_FILTER_DIMENSIONS: readonly Dimension[] = [
   "category",
+  "tag",
   "status",
-  "since",
-  "stale_days",
+  "activity",
 ] as const;
+
+/** Map a unified ActivityValue to its underlying URL param encoding. */
+function activityToParams(
+  value: ActivityValue,
+): { since?: SinceValue; stale_days?: number } {
+  switch (value) {
+    case "today":
+      return { since: "today" };
+    case "week":
+      return { since: "week" };
+    case "month":
+      return { since: "month" };
+    case "stale5":
+      return { stale_days: 5 };
+    case "stale14":
+      return { stale_days: 14 };
+    case "stale30":
+      return { stale_days: 30 };
+  }
+}
+
+/** Resolve the currently-applied ActivityValue from the two URL params. */
+function paramsToActivity(
+  since: SinceValue | undefined,
+  staleDays: number | undefined,
+): ActivityValue | undefined {
+  if (since) return since;
+  if (staleDays === 5) return "stale5";
+  if (staleDays === 14) return "stale14";
+  if (staleDays === 30) return "stale30";
+  return undefined;
+}
+
+function activityLabel(value: ActivityValue, t: TFunction): string {
+  return t(`browse.filter.value.activity.${value}`);
+}
 
 export function categoryBadgeClass(category: string | null): string {
   if (!category) return "badge-unclassified";
@@ -213,54 +277,6 @@ export function renderTagPills(
   return html;
 }
 
-export function renderSidebarTags(
-  tagCounts: TagCount[],
-  activeTag: string | undefined,
-  currentCategory: string | undefined,
-  currentQuery: string | undefined,
-  currentMode: string | undefined,
-  basePath = "/browse",
-  t?: TFunction,
-): string {
-  const label = t ? t("browse.filter_tags") : "Tags";
-
-  function renderTagItem(tc: TagCount): string {
-    const isActive = activeTag === tc.tag;
-    const href = isActive
-      ? buildUrl({ category: currentCategory, q: currentQuery, mode: currentMode }, basePath)
-      : buildUrl({ category: currentCategory, tag: tc.tag, q: currentQuery, mode: currentMode }, basePath);
-    const linkCls = isActive
-      ? "flex-1 min-w-0 px-2 py-1 text-xs text-primary truncate active"
-      : "flex-1 min-w-0 px-2 py-1 text-xs text-muted-foreground hover:text-foreground truncate";
-    const countCls = isActive
-      ? "text-[10px] text-primary/60 shrink-0 pr-2 tabular-nums"
-      : "text-[10px] text-muted-foreground/50 shrink-0 pr-2 tabular-nums";
-    return `<div class="flex items-center rounded hover:bg-secondary transition-colors"><a href="${escapeHtml(href)}" class="${linkCls}">${escapeHtml(tc.tag)}</a><span class="${countCls}">${tc.count}</span></div>`;
-  }
-
-  if (tagCounts.length === 0) {
-    return `<div class="px-3 py-3">
-      <div class="text-[9px] uppercase tracking-widest text-muted-foreground font-medium mb-2 px-1">${escapeHtml(label)}</div>
-    </div>`;
-  }
-
-  const visibleTags = tagCounts.slice(0, MAX_VISIBLE_TAGS);
-  const hiddenTags = tagCounts.slice(MAX_VISIBLE_TAGS);
-
-  let html = `<div class="px-3 py-3">
-    <div class="text-[9px] uppercase tracking-widest text-muted-foreground font-medium mb-2 px-1">${escapeHtml(label)}</div>
-    <div class="flex flex-col gap-0.5">
-      ${visibleTags.map((tc) => renderTagItem(tc)).join("")}`;
-
-  if (hiddenTags.length > 0) {
-    html += `<div class="hidden" id="extra-sidebar-tags">${hiddenTags.map((tc) => renderTagItem(tc)).join("")}</div>
-      <button onclick="document.getElementById('extra-sidebar-tags').classList.toggle('hidden');this.textContent=this.textContent.includes('show more')?'show less':'show more'" class="text-[10px] text-primary hover:underline px-2 py-0.5 text-left w-full">show more</button>`;
-  }
-
-  html += `</div></div>`;
-  return html;
-}
-
 export function renderSearchBar(
   currentQuery: string | undefined,
   currentCategory: string | undefined,
@@ -381,7 +397,7 @@ function browseUrl(params: {
   return parts.length > 0 ? `/browse?${parts.join("&")}` : "/browse";
 }
 
-/** Status values available for a given category. Context-aware per AC-3.8. */
+/** Status values relevant for a given category. */
 function statusOptions(category: string | undefined): readonly StatusValue[] {
   if (category === "tasks") return ["pending", "done"] as const;
   if (category === "projects") return ["active", "paused", "completed"] as const;
@@ -392,25 +408,12 @@ function statusLabel(value: StatusValue, t: TFunction): string {
   return t(`browse.filter.value.status.${value}`);
 }
 
-function sinceLabel(value: SinceValue, t: TFunction): string {
-  return t(`browse.filter.value.since.${value}`);
-}
-
 function dimensionLabel(dim: Dimension, t: TFunction): string {
   return t(`browse.filter.dimension.${dim}`);
 }
 
-function categoryValueLabel(
-  value: string | undefined,
-  t: TFunction,
-  includeAll: boolean,
-): string {
-  if (!value) {
-    return includeAll ? t("browse.filter.all") : "";
-  }
-  if (value === "unclassified") {
-    return t("browse.unclassified_tab");
-  }
+function categoryValueLabel(value: string, t: TFunction): string {
+  if (value === "unclassified") return t("browse.unclassified_tab");
   const key = `category.${value}`;
   const localized = t(key);
   return localized === key ? (CATEGORY_LABELS[value] ?? value) : localized;
@@ -423,9 +426,9 @@ function categoryValueLabel(
  * `role="option"` anchor per legal value. The option matching the currently-
  * applied value is marked with `aria-selected="true"`, prefixed with a
  * Lucide check icon, and styled with `text-primary`. All other options carry
- * `aria-selected="false"`. Per AC-3.15 (roving tabindex), the matching
- * option (or the first option if no value is applied) carries `tabindex="0"`;
- * all other options carry `tabindex="-1"`.
+ * `aria-selected="false"`. Roving tabindex: the matching option (or the
+ * first option if no value is applied) carries `tabindex="0"`; all other
+ * options carry `tabindex="-1"`.
  */
 function renderValuePicker(params: {
   dimension: Dimension;
@@ -437,8 +440,8 @@ function renderValuePicker(params: {
   currentStatus: StatusValue | undefined;
   currentStaleDays: number | undefined;
   t: TFunction;
-  includeAllOption?: boolean;
   unclassifiedCount?: number;
+  tagCounts?: readonly TagCount[];
 }): string {
   const {
     dimension,
@@ -450,8 +453,8 @@ function renderValuePicker(params: {
     currentStatus,
     currentStaleDays,
     t,
-    includeAllOption = false,
     unclassifiedCount = 0,
+    tagCounts = [],
   } = params;
 
   const base = {
@@ -471,18 +474,25 @@ function renderValuePicker(params: {
   if (dimension === "category") {
     const cats: PickerOption[] = CATEGORIES.map((cat) => ({
       href: browseUrl({ ...base, category: cat }),
-      label: categoryValueLabel(cat, t, false),
+      label: categoryValueLabel(cat, t),
       value: cat,
     }));
     if (unclassifiedCount > 0) {
       cats.push({
         href: browseUrl({ ...base, category: "unclassified" }),
-        label: categoryValueLabel("unclassified", t, false),
+        label: categoryValueLabel("unclassified", t),
         value: "unclassified",
       });
     }
     options = cats;
     currentValueKey = currentCategory;
+  } else if (dimension === "tag") {
+    options = tagCounts.map((tc) => ({
+      href: browseUrl({ ...base, tag: tc.tag }),
+      label: `${tc.tag} · ${tc.count}`,
+      value: tc.tag,
+    }));
+    currentValueKey = currentTag;
   } else if (dimension === "status") {
     options = statusOptions(currentCategory).map((v) => ({
       href: browseUrl({ ...base, status: v }),
@@ -490,51 +500,50 @@ function renderValuePicker(params: {
       value: v,
     }));
     currentValueKey = currentStatus;
-  } else if (dimension === "since") {
-    options = SINCE_VALUES.map((v) => ({
-      href: browseUrl({ ...base, since: v }),
-      label: sinceLabel(v, t),
-      value: v,
-    }));
-    currentValueKey = currentSince;
   } else {
-    options = STALE_DAYS_PRESETS.map((n) => ({
-      href: browseUrl({ ...base, stale_days: n }),
-      label:
-        n === 1
-          ? t("browse.filter.pill.stale_days_one", { count: n })
-          : t("browse.filter.pill.stale_days_other", { count: n }),
-      value: String(n),
-    }));
-    currentValueKey =
-      currentStaleDays !== undefined ? String(currentStaleDays) : undefined;
+    // activity: one axis combining recency (since=) and staleness
+    // (stale_days=). Each option's href writes one param and clears the
+    // other — spreading `p` over `base` does both in one step because
+    // activityToParams always returns exactly one of the two fields.
+    options = ACTIVITY_VALUES.map((v) => {
+      const p = activityToParams(v);
+      return {
+        href: browseUrl({
+          ...base,
+          since: p.since,
+          stale_days: p.stale_days,
+        }),
+        label: activityLabel(v, t),
+        value: v,
+      };
+    });
+    currentValueKey = paramsToActivity(currentSince, currentStaleDays);
   }
 
-  // Prepend "Alle" sentinel whose href clears this dimension. Used by the
-  // peer-dropdown filter row (always-visible dropdowns) so every filter has a
-  // way to be cleared from inside its own picker.
-  if (includeAllOption) {
-    const clearBase = { ...base };
-    if (dimension === "category") clearBase.category = undefined;
-    if (dimension === "status") clearBase.status = undefined;
-    if (dimension === "since") clearBase.since = undefined;
-    if (dimension === "stale_days") clearBase.stale_days = undefined;
-    options = [
-      {
-        href: browseUrl(clearBase),
-        label: t("browse.filter.all"),
-        value: null,
-      },
-      ...options,
-    ];
+  // Every picker is prepended with an "any" sentinel whose href clears this
+  // dimension. Keyboard-users and discoverability both benefit; the primary
+  // clear path is the × on the chip itself, but this covers all codepaths.
+  const clearBase = { ...base };
+  if (dimension === "category") clearBase.category = undefined;
+  if (dimension === "tag") clearBase.tag = undefined;
+  if (dimension === "status") clearBase.status = undefined;
+  if (dimension === "activity") {
+    clearBase.since = undefined;
+    clearBase.stale_days = undefined;
   }
+  options = [
+    {
+      href: browseUrl(clearBase),
+      label: t("browse.filter.any"),
+      value: null,
+    },
+    ...options,
+  ];
 
   const selectedIdx =
     currentValueKey !== undefined
       ? options.findIndex((o) => o.value === currentValueKey)
-      : includeAllOption
-        ? 0
-        : -1;
+      : 0;
   const focusIdx = selectedIdx >= 0 ? selectedIdx : 0;
 
   const optionHtml = options
@@ -550,53 +559,63 @@ function renderValuePicker(params: {
     })
     .join("");
 
+  // Tag picker can grow tall; constrain height + scroll, keep others unbounded.
+  const heightCls = dimension === "tag" ? "max-h-36 overflow-y-auto scrollbar-thin" : "";
+
   return `
-    <div data-picker-values="${escapeHtml(dimension)}" role="listbox" class="hidden absolute top-full left-0 mt-1 rounded-md border border-border bg-card shadow-md min-w-32 z-20">
+    <div data-picker-values="${escapeHtml(dimension)}" role="listbox" class="hidden absolute top-full left-0 mt-1 rounded-md border border-border bg-card shadow-md min-w-32 z-20 ${heightCls}">
       ${optionHtml}
     </div>`;
 }
 
 /**
- * Render a single peer filter dropdown: a trigger button of the form
- * `key · value ▼` + a value picker overlay that anchors below it. The trigger
- * is always visible — no progressive disclosure — and includes an "Alle"
- * option as the first picker item that clears the dimension.
+ * Render one peer chip. Two visual states:
  *
- * Active state (a filter is applied): border-primary + value in text-primary.
- * Idle state: muted-foreground label, foreground value, border-border.
+ *   Idle   — `[dimension ▼]`              muted border, no value text.
+ *   Active — `[dimension: value ×]`       primary border, bold primary value,
+ *                                          × is a one-click clear anchor.
+ *
+ * The whole chip body (except the × when present) acts as the picker trigger:
+ * a single click opens the dropdown. The × is a separate <a> so keyboard users
+ * can tab to it and screen readers announce it distinctly.
  */
-function renderPeerDropdown(params: {
+function renderPeerChip(params: {
   dimension: Dimension;
   label: string;
-  valueLabel: string;
-  isActive: boolean;
+  valueLabel: string | undefined;
+  clearHref: string | undefined;
   picker: string;
 }): string {
-  const { dimension, label, valueLabel, isActive, picker } = params;
+  const { dimension, label, valueLabel, clearHref, picker } = params;
+  const isActive = valueLabel !== undefined;
   const borderCls = isActive
     ? "border-primary hover:border-primary"
     : "border-border hover:border-foreground";
-  const valueCls = isActive ? "text-primary font-medium" : "text-foreground";
+  const valueBlock = isActive
+    ? `<span class="text-muted-foreground">:</span><span class="text-primary font-medium">${escapeHtml(valueLabel!.toLowerCase())}</span>`
+    : "";
+  const trailing = isActive && clearHref
+    ? `<a href="${escapeHtml(clearHref)}" aria-label="Clear ${escapeHtml(label)} filter" class="inline-flex items-center text-muted-foreground hover:text-primary transition-colors" onclick="event.stopPropagation()">${iconX("size-3")}</a>`
+    : `<span data-picker-chevron class="inline-flex items-center text-muted-foreground transition-transform">${iconChevronDown("size-3")}</span>`;
+
   return `
     <span class="relative inline-block">
       <button type="button" data-picker="${escapeHtml(dimension)}" aria-haspopup="listbox" aria-expanded="false" class="inline-flex items-center gap-1.5 rounded-md border ${borderCls} bg-card px-2.5 py-1 text-xs transition-colors">
-        <span class="text-muted-foreground">${escapeHtml(label.toLowerCase())}</span>
-        <span class="text-muted-foreground/60" aria-hidden="true">·</span>
-        <span class="${valueCls}">${escapeHtml(valueLabel.toLowerCase())}</span>
-        <span data-picker-chevron class="inline-flex items-center text-muted-foreground transition-transform">${iconChevronDown("size-3")}</span>
+        <span class="${isActive ? "text-foreground" : "text-muted-foreground"}">${escapeHtml(label.toLowerCase())}</span>
+        ${valueBlock}
+        ${trailing}
       </button>
       ${picker}
     </span>`;
 }
 
 /**
- * Render the peer-dropdown filter row: four always-visible dropdowns
- * (Kategorie, Status, Seit, Stagniert) followed by a trailing result count.
+ * Render the peer-dropdown filter row — four always-visible dimension chips
+ * (Kategorie, Tag, Status, Aktivität) followed by a trailing result count.
  *
- * Each dropdown shows its current value (or "alle" when no filter applied).
- * Opening a dropdown shows a value picker; picking a value applies the filter;
- * picking "alle" clears it. No "+ Filter" disclosure — every dimension is
- * reachable in one click.
+ * Idle chips show only the dimension name. Active chips show `dim: value ×`
+ * with the × as a one-click clear. Clicking the chip body opens a picker of
+ * that dimension's values (including "any" as the first option).
  */
 export function renderFilterDropdowns(params: {
   category: string | undefined;
@@ -608,6 +627,7 @@ export function renderFilterDropdowns(params: {
   stale_days: number | undefined;
   resultCount: number;
   unclassifiedCount: number;
+  tagCounts: readonly TagCount[];
   t: TFunction;
 }): string {
   const {
@@ -620,8 +640,19 @@ export function renderFilterDropdowns(params: {
     stale_days: staleDays,
     resultCount,
     unclassifiedCount,
+    tagCounts,
     t,
   } = params;
+
+  const base = {
+    category,
+    tag,
+    q,
+    mode,
+    since,
+    status,
+    stale_days: staleDays,
+  };
 
   const pickerBase = {
     currentCategory: category,
@@ -632,41 +663,46 @@ export function renderFilterDropdowns(params: {
     currentStatus: status,
     currentStaleDays: staleDays,
     t,
-    includeAllOption: true,
     unclassifiedCount,
+    tagCounts,
   };
 
-  const allLabel = t("browse.filter.all");
-
-  const staleValueLabel =
-    staleDays === undefined
-      ? allLabel
-      : staleDays === 1
-        ? t("browse.filter.pill.stale_days_one", { count: staleDays })
-        : t("browse.filter.pill.stale_days_other", { count: staleDays });
+  const currentActivity = paramsToActivity(since, staleDays);
 
   const dropdowns = PEER_FILTER_DIMENSIONS.map((dim) => {
-    let valueLabel = allLabel;
-    let isActive = false;
+    let valueLabel: string | undefined;
+    let clearHref: string | undefined;
     if (dim === "category") {
-      valueLabel = category ? categoryValueLabel(category, t, false) : allLabel;
-      isActive = !!category;
+      if (category) {
+        valueLabel = categoryValueLabel(category, t);
+        clearHref = browseUrl({ ...base, category: undefined });
+      }
+    } else if (dim === "tag") {
+      if (tag) {
+        valueLabel = tag;
+        clearHref = browseUrl({ ...base, tag: undefined });
+      }
     } else if (dim === "status") {
-      valueLabel = status ? statusLabel(status, t) : allLabel;
-      isActive = !!status;
-    } else if (dim === "since") {
-      valueLabel = since ? sinceLabel(since, t) : allLabel;
-      isActive = !!since;
-    } else {
-      valueLabel = staleValueLabel;
-      isActive = staleDays !== undefined;
+      if (status) {
+        valueLabel = statusLabel(status, t);
+        clearHref = browseUrl({ ...base, status: undefined });
+      }
+    } else if (dim === "activity") {
+      if (currentActivity) {
+        valueLabel = activityLabel(currentActivity, t);
+        clearHref = browseUrl({
+          ...base,
+          since: undefined,
+          stale_days: undefined,
+        });
+      }
     }
     const picker = renderValuePicker({ dimension: dim, ...pickerBase });
-    return renderPeerDropdown({
+    return renderPeerChip({
       dimension: dim,
       label: dimensionLabel(dim, t),
       valueLabel,
-      isActive,
+      clearHref,
       picker,
     });
   }).join("");
@@ -689,19 +725,16 @@ export function renderFilterDropdowns(params: {
 /**
  * Client-side script that powers the peer-dropdown pickers.
  *
- * Responsibilities (per AC-3.5, AC-3.13–AC-3.18):
- * - Open / close pickers on trigger click; open by relocating the picker into
- *   the trigger's nearest positioned ancestor so it visually anchors there.
- * - Toggle `aria-expanded` on triggers; rotate the chevron via `rotate-180`.
- * - Manage roving-tabindex focus inside the picker (ArrowUp/Down cycle with
- *   wrap; Tab from last / Shift-Tab from first close + yield focus).
- * - Treat clicks on the currently-selected option (`aria-selected="true"`) as
- *   a no-op (close picker, no navigation) per AC-3.5 / E-16.
- * - Auto-flip overlay alignment to `right-0` when the trigger sits within
- *   200px of the right viewport edge (AC-3.16, E-15).
+ * - Open / close pickers on trigger click or keyboard activation.
+ * - Toggle aria-expanded on triggers; rotate the chevron via rotate-180.
+ * - Manage roving-tabindex focus inside the picker: ArrowUp/Down cycle with
+ *   wrap; Tab / Shift-Tab yield focus out of the picker and close it.
+ * - Clicking the currently-selected option is a no-op (close, no navigation).
+ * - Auto-flip overlay alignment to right-0 when the trigger sits within
+ *   200px of the right viewport edge.
  * - Escape closes the open picker and returns focus to the trigger.
- * - Without JS, the × anchors and the +Filter dimension items still navigate
- *   via their default hrefs (progressive enhancement, C-2).
+ * - Without JS, option anchors still navigate via their default hrefs, so
+ *   the filter bar is fully usable as a progressive-enhancement layer.
  */
 function renderFilterBarScript(): string {
   return `
@@ -744,21 +777,8 @@ function renderFilterBarScript(): string {
     if (!dim) return;
     var picker = getPicker(dim);
     if (!picker) return;
-    // Resolve the element the picker visually anchors to. For a pill trigger
-    // that's the trigger itself; for a +Filter dimension item the picker
-    // anchors to the wrapping span (visually under the +Filter <summary>),
-    // so use the <summary>'s rect for the overflow-flip decision.
-    var addMenu = trigger.closest('details[data-filter-add-menu]');
-    var rectEl = addMenu ? addMenu.querySelector('summary') : trigger;
-    var rect = (rectEl || trigger).getBoundingClientRect();
+    var rect = trigger.getBoundingClientRect();
     closeAll();
-    // If the trigger is a +Filter dimension item, close the <details>
-    // disclosure so the dropdown does not visually compete with the picker.
-    // We do NOT relocate the picker into <details> — the HTML spec hides
-    // all non-<summary> children when <details> is closed, so the picker
-    // would vanish. Pickers are already siblings of <details> inside the
-    // shared positioned wrapper, server-rendered in the right place.
-    if (addMenu) addMenu.removeAttribute('open');
     // Overflow flip: align right when the trigger is within 200px of the edge.
     picker.classList.remove('left-0', 'right-0');
     if (rect.right > window.innerWidth - 200) {
@@ -770,27 +790,13 @@ function renderFilterBarScript(): string {
     setExpanded(trigger, true);
     var c = chevronIn(trigger);
     if (c) c.classList.add('rotate-180');
-    // Focus the option that already carries tabindex="0" — that's the
-    // currently-selected option, or the first option if no value is applied.
+    // Focus the option with tabindex="0" (currently-selected, or first).
     var focused = picker.querySelector('[role="option"][tabindex="0"]');
     if (focused) focused.focus();
   }
-  function effectiveFocusTarget(trigger) {
-    // If trigger lives inside a now-closed +Filter <details>, the trigger
-    // itself is hidden — focus the visible <summary> instead so keyboard
-    // focus lands somewhere usable.
-    if (!trigger) return null;
-    var addMenu = trigger.closest('details[data-filter-add-menu]');
-    if (addMenu && !addMenu.hasAttribute('open')) {
-      var summary = addMenu.querySelector('summary');
-      if (summary) return summary;
-    }
-    return trigger;
-  }
   function closeAndFocus(trigger) {
     closeAll();
-    var target = effectiveFocusTarget(trigger);
-    if (target) target.focus();
+    if (trigger) trigger.focus();
   }
   // Wire trigger click + keyboard activation
   document.querySelectorAll('[data-picker]').forEach(function(trigger) {
@@ -843,13 +849,9 @@ function renderFilterBarScript(): string {
       if (e.key === 'Tab') {
         if (!e.shiftKey) {
           if (currentIdx >= options.length - 1 || currentIdx < 0) {
-            // Tab past last option (or unfocused): focus the (effective)
-            // trigger so the browser's default Tab moves on to the next
-            // focusable element after the trigger, then close. Without the
-            // explicit focus, focus would be on a now-hidden option and the
-            // browser's tab order recovery is inconsistent across engines.
-            var fwdTarget = effectiveFocusTarget(trigger);
-            if (fwdTarget) fwdTarget.focus();
+            // Tab past last option: focus the trigger so the browser's
+            // default Tab moves on to the next focusable element, then close.
+            if (trigger) trigger.focus();
             closeAll();
           } else {
             e.preventDefault();
@@ -859,8 +861,7 @@ function renderFilterBarScript(): string {
           if (currentIdx <= 0) {
             // Shift-Tab past first option: focus the trigger so default
             // Shift-Tab moves to the previous focusable element.
-            var backTarget = effectiveFocusTarget(trigger);
-            if (backTarget) backTarget.focus();
+            if (trigger) trigger.focus();
             closeAll();
           } else {
             e.preventDefault();
@@ -1056,6 +1057,7 @@ export function createBrowseRoutes(sql: Sql): Hono {
       stale_days: parsed.stale_days,
       resultCount: entries.length,
       unclassifiedCount,
+      tagCounts,
       t,
     });
 
@@ -1080,17 +1082,10 @@ export function createBrowseRoutes(sql: Sql): Hono {
           ${filterRowHtml}
           ${reclassifyControlHtml}
         </div>
-        <div class="flex-1 min-h-0 flex gap-3">
-          <div class="w-44 shrink-0 flex flex-col rounded-md border border-border bg-card">
-            <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
-              ${renderSidebarTags(tagCounts, tag, category, q, mode, "/browse", t)}
-            </div>
-          </div>
-          <div class="flex-1 min-h-0 flex flex-col gap-2">
-            ${notice ? renderNotice(notice) : ""}
-            <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin rounded-md border border-border bg-card px-4 py-3">
-              ${hasResults ? renderEntryList(entries) : renderEmptyState(hasQuery, hasCategory, t, clearFiltersHref)}
-            </div>
+        <div class="flex-1 min-h-0 flex flex-col gap-2">
+          ${notice ? renderNotice(notice) : ""}
+          <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin rounded-md border border-border bg-card px-4 py-3">
+            ${hasResults ? renderEntryList(entries) : renderEmptyState(hasQuery, hasCategory, t, clearFiltersHref)}
           </div>
         </div>
       </div>

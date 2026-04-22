@@ -144,15 +144,18 @@ describe("Web Browse", () => {
 
       expect(res.status).toBe(200);
       const body = await res.text();
-      // All category labels present
+      // All 5 category labels appear (as options in the Category dropdown picker)
       expect(body).toContain("People");
       expect(body).toContain("Projects");
       expect(body).toContain("Tasks");
       expect(body).toContain("Ideas");
       expect(body).toContain("Reference");
-      expect(body).toContain("All");
-      // "All" has active/selected indicator
-      expect(body).toMatch(/All[\s\S]{0,200}active|active[\s\S]{0,200}All/i);
+      // With no filter applied, the category picker's first option ("any") is
+      // the currently-selected one.
+      const catPicker = body.match(/data-picker-values=["']category["'][\s\S]*?<\/div>/);
+      expect(catPicker).not.toBeNull();
+      const firstOpt = catPicker![0].match(/<a\b[\s\S]*?<\/a>/);
+      expect(firstOpt![0]).toMatch(/aria-selected=["']true["']/);
       // All entries rendered
       expect(body).toContain("Alice");
       expect(body).toContain("Project X");
@@ -183,8 +186,9 @@ describe("Web Browse", () => {
       expect(body).toContain("Task 1");
       expect(body).toContain("Task 2");
       expect(body).toContain("Task 3");
-      // Tasks tab is active
-      expect(body).toMatch(/Tasks[\s\S]{0,200}active|active[\s\S]{0,200}Tasks/i);
+      // Category chip is active (shows "tasks" in primary color next to the
+      // category label).
+      expect(body).toMatch(/data-picker=["']category["'][\s\S]*?text-primary/);
       // Verify browseEntries was called with category filter
       expect(vi.mocked(browseEntries).mock.calls[0]?.[1]).toEqual(
         expect.objectContaining({ category: "tasks" }),
@@ -214,8 +218,12 @@ describe("Web Browse", () => {
       expect(body).toContain("Person A");
       expect(body).toContain("Project B");
       expect(body).toContain("Task C");
-      // All tab is active
-      expect(body).toMatch(/All[\s\S]{0,200}active|active[\s\S]{0,200}All/i);
+      // With no category filter, the category picker's first option ("any")
+      // carries aria-selected="true".
+      const catPicker = body.match(/data-picker-values=["']category["'][\s\S]*?<\/div>/);
+      expect(catPicker).not.toBeNull();
+      const firstOpt = catPicker![0].match(/<a\b[\s\S]*?<\/a>/);
+      expect(firstOpt![0]).toMatch(/aria-selected=["']true["']/);
       // browseEntries called without category filter
       const callArgs = vi.mocked(browseEntries).mock.calls[0];
       const filters = callArgs?.[1];
@@ -473,13 +481,16 @@ describe("Web Browse", () => {
       });
 
       const body = await res.text();
-      // "personal" tag has active indicator
-      expect(body).toMatch(/personal[\s\S]{0,200}active|active[\s\S]{0,200}personal/i);
-      // "work" and "urgent" do NOT have active indicator on their pill elements
-      const workPill = body.match(/<a[^>]*href="[^"]*tag=work[^"]*"[^>]*>/i)?.[0] ?? "";
-      const urgentPill = body.match(/<a[^>]*href="[^"]*tag=urgent[^"]*"[^>]*>/i)?.[0] ?? "";
-      expect(workPill).not.toMatch(/active/i);
-      expect(urgentPill).not.toMatch(/active/i);
+      // Tag chip is active (shows "personal" in text-primary) and
+      // "personal" option in the picker carries aria-selected="true".
+      expect(body).toMatch(/data-picker=["']tag["'][\s\S]*?text-primary[\s\S]*?personal/);
+      expect(body).toMatch(
+        /href="[^"]*tag=personal[^"]*"[^>]*aria-selected=["']true["']|aria-selected=["']true["'][^>]*href="[^"]*tag=personal[^"]*"/,
+      );
+      // "work" option is NOT aria-selected
+      expect(body).toMatch(
+        /href="[^"]*tag=work[^"]*"[^>]*aria-selected=["']false["']|aria-selected=["']false["'][^>]*href="[^"]*tag=work[^"]*"/,
+      );
       // browseEntries called with tag filter
       expect(vi.mocked(browseEntries)).toHaveBeenCalledWith(
         expect.anything(),
@@ -488,7 +499,7 @@ describe("Web Browse", () => {
     });
 
     // TS-4.6
-    it("clears tag filter when active tag clicked", async () => {
+    it("active tag chip provides a one-click × clear that drops tag=", async () => {
       const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
@@ -498,27 +509,25 @@ describe("Web Browse", () => {
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
 
-      // Request with tag=work — the "work" pill's href should link to URL WITHOUT tag param (deselect)
+      // Tag chip in active state: carries a × anchor with href that drops tag=
       const res = await app.request("/browse?tag=work", {
         headers: { Cookie: cookie },
       });
-
       const body = await res.text();
-      // The active "work" tag pill links to a URL without tag=work (to deselect)
-      // Find the <a> tag containing "work" text and check its href does NOT include tag=work
-      const workLinkMatch = body.match(
-        /<a[^>]*href="([^"]*)"[^>]*>[^<]*work[^<]*<\/a>/i,
+      const chipRegion = body.match(
+        /data-picker=["']tag["'][\s\S]*?<\/button>/,
+      )?.[0];
+      expect(chipRegion).toBeDefined();
+      const clearAnchor = chipRegion!.match(
+        /<a\b[^>]*aria-label=["']Clear[^"']*["'][^>]*>/,
       );
-      expect(workLinkMatch).not.toBeNull();
-      expect(workLinkMatch![1]).not.toMatch(/tag=work/);
+      expect(clearAnchor).not.toBeNull();
+      const href = clearAnchor![0].match(/href="([^"]+)"/)?.[1];
+      expect(href).toBeDefined();
+      expect(href!).not.toMatch(/tag=/);
 
-      // Also verify the inverse: when no tag is selected, pills link TO ?tag=<name>
-      const resNoTag = await app.request("/browse", {
-        headers: { Cookie: cookie },
-      });
-      const bodyNoTag = await resNoTag.text();
-      // "work" pill should link to ?tag=work (to select it)
-      expect(bodyNoTag).toMatch(/<a[^>]*href="[^"]*tag=work[^"]*"/);
+      // Tag picker options link TO ?tag=<name> so clicking a value applies the filter
+      expect(body).toMatch(/data-picker-values=["']tag["'][\s\S]*?href="[^"]*tag=work[^"]*"/);
     });
   });
 
@@ -715,12 +724,13 @@ describe("Web Browse", () => {
 
       const body = await res.text();
       expect(body.toLowerCase()).toMatch(/no entries|no results/i);
-      // People tab is active
-      expect(body).toMatch(/People[\s\S]{0,200}active|active[\s\S]{0,200}People/i);
+      // Category chip is active (text-primary present inside the category trigger)
+      expect(body).toMatch(/data-picker=["']category["'][\s\S]*?text-primary/);
     });
 
-    // TS-6.7
-    it("shows max 10 tags with show more collapse", async () => {
+    // Tag dropdown handles all tags via scrollable picker — no legacy
+    // "show more" collapse (that was sidebar behavior).
+    it("tag picker renders all tags as options (no artificial truncation)", async () => {
       const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
@@ -732,21 +742,14 @@ describe("Web Browse", () => {
 
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
-
-      const res = await app.request("/browse", {
-        headers: { Cookie: cookie },
-      });
-
+      const res = await app.request("/browse", { headers: { Cookie: cookie } });
       const body = await res.text();
-      // All 15 tags present in the HTML
+
+      // All 15 tags appear as picker options
+      const tagPicker = body.match(/data-picker-values=["']tag["'][\s\S]*?<\/div>/)?.[0] ?? "";
       for (const tag of tags) {
-        expect(body).toContain(tag);
+        expect(tagPicker).toContain(tag);
       }
-      // "show more" control present
-      expect(body.toLowerCase()).toMatch(/show more|more tags/);
-      // Extra tags (beyond 10) are in a collapsible container
-      // The first 10 tags should be visible, remaining 5 in a hidden/collapsed section
-      expect(body).toMatch(/hidden|collapse|display:\s*none/i);
     });
   });
 
@@ -926,51 +929,46 @@ describe("Web Browse", () => {
       expect(body).toContain("data-filter-bar");
     });
 
-    // Peer dropdown renders current value label for since=week
-    it("renders the Updated dropdown with 'this week' as current value for since=week", async () => {
+    // Activity chip reflects since=week as "this week"
+    it("renders activity chip with 'this week' value when since=week", async () => {
       const { status, body } = await fetchBrowse("/browse?since=week");
       expect(status).toBe(200);
-      // Peer dropdown trigger carries data-picker="since" and its value span
-      // is lowercase "this week" (the i18n label lowercased)
-      expect(body).toMatch(/data-picker=["']since["']/);
-      expect(body.toLowerCase()).toMatch(/this week/);
+      expect(body).toMatch(/data-picker=["']activity["']/);
+      // Active chip shows the value in text-primary next to the dim label
+      expect(body).toMatch(/data-picker=["']activity["'][\s\S]*?text-primary[\s\S]*?this week/);
     });
 
-    // Peer dropdown renders current value label for status=pending
-    it("renders the Status dropdown with 'pending' as current value for status=pending", async () => {
+    // Status chip reflects status=pending
+    it("renders status chip with 'pending' value when status=pending", async () => {
       const { status, body } = await fetchBrowse("/browse?status=pending");
       expect(status).toBe(200);
       expect(body).toMatch(/data-picker=["']status["']/);
-      expect(body.toLowerCase()).toMatch(/>pending</);
+      expect(body).toMatch(/data-picker=["']status["'][\s\S]*?text-primary[\s\S]*?pending/);
     });
 
-    // Peer dropdown renders Inactive value label for stale_days=5
-    it("renders the Inactive dropdown with '5+ days' as current value for stale_days=5", async () => {
+    // Activity chip reflects stale_days=5 as "stale 5+ days"
+    it("renders activity chip with 'stale 5+ days' value when stale_days=5", async () => {
       const { status, body } = await fetchBrowse("/browse?stale_days=5");
       expect(status).toBe(200);
-      expect(body).toMatch(/data-picker=["']stale_days["']/);
-      expect(body.toLowerCase()).toMatch(/5\+\s*days/);
+      expect(body).toMatch(/data-picker=["']activity["']/);
+      expect(body.toLowerCase()).toMatch(/stale 5\+\s*days/);
     });
 
-    // Renders values from i18n in EN by default
-    it("renders dropdown value labels in English by default", async () => {
-      const { body } = await fetchBrowse(
-        "/browse?since=today&status=done&stale_days=14",
-      );
-      expect(body.toLowerCase()).toMatch(/today/);
-      expect(body.toLowerCase()).toMatch(/done/);
-      expect(body.toLowerCase()).toMatch(/14\+\s*days/);
+    // Multiple value labels render when each underlying param is set
+    it("renders value labels in English by default", async () => {
+      const { body } = await fetchBrowse("/browse?since=today&status=done");
+      expect(body.toLowerCase()).toMatch(/>today</);
+      expect(body.toLowerCase()).toMatch(/>done</);
     });
 
-    // Renders dimension labels in German when the locale is 'de'
-    it("renders dimension labels in German when the locale is 'de'", async () => {
+    // i18n: dimension labels + value labels flip to DE when locale is 'de'
+    it("renders dimension + activity value labels in German when the locale is 'de'", async () => {
       const { browseEntries } = await import(
         "../../src/web/browse-queries.js"
       );
       vi.mocked(browseEntries).mockResolvedValue([]);
 
       const { app } = await createTestBrowse();
-      // Seed cookie with locale=de via Accept-Language on /login POST
       const loginRes = await app.request("/login", {
         method: "POST",
         body: new URLSearchParams({ password: TEST_PASSWORD }),
@@ -982,37 +980,37 @@ describe("Web Browse", () => {
       const setCookie = loginRes.headers.get("set-cookie");
       const cookie = setCookie!.split(";")[0]!;
 
-      const res = await app.request(
-        "/browse?since=today&status=done&stale_days=14",
-        { headers: { Cookie: cookie } },
-      );
+      const res = await app.request("/browse?since=week&status=done", {
+        headers: { Cookie: cookie },
+      });
       const body = await res.text();
       expect(res.status).toBe(200);
       const { i18next } = await import("../../src/web/i18n/index.js");
       const t = i18next.getFixedT("de");
-      // Dropdown trigger lowercases the dimension label
-      expect(body).toContain((t("browse.filter.dimension.since") as string).toLowerCase());
+      // Dimension labels (chip triggers lowercase)
+      expect(body).toContain((t("browse.filter.dimension.activity") as string).toLowerCase());
       expect(body).toContain((t("browse.filter.dimension.status") as string).toLowerCase());
-      expect(body).toContain((t("browse.filter.dimension.stale_days") as string).toLowerCase());
+      expect(body).toContain((t("browse.filter.dimension.tag") as string).toLowerCase());
+      expect(body).toContain((t("browse.filter.dimension.category") as string).toLowerCase());
+      // Active value labels in DE
+      expect(body.toLowerCase()).toContain((t("browse.filter.value.activity.week") as string).toLowerCase());
     });
 
-    // Inactive value label uses singular pluralization when count=1
-    it("renders '1+ day' using singular pluralization in stale_days picker", async () => {
-      const { body } = await fetchBrowse("/browse?stale_days=1");
-      // Trigger value is the singular label; peer-dropdown lowercases it.
-      expect(body.toLowerCase()).toMatch(/1\+\s*day(?!s)/);
-    });
-
-    // TS-3.8
-    it("× on a pill removes only that param, preserving others", async () => {
+    // × on an active chip clears only that dim, preserving other filters
+    it("× anchor on an active chip removes only that dim, preserving others", async () => {
       const { body } = await fetchBrowse(
         "/browse?category=tasks&status=pending&since=week",
       );
-      // The × anchor for the status pill should link to /browse with
-      // status removed, category + since preserved.
-      expect(body).toMatch(
-        /href="\/browse\?category=tasks&(?:amp;)?since=week"/,
-      );
+      // Status chip's × anchor href should omit status but keep category+since
+      const statusChip = body.match(/data-picker=["']status["'][\s\S]*?<\/button>/)?.[0];
+      expect(statusChip).toBeDefined();
+      const clearAnchor = statusChip!.match(/<a\b[^>]*aria-label=["']Clear[^"']*["'][^>]*>/);
+      expect(clearAnchor).not.toBeNull();
+      const href = clearAnchor![0].match(/href="([^"]+)"/)?.[1];
+      expect(href).toBeDefined();
+      expect(href!).toMatch(/category=tasks/);
+      expect(href!).toMatch(/since=week/);
+      expect(href!).not.toMatch(/status=/);
     });
 
     // TS-3.9
@@ -1034,24 +1032,20 @@ describe("Web Browse", () => {
     // Peer dropdown — all 4 dimensions are always visible
     it("peer-dropdown filter row always renders all four dropdown triggers", async () => {
       const { body } = await fetchBrowse("/browse");
-      for (const dim of ["category", "status", "since", "stale_days"]) {
+      for (const dim of ["category", "tag", "status", "activity"]) {
         expect(body).toMatch(new RegExp(`data-picker=["']${dim}["']`));
       }
       // The old progressive-disclosure +Filter <details> element is gone.
-      // (The attribute name still appears inside the inline JS source, so
-      // only assert the <details> opener is absent.)
       expect(body).not.toMatch(/<details\b[^>]*data-filter-add-menu/);
     });
 
-    // Alle option is the first option in each dropdown picker (clears dimension)
-    it("each peer dropdown picker includes an 'Alle' option as its first option", async () => {
+    // "any" option is the first option in each dropdown picker (clears dimension)
+    it("each peer dropdown picker includes an 'any' option as its first option", async () => {
       const { body } = await fetchBrowse(
-        "/browse?status=pending&since=week&stale_days=5&category=tasks",
+        "/browse?status=pending&since=week&category=tasks",
       );
-      // Each picker's first anchor option is the clear-dimension link.
-      // The Alle option's href omits the dimension param.
-      const allLabel = "All"; // en.ts browse.filter.all
-      for (const dim of ["category", "status", "since", "stale_days"]) {
+      const anyLabel = "any"; // en.ts browse.filter.any
+      for (const dim of ["category", "tag", "status", "activity"]) {
         const pickerMatch = body.match(
           new RegExp(
             `data-picker-values=["']${dim}["'][\\s\\S]*?</div>`,
@@ -1060,7 +1054,7 @@ describe("Web Browse", () => {
         expect(pickerMatch).not.toBeNull();
         const firstOpt = pickerMatch![0].match(/<a\b[\s\S]*?<\/a>/);
         expect(firstOpt).not.toBeNull();
-        expect(firstOpt![0]).toContain(allLabel);
+        expect(firstOpt![0]).toContain(anyLabel);
       }
     });
 
@@ -1136,36 +1130,37 @@ describe("Web Browse", () => {
     });
 
     // TS-3.20
-    it("renders 'No entries match' when result set is empty", async () => {
+    it("renders 'no entries' count when result set is empty", async () => {
       const { body } = await fetchBrowse("/browse?status=paused", []);
-      expect(body).toMatch(/No entries match/i);
+      expect(body).toMatch(/no entries/i);
     });
 
     // TS-3.21
-    it("renders '1 entry matches' when result set has one entry", async () => {
+    it("renders '1 entry' count when result set has one entry", async () => {
       const { body } = await fetchBrowse(
         "/browse?status=paused",
         [createMockEntry({ name: "Only one" })],
       );
-      expect(body).toMatch(/1\s*entry\s*matches/i);
+      // trailing <span> in data-filter-bar carries the count, not the entry row
+      expect(body).toMatch(/data-filter-bar[\s\S]*?1\s*entry(?!s)/i);
     });
 
     // TS-3.22
-    it("renders '{N} entries match' when result set has multiple entries", async () => {
+    it("renders '{N} entries' count when result set has multiple entries", async () => {
       const entries = Array.from({ length: 4 }, (_, i) =>
         createMockEntry({ name: `Entry ${i}` }),
       );
       const { body } = await fetchBrowse("/browse?status=pending", entries);
-      expect(body).toMatch(/4\s*entries\s*match/i);
+      expect(body).toMatch(/4\s*entries/i);
     });
 
-    // TS-3.23
-    it("renders a Clear filters link when at least one filter is active", async () => {
-      const { body: withFilter } = await fetchBrowse("/browse?status=pending");
+    // TS-3.23 — Clear filters link is now only rendered on the empty state
+    it("renders a Clear filters link in the empty state when filters are active", async () => {
+      const { body: withFilter } = await fetchBrowse("/browse?status=pending", []);
       expect(withFilter.toLowerCase()).toContain("clear filters");
 
-      const { body: noFilter } = await fetchBrowse("/browse");
-      expect(noFilter.toLowerCase()).not.toContain("clear filters");
+      const { body: noFilterEmpty } = await fetchBrowse("/browse", []);
+      expect(noFilterEmpty.toLowerCase()).not.toContain("clear filters");
     });
 
     // Clear filters link appears only in the empty state (no results),
@@ -1239,8 +1234,8 @@ describe("Web Browse", () => {
       expect(body).toMatch(/<input[^>]*name="q"/);
     });
 
-    // TS-4.3
-    it("tag pill row renders discovery pills and active tag deselects on click", async () => {
+    // TS-4.3 — Tag dropdown presents all tags (most-used first) with counts
+    it("tag dropdown renders all tags as picker options with counts", async () => {
       const { browseEntries, getTagCounts } = await import(
         "../../src/web/browse-queries.js"
       );
@@ -1253,22 +1248,15 @@ describe("Web Browse", () => {
       const { app } = await createTestBrowse();
       const cookie = await loginAndGetCookie(app);
 
-      const { body: noTag } = await (async () => {
-        const r = await app.request("/browse", { headers: { Cookie: cookie } });
-        return { body: await r.text() };
-      })();
-      expect(noTag).toContain("alpha");
-      expect(noTag).toContain("beta");
-      expect(noTag).toContain("gamma");
-
-      const { body: withTag } = await (async () => {
-        const r = await app.request("/browse?tag=alpha", {
-          headers: { Cookie: cookie },
-        });
-        return { body: await r.text() };
-      })();
-      // Active tag click-to-deselect: href back to /browse without tag=
-      expect(withTag).toMatch(/<a[^>]*href="\/browse"[^>]*>[^<]*alpha/);
+      const res = await app.request("/browse", { headers: { Cookie: cookie } });
+      const body = await res.text();
+      const tagPicker = body.match(/data-picker-values=["']tag["'][\s\S]*?<\/div>/)?.[0] ?? "";
+      expect(tagPicker).toContain("alpha · 3");
+      expect(tagPicker).toContain("beta · 2");
+      expect(tagPicker).toContain("gamma · 1");
+      // Order preserved: alpha appears before beta before gamma
+      expect(tagPicker.indexOf("alpha")).toBeLessThan(tagPicker.indexOf("beta"));
+      expect(tagPicker.indexOf("beta")).toBeLessThan(tagPicker.indexOf("gamma"));
     });
 
     // TS-4.4
@@ -1376,23 +1364,23 @@ describe("Web Browse", () => {
             obj,
           );
       const requiredKeys = [
-        "browse.filter.add",
         "browse.filter.clear",
+        "browse.filter.any",
+        "browse.filter.dimension.category",
+        "browse.filter.dimension.tag",
         "browse.filter.dimension.status",
-        "browse.filter.dimension.since",
-        "browse.filter.dimension.stale_days",
+        "browse.filter.dimension.activity",
         "browse.filter.value.status.pending",
         "browse.filter.value.status.done",
         "browse.filter.value.status.active",
         "browse.filter.value.status.paused",
         "browse.filter.value.status.completed",
-        "browse.filter.value.since.today",
-        "browse.filter.value.since.week",
-        "browse.filter.value.since.month",
-        "browse.filter.pill.status",
-        "browse.filter.pill.since",
-        "browse.filter.pill.stale_days_one",
-        "browse.filter.pill.stale_days_other",
+        "browse.filter.value.activity.today",
+        "browse.filter.value.activity.week",
+        "browse.filter.value.activity.month",
+        "browse.filter.value.activity.stale5",
+        "browse.filter.value.activity.stale14",
+        "browse.filter.value.activity.stale30",
         "browse.filter.results_zero",
         "browse.filter.results_one",
         "browse.filter.results_other",
@@ -1415,23 +1403,23 @@ describe("Web Browse", () => {
             obj,
           );
       const requiredKeys = [
-        "browse.filter.add",
         "browse.filter.clear",
+        "browse.filter.any",
+        "browse.filter.dimension.category",
+        "browse.filter.dimension.tag",
         "browse.filter.dimension.status",
-        "browse.filter.dimension.since",
-        "browse.filter.dimension.stale_days",
+        "browse.filter.dimension.activity",
         "browse.filter.value.status.pending",
         "browse.filter.value.status.done",
         "browse.filter.value.status.active",
         "browse.filter.value.status.paused",
         "browse.filter.value.status.completed",
-        "browse.filter.value.since.today",
-        "browse.filter.value.since.week",
-        "browse.filter.value.since.month",
-        "browse.filter.pill.status",
-        "browse.filter.pill.since",
-        "browse.filter.pill.stale_days_one",
-        "browse.filter.pill.stale_days_other",
+        "browse.filter.value.activity.today",
+        "browse.filter.value.activity.week",
+        "browse.filter.value.activity.month",
+        "browse.filter.value.activity.stale5",
+        "browse.filter.value.activity.stale14",
+        "browse.filter.value.activity.stale30",
         "browse.filter.results_zero",
         "browse.filter.results_one",
         "browse.filter.results_other",
@@ -1578,15 +1566,11 @@ describe("Web Browse", () => {
       );
     });
 
-    // Each peer-dropdown trigger renders a chevron-down SVG after its value.
-    it("each peer-dropdown trigger renders a chevron-down SVG", async () => {
-      const { body } = await fetchBrowse(
-        "/browse?status=pending&since=week&stale_days=5",
-      );
-      // Each trigger button contains a data-picker-chevron span with the
-      // Lucide chevron-down path (m6 9 6 6 6-6).
-      const dims = ["category", "status", "since", "stale_days"];
-      for (const dim of dims) {
+    // Idle peer-dropdown chips render a chevron-down SVG (no filter applied).
+    // Active chips render a × clear anchor instead of a chevron.
+    it("each idle peer-dropdown chip renders a chevron-down SVG", async () => {
+      const { body } = await fetchBrowse("/browse");
+      for (const dim of ["category", "tag", "status", "activity"]) {
         const re = new RegExp(
           `data-picker=["']${dim}["'][\\s\\S]*?</button>`,
         );
@@ -1597,17 +1581,31 @@ describe("Web Browse", () => {
       }
     });
 
+    // Active chip renders an × clear anchor instead of a chevron
+    it("each active peer-dropdown chip renders an × clear anchor (no chevron)", async () => {
+      const { body } = await fetchBrowse("/browse?status=pending&since=week");
+      // Status chip is active → has clear anchor, no chevron-down path
+      const statusChip = body.match(/data-picker=["']status["'][\s\S]*?<\/button>/)?.[0];
+      expect(statusChip).toBeDefined();
+      expect(statusChip!).toMatch(/aria-label=["']Clear[^"']*["']/);
+      expect(statusChip!).not.toMatch(/data-picker-chevron/);
+      // Activity chip is active
+      const activityChip = body.match(/data-picker=["']activity["'][\s\S]*?<\/button>/)?.[0];
+      expect(activityChip!).toMatch(/aria-label=["']Clear[^"']*["']/);
+      expect(activityChip!).not.toMatch(/data-picker-chevron/);
+    });
+
     // TS-3.33 — + Filter dimension items reuse the same overlay-positioned picker DOM
     it("+ Filter dimension items reuse the same overlay-positioned picker DOM", async () => {
       const { body } = await fetchBrowse("/browse");
       const count = (s: string, sub: string) =>
         (s.match(new RegExp(sub, "g")) || []).length;
       // Each picker is rendered exactly once
-      for (const dim of ["status", "since", "stale_days"]) {
+      for (const dim of ["category", "tag", "status", "activity"]) {
         expect(count(body, `data-picker-values=["']${dim}["']`)).toBe(1);
       }
       // Overlay classes apply
-      for (const dim of ["status", "since", "stale_days"]) {
+      for (const dim of ["category", "tag", "status", "activity"]) {
         expect(body).toMatch(
           new RegExp(
             `data-picker-values=["']${dim}["'][^>]*class="[^"]*\\babsolute\\b`,
@@ -1661,7 +1659,7 @@ describe("Web Browse", () => {
     // aria-haspopup="listbox".
     it("each peer-dropdown trigger carries aria-haspopup=listbox", async () => {
       const { body } = await fetchBrowse("/browse?status=pending&since=week");
-      for (const dim of ["category", "status", "since", "stale_days"]) {
+      for (const dim of ["category", "tag", "status", "activity"]) {
         expect(body).toMatch(
           new RegExp(
             `data-picker=["']${dim}["'][^>]*aria-haspopup=["']listbox["']|aria-haspopup=["']listbox["'][^>]*data-picker=["']${dim}["']`,
@@ -1681,7 +1679,7 @@ describe("Web Browse", () => {
     // TS-3.40 — role="listbox" on each value picker
     it("each value picker carries role=listbox", async () => {
       const { body } = await fetchBrowse("/browse");
-      for (const dim of ["status", "since", "stale_days"]) {
+      for (const dim of ["category", "tag", "status", "activity"]) {
         expect(body).toMatch(
           new RegExp(
             `data-picker-values=["']${dim}["'][^>]*role=["']listbox["']|role=["']listbox["'][^>]*data-picker-values=["']${dim}["']`,
@@ -1709,7 +1707,7 @@ describe("Web Browse", () => {
       const { body } = await fetchBrowse(
         "/browse?status=pending&since=week&stale_days=5",
       );
-      for (const dim of ["status", "since", "stale_days"]) {
+      for (const dim of ["category", "tag", "status", "activity"]) {
         const pickerMatch = body.match(
           new RegExp(
             `data-picker-values=["']${dim}["'][\\s\\S]*?</div>`,
@@ -1726,7 +1724,7 @@ describe("Web Browse", () => {
     // TS-3.43 — overlay-positioning class assertions
     it("picker overlay-positioning class assertions: absolute + top-full + (left-0 or right-0) on a relative-positioned ancestor", async () => {
       const { body } = await fetchBrowse("/browse?status=pending");
-      for (const dim of ["status", "since", "stale_days"]) {
+      for (const dim of ["category", "tag", "status", "activity"]) {
         const re = new RegExp(
           `data-picker-values=["']${dim}["'][^>]*class="([^"]+)"`,
         );
