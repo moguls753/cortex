@@ -492,7 +492,7 @@ function buildFooter(data: DisplayData): El {
       },
     },
     text({}, `Last updated ${data.time}`),
-    text({}, "cortex v0.1"),
+    text({}, "cortex"),
   );
 }
 

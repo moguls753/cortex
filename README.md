@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://moguls753.github.io/cortex/"><strong>Live Demo</strong></a>
+  <a href="https://moguls753.github.io/cortex/"><strong>Project page</strong></a>
 </p>
 
 ## How It Works

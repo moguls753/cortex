@@ -116,7 +116,7 @@ describe("buildLayout", () => {
     const element = buildLayout(sampleData, 1872, 1404);
     const json = JSON.stringify(element);
     expect(json).toContain("Last updated 07:30");
-    expect(json).toContain("cortex v0.1");
+    expect(json).toContain("cortex");
   });
 
   it("includes tomorrow section when tomorrowEvents exist", () => {
