@@ -1558,31 +1558,17 @@ export function createSettingsRoutes(
       });
     }
 
-    // Post-save connectivity checks (parallel)
+    // Post-save Ollama connectivity check. Google Calendar validation is not
+    // done here — it belongs in /settings/google-calendar/connect where Google
+    // itself verifies client_id + client_secret + auth code together. Checking
+    // the stored refresh token on every save misfired once tokens went stale.
     let warning = "";
     const savedSettings = (await getAllSettings(sql)) ?? {};
     const ollamaCheckUrl = resolveEffective(savedSettings, "ollama_url", DEFAULTS.ollama_url);
-    const gcalRefreshToken = savedSettings.google_refresh_token || "";
-    const gcalClientId = savedSettings.google_client_id || "";
-    const gcalClientSecret = savedSettings.google_client_secret || "";
-    const [ollamaOk, gcalOk] = await Promise.all([
-      fetch(ollamaCheckUrl, { signal: AbortSignal.timeout(3000) }).then(() => true).catch(() => false),
-      (gcalRefreshToken && gcalClientId && gcalClientSecret)
-        ? fetch("https://oauth2.googleapis.com/token", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              grant_type: "refresh_token",
-              refresh_token: gcalRefreshToken,
-              client_id: gcalClientId,
-              client_secret: gcalClientSecret,
-            }),
-            signal: AbortSignal.timeout(3000),
-          }).then((r) => r.ok).catch(() => true)
-        : Promise.resolve(true),
-    ]);
+    const ollamaOk = await fetch(ollamaCheckUrl, { signal: AbortSignal.timeout(3000) })
+      .then(() => true)
+      .catch(() => false);
     if (!ollamaOk) warning = "Could not connect to the configured Ollama endpoint. Embedding generation may fail.";
-    if (!gcalOk && !warning) warning = "Saved — but Google Calendar credentials appear invalid.";
 
     const params = new URLSearchParams({ success: "saved" });
     if (warning) params.set("warning", warning);
