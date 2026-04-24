@@ -1,8 +1,8 @@
 <h1 align="center">Cortex</h1>
 
 <p align="center">
-  A self-hosted, agent-readable second brain.<br>
-  Capture from Telegram or the web, classify with AI, search by meaning, access via MCP.
+  A self-hosted personal memory assistant.<br>
+  Capture by voice or text. Recall the small things before they slip.
 </p>
 
 <p align="center">
@@ -15,6 +15,12 @@
 2. **Classify** - an LLM sorts it into one of five categories (People, Projects, Tasks, Ideas, Reference) and extracts structured fields.
 3. **Store** - PostgreSQL with pgvector embeddings. Search by meaning, not just keywords.
 4. **Access** - web dashboard, daily/weekly email digests, or query your brain from any MCP-compatible tool.
+
+## When Cortex fits (and when it doesn't)
+
+**Fits:** low-friction capture of individual thoughts from anywhere — voice from a phone, text on the go, or a quick note at the desk. Personal logistics (tasks, follow-ups, appointments, people context, idea backlog). Agent-assisted recall via MCP. Self-hosted with local LLM support.
+
+**Doesn't fit:** long-form writing, progressive-summarization knowledge work, cross-linked knowledge graphs, team wikis, curated reference libraries. For those, [Obsidian](https://obsidian.md), [Notion](https://www.notion.so), or [Logseq](https://logseq.com) are purpose-built — Cortex is deliberately a different shape.
 
 ## Features
 

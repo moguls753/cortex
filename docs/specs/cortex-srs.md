@@ -27,7 +27,7 @@
 
 ### 1.1 Purpose
 
-This document specifies the functional and non-functional requirements for Cortex, a self-hosted, agent-readable second brain. It serves as the authoritative reference for development, testing, and acceptance of the system.
+This document specifies the functional and non-functional requirements for Cortex, a self-hosted personal memory assistant — a capture-and-retrieval system for individual thoughts with agent-readable recall via MCP. It serves as the authoritative reference for development, testing, and acceptance of the system.
 
 ### 1.2 System Description
 

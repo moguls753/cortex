@@ -2137,7 +2137,7 @@ describe("UI Language", () => {
 
       // Prompt body starts with English instruction text
       expect(rendered).toMatch(
-        /classification engine for a personal knowledge base/i,
+        /classification engine for a personal memory assistant/i,
       );
       // Prompt does not contain any German-only stub catalog strings
       // (stub is empty; this guard ensures the prompt body itself is English).

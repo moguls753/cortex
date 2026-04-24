@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A self-hosted, agent-readable second brain. See `ARCHITECTURE.md` for the full architecture (v3).
+Cortex is a self-hosted personal memory assistant — a capture-and-retrieval system for individual thoughts, not a knowledge graph or PKM tool. Don't suggest PKM-style features (progressive summarization, bidirectional linking, knowledge-graph workflows); Cortex deliberately avoids that territory. See `ARCHITECTURE.md` for the full architecture (v3).
 
 ## Key Architectural Decisions
 

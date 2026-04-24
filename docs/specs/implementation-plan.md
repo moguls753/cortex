@@ -6,7 +6,7 @@
 
 ## Overview
 
-Cortex is a self-hosted, agent-readable second brain. Users capture thoughts from Telegram (text or voice) or a web editor. Every entry is classified by Claude, embedded by Ollama, and stored in PostgreSQL with pgvector. Any AI tool can read, write, and search the brain via MCP.
+Cortex is a self-hosted personal memory assistant — a capture-and-retrieval system for individual thoughts, not a PKM tool. Users capture thoughts from Telegram (text or voice) or a web editor. Every entry is classified by Claude, embedded by Ollama, and stored in PostgreSQL with pgvector. Any AI tool can read, write, and search the brain via MCP.
 
 The implementation follows a "capture first" strategy: get Telegram ingestion working end-to-end before building the web interface or MCP server. Each feature goes through the full spec-dd workflow (behavioral spec, test spec, test implementation spec, failing tests, then implementation) before moving to the next.
 

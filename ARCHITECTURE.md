@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A self-hosted, agent-readable second brain. Capture thoughts from Telegram (text or voice) or a web editor, classify and embed them with AI, store everything in PostgreSQL with vector search, and expose it to any AI tool via MCP.
+Cortex is a self-hosted personal memory assistant: a capture-and-retrieval system for individual thoughts — not a knowledge graph or PKM tool. Capture thoughts from Telegram (text or voice) or a web editor, classify and embed them with AI, store everything in PostgreSQL with vector search, and expose it to any AI tool via MCP.
 
 Your data lives on your server. No SaaS middlemen. One brain, every AI tool.
 
@@ -178,7 +178,7 @@ Note: `category` is nullable to support unclassified entries (when LLM API fails
 **Ideas:**
 ```json
 {
-    "oneliner": "Self-hosted second brain using MCP",
+    "oneliner": "Self-hosted personal memory assistant using MCP",
     "notes": "Could be open sourced"
 }
 ```
@@ -464,7 +464,7 @@ RECURRING THEME
 ### Classification Prompt
 
 ```
-You are a classification engine for a personal knowledge management system.
+You are a classification engine for a personal memory assistant.
 
 Classify the following thought into exactly one category:
 - people: about a specific person, relationship, or social interaction
