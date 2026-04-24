@@ -687,6 +687,13 @@
   }
   .flowdiag .core { animation: coreBreath 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 
+  /* swap wide (desktop) ↔ portrait (mobile) flow diagrams by viewport */
+  .flowdiag.flow-portrait { display: none; }
+  @media (max-width: 700px) {
+    .flowdiag.flow-wide { display: none; }
+    .flowdiag.flow-portrait { display: block; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .flowdiag .pkt, .flowdiag .corePulse, .flowdiag .storePulse { display: none; }
     .flowdiag .core { animation: none; }
@@ -1328,7 +1335,7 @@
       <div class="how-col how-flow">
         <h3>flow · architecture</h3>
         <div class="arch arch-wide">
-          <svg viewBox="0 0 1200 440" preserveAspectRatio="xMidYMid meet" aria-hidden="true" class="flowdiag">
+          <svg viewBox="0 0 1200 440" preserveAspectRatio="xMidYMid meet" aria-hidden="true" class="flowdiag flow-wide">
             <defs>
               <marker id="arrq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
                 <path d="M0,0 L10,5 L0,10 z" fill="oklch(0.45 0.01 150)"/>
@@ -1537,6 +1544,205 @@
             <rect x="400" y="80" width="220" height="44" rx="3" fill="none" stroke="oklch(0.78 0.14 150)" stroke-width="1" opacity="0" pointer-events="none">
               <animate attributeName="opacity" values="0;0.75;0" dur="0.5s" begin="L1s2.end;L2s2.end;L3s1.end" fill="freeze"/>
               <animate attributeName="stroke-width" values="1;2.4;1" dur="0.5s" begin="L1s2.end;L2s2.end;L3s1.end" fill="freeze"/>
+            </rect>
+          </svg>
+
+          <!-- ─────── Mobile portrait variant ─────── -->
+          <svg viewBox="0 0 360 740" preserveAspectRatio="xMidYMid meet" aria-hidden="true" class="flowdiag flow-portrait">
+            <defs>
+              <marker id="arrqM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="oklch(0.45 0.01 150)"/>
+              </marker>
+              <filter id="pktGlowM" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="1.6" result="b"/>
+                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+
+              <!-- path definitions — all flow top-to-bottom -->
+              <path id="M1a" d="M180 63  C 180 120, 97 160, 97 220" fill="none"/>
+              <path id="M1b" d="M170 239 L 180 239" fill="none"/>
+              <path id="M1c" d="M257 258 C 257 310, 100 320, 100 340" fill="none"/>
+              <path id="M1d" d="M100 390 C 100 405, 180 405, 180 415" fill="none"/>
+              <path id="M1e" d="M180 463 C 180 478, 75  478, 75  490" fill="none"/>
+              <path id="M1f" d="M75  526 C 75  570, 180 600, 180 618" fill="none"/>
+
+              <path id="M2a" d="M180 96  C 180 140, 97  180, 97  220" fill="none"/>
+              <path id="M2b" d="M170 239 L 180 239" fill="none"/>
+              <path id="M2c" d="M257 258 C 257 300, 260 320, 260 340" fill="none"/>
+              <path id="M2d" d="M260 390 C 260 405, 180 405, 180 415" fill="none"/>
+              <path id="M2e" d="M180 463 C 345 465, 345 570, 180 585" fill="none"/>
+
+              <path id="M3a" d="M180 162 C 340 170, 340 250, 180 275" fill="none"/>
+              <path id="M3b" d="M180 313 C 180 340, 15  360, 180 415" fill="none"/>
+              <path id="M3c" d="M180 463 C 15  500, 15  680, 180 684" fill="none"/>
+            </defs>
+
+            <!-- docker compose boundary -->
+            <rect x="10" y="205" width="340" height="345" rx="4"
+                  fill="oklch(0.135 0.006 150)" stroke="oklch(0.38 0.02 150)" stroke-width="1" stroke-dasharray="3 3"/>
+            <text x="16"  y="197" font-family="JetBrains Mono, monospace" font-size="9" fill="oklch(0.55 0.02 150)" letter-spacing="1.2">DOCKER&#8201;COMPOSE</text>
+            <text x="344" y="197" font-family="JetBrains Mono, monospace" font-size="9" fill="oklch(0.48 0.02 150)" text-anchor="end">cortex_net</text>
+
+            <!-- static wires — faint so overlap with input boxes is subtle -->
+            <g stroke="oklch(0.40 0.012 150)" stroke-width="1" stroke-opacity="0.55" fill="none" marker-end="url(#arrqM)">
+              <use href="#M1a"/><use href="#M1b"/><use href="#M1c"/>
+              <use href="#M2a"/><use href="#M2c"/>
+              <use href="#M3a"/><use href="#M3b"/>
+            </g>
+            <g stroke="oklch(0.50 0.08 150)" stroke-width="1" fill="none" marker-end="url(#arrqM)">
+              <use href="#M1d"/><use href="#M2d"/>
+              <use href="#M1e"/>
+            </g>
+            <g stroke="oklch(0.40 0.012 150)" stroke-width="1" fill="none" marker-end="url(#arrqM)">
+              <use href="#M1f"/><use href="#M2e"/><use href="#M3c"/>
+            </g>
+
+            <!-- INPUT nodes (stacked full-width) -->
+            <g font-family="JetBrains Mono, monospace" font-size="11" fill="oklch(0.88 0.006 150)">
+              <rect x="20" y="35"  width="320" height="28" rx="3" fill="oklch(0.14 0.008 150)" stroke="oklch(0.42 0.012 150)"/>
+              <text x="180" y="54" text-anchor="middle">telegram</text>
+
+              <rect x="20" y="68"  width="320" height="28" rx="3" fill="oklch(0.14 0.008 150)" stroke="oklch(0.42 0.012 150)"/>
+              <text x="180" y="87" text-anchor="middle">voice · whisper</text>
+
+              <rect x="20" y="101" width="320" height="28" rx="3" fill="oklch(0.14 0.008 150)" stroke="oklch(0.42 0.012 150)"/>
+              <text x="180" y="120" text-anchor="middle">web ui</text>
+
+              <rect x="20" y="134" width="320" height="28" rx="3" fill="oklch(0.14 0.008 150)" stroke="oklch(0.42 0.012 150)"/>
+              <text x="180" y="153" text-anchor="middle">mcp client</text>
+            </g>
+            <text x="20" y="183" font-family="JetBrains Mono, monospace" font-size="9" fill="oklch(0.50 0.012 150)" letter-spacing="1.4">INPUTS</text>
+
+            <!-- edge row: grammY | hono ; then mcp-server full width -->
+            <g font-family="JetBrains Mono, monospace" fill="oklch(0.92 0.006 150)">
+              <rect x="25" y="220" width="145" height="38" rx="3" fill="oklch(0.17 0.008 150)" stroke="oklch(0.48 0.012 150)"/>
+              <text x="97" y="238" text-anchor="middle" font-size="11" font-weight="600">grammY</text>
+              <text x="97" y="251" text-anchor="middle" font-size="8.5" fill="oklch(0.60 0.012 150)">telegram bot</text>
+
+              <rect x="180" y="220" width="155" height="38" rx="3" fill="oklch(0.17 0.008 150)" stroke="oklch(0.48 0.012 150)"/>
+              <text x="257" y="238" text-anchor="middle" font-size="11" font-weight="600">hono <tspan fill="oklch(0.60 0.012 150)" font-weight="400">:3000</tspan></text>
+              <text x="257" y="251" text-anchor="middle" font-size="8.5" fill="oklch(0.60 0.012 150)">api gateway</text>
+
+              <rect x="25" y="275" width="310" height="38" rx="3" fill="oklch(0.17 0.008 150)" stroke="oklch(0.48 0.012 150)"/>
+              <text x="180" y="293" text-anchor="middle" font-size="11" font-weight="600">mcp-server <tspan fill="oklch(0.60 0.012 150)" font-weight="400">:8080</tspan></text>
+              <text x="180" y="306" text-anchor="middle" font-size="8.5" fill="oklch(0.60 0.012 150)">tool endpoints</text>
+            </g>
+
+            <!-- llm row: ollama (core, accent) | cloud-llm (optional, blue) -->
+            <g font-family="JetBrains Mono, monospace" fill="oklch(0.96 0.006 150)">
+              <g class="core">
+                <rect x="25" y="340" width="150" height="50" rx="3" fill="oklch(0.24 0.06 150 / 0.55)" stroke="oklch(0.72 0.14 150)" stroke-width="1.2"/>
+                <text x="100" y="360" text-anchor="middle" font-size="11" font-weight="600">ollama <tspan fill="oklch(0.74 0.14 150)" font-weight="400">:11434</tspan></text>
+                <text x="100" y="378" text-anchor="middle" font-size="8.5" fill="oklch(0.80 0.06 150)">qwen3 · embed + classify</text>
+              </g>
+              <rect x="185" y="340" width="150" height="50" rx="3" fill="oklch(0.20 0.04 220 / 0.40)" stroke="oklch(0.58 0.08 220)" stroke-width="1" stroke-dasharray="4 2"/>
+              <text x="260" y="360" text-anchor="middle" font-size="11" font-weight="600">cloud llm</text>
+              <text x="260" y="378" text-anchor="middle" font-size="8.5" fill="oklch(0.70 0.06 220)">anthropic · openai · groq</text>
+            </g>
+
+            <!-- storage row -->
+            <g font-family="JetBrains Mono, monospace" fill="oklch(0.94 0.006 150)">
+              <rect x="25" y="415" width="310" height="48" rx="3" fill="oklch(0.17 0.02 150)" stroke="oklch(0.58 0.10 150)" stroke-width="1.2"/>
+              <text x="180" y="436" text-anchor="middle" font-size="11" font-weight="600">postgres <tspan fill="oklch(0.64 0.10 150)" font-weight="400">:5432</tspan> · pgvector</text>
+              <text x="180" y="453" text-anchor="middle" font-size="8.5" fill="oklch(0.62 0.04 150)">entries · embeddings(4096d)</text>
+            </g>
+
+            <!-- worker row -->
+            <g font-family="JetBrains Mono, monospace" fill="oklch(0.88 0.006 150)">
+              <rect x="25" y="490" width="100" height="36" rx="3" fill="oklch(0.17 0.008 150)" stroke="oklch(0.45 0.012 150)"/>
+              <text x="75" y="508" text-anchor="middle" font-size="9.5" font-weight="600">digest-worker</text>
+              <text x="75" y="520" text-anchor="middle" font-size="8" fill="oklch(0.58 0.012 150)">cron · daily</text>
+
+              <rect x="130" y="490" width="100" height="36" rx="3" fill="oklch(0.17 0.008 150)" stroke="oklch(0.45 0.012 150)"/>
+              <text x="180" y="508" text-anchor="middle" font-size="9.5" font-weight="600">e-ink-renderer</text>
+              <text x="180" y="520" text-anchor="middle" font-size="8" fill="oklch(0.58 0.012 150)">png</text>
+
+              <rect x="235" y="490" width="100" height="36" rx="3" fill="oklch(0.17 0.008 150)" stroke="oklch(0.45 0.012 150)"/>
+              <text x="285" y="508" text-anchor="middle" font-size="9.5" font-weight="600">scheduler</text>
+              <text x="285" y="520" text-anchor="middle" font-size="8" fill="oklch(0.58 0.012 150)">node-cron</text>
+            </g>
+
+            <!-- SURFACES header -->
+            <text x="20" y="578" font-family="JetBrains Mono, monospace" font-size="9" fill="oklch(0.50 0.012 150)" letter-spacing="1.4">SURFACES</text>
+
+            <!-- OUTPUT surfaces -->
+            <g font-family="JetBrains Mono, monospace" font-size="11" fill="oklch(0.88 0.006 150)">
+              <rect x="20" y="585" width="320" height="28" rx="3" fill="oklch(0.14 0.008 150)" stroke="oklch(0.42 0.012 150)"/>
+              <text x="180" y="604" text-anchor="middle">dashboard</text>
+
+              <rect x="20" y="618" width="320" height="28" rx="3" fill="oklch(0.14 0.008 150)" stroke="oklch(0.42 0.012 150)"/>
+              <text x="180" y="637" text-anchor="middle">digest email</text>
+
+              <rect x="20" y="651" width="320" height="28" rx="3" fill="oklch(0.14 0.008 150)" stroke="oklch(0.42 0.012 150)"/>
+              <text x="180" y="670" text-anchor="middle">e-ink device</text>
+
+              <rect x="20" y="684" width="320" height="28" rx="3" fill="oklch(0.14 0.008 150)" stroke="oklch(0.42 0.012 150)"/>
+              <text x="180" y="703" text-anchor="middle">calendar · mcp tools</text>
+            </g>
+
+            <!-- LANE 1: telegram → grammY → hono → ollama → postgres → digest-worker → digest email -->
+            <g class="pkt">
+              <circle r="2.8" fill="oklch(0.90 0.18 150)" filter="url(#pktGlowM)">
+                <animateMotion dur="0.6s"  begin="0s;mdone1.end+0.8s"   id="M1s1" rotate="auto" fill="freeze"><mpath href="#M1a"/></animateMotion>
+                <animateMotion dur="0.3s"  begin="M1s1.end"             id="M1s2" rotate="auto" fill="freeze"><mpath href="#M1b"/></animateMotion>
+                <animateMotion dur="0.55s" begin="M1s2.end+0.15s"       id="M1s3" rotate="auto" fill="freeze"><mpath href="#M1c"/></animateMotion>
+                <animateMotion dur="0.5s"  begin="M1s3.end+0.25s"       id="M1s4" rotate="auto" fill="freeze"><mpath href="#M1d"/></animateMotion>
+                <animateMotion dur="0.5s"  begin="M1s4.end+0.3s"        id="M1s5" rotate="auto" fill="freeze"><mpath href="#M1e"/></animateMotion>
+                <animateMotion dur="0.9s"  begin="M1s5.end+0.3s"        id="mdone1" rotate="auto" fill="remove"><mpath href="#M1f"/></animateMotion>
+                <animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;0.03;0.5;0.97;1" dur="4.7s" begin="0s;mdone1.end+0.8s" fill="freeze"/>
+              </circle>
+            </g>
+
+            <!-- LANE 2: voice → grammY → hono → cloud-llm → postgres → dashboard -->
+            <g class="pkt">
+              <circle r="2.8" fill="oklch(0.80 0.12 220)" filter="url(#pktGlowM)">
+                <animateMotion dur="0.6s"  begin="1.3s;mdone2.end+2.0s" id="M2s1" rotate="auto" fill="freeze"><mpath href="#M2a"/></animateMotion>
+                <animateMotion dur="0.3s"  begin="M2s1.end"             id="M2s2" rotate="auto" fill="freeze"><mpath href="#M2b"/></animateMotion>
+                <animateMotion dur="0.55s" begin="M2s2.end+0.15s"       id="M2s3" rotate="auto" fill="freeze"><mpath href="#M2c"/></animateMotion>
+                <animateMotion dur="0.5s"  begin="M2s3.end+0.25s"       id="M2s4" rotate="auto" fill="freeze"><mpath href="#M2d"/></animateMotion>
+                <animateMotion dur="1.0s"  begin="M2s4.end+0.3s"        id="mdone2" rotate="auto" fill="remove"><mpath href="#M2e"/></animateMotion>
+                <animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;0.03;0.5;0.97;1" dur="4.0s" begin="1.3s;mdone2.end+2.0s" fill="freeze"/>
+              </circle>
+            </g>
+
+            <!-- LANE 3: mcp client → mcp-server → postgres → calendar -->
+            <g class="pkt">
+              <circle r="2.8" fill="oklch(0.90 0.18 150)" filter="url(#pktGlowM)">
+                <animateMotion dur="0.7s"  begin="2.6s;mdone3.end+1.4s" id="M3s1" rotate="auto" fill="freeze"><mpath href="#M3a"/></animateMotion>
+                <animateMotion dur="0.6s"  begin="M3s1.end+0.2s"        id="M3s2" rotate="auto" fill="freeze"><mpath href="#M3b"/></animateMotion>
+                <animateMotion dur="1.1s"  begin="M3s2.end+0.3s"        id="mdone3" rotate="auto" fill="remove"><mpath href="#M3c"/></animateMotion>
+                <animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;0.03;0.5;0.97;1" dur="3.5s" begin="2.6s;mdone3.end+1.4s" fill="freeze"/>
+              </circle>
+            </g>
+
+            <!-- ollama pulse on local classify hits -->
+            <rect x="25" y="340" width="150" height="50" rx="3" fill="none" stroke="oklch(0.82 0.16 150)" stroke-width="1" opacity="0" pointer-events="none">
+              <animate attributeName="opacity" values="0;0.9;0" dur="0.6s" begin="M1s3.end" fill="freeze"/>
+              <animate attributeName="stroke-width" values="1;2.8;1" dur="0.6s" begin="M1s3.end" fill="freeze"/>
+            </rect>
+
+            <!-- cloud-llm pulse on cloud hits -->
+            <rect x="185" y="340" width="150" height="50" rx="3" fill="none" stroke="oklch(0.68 0.12 220)" stroke-width="1" opacity="0" pointer-events="none">
+              <animate attributeName="opacity" values="0;0.9;0" dur="0.6s" begin="M2s3.end" fill="freeze"/>
+              <animate attributeName="stroke-width" values="1;2.8;1" dur="0.6s" begin="M2s3.end" fill="freeze"/>
+            </rect>
+
+            <!-- postgres pulse on every r/w -->
+            <rect x="25" y="415" width="310" height="48" rx="3" fill="none" stroke="oklch(0.78 0.14 150)" stroke-width="1" opacity="0" pointer-events="none">
+              <animate attributeName="opacity" values="0;0.9;0" dur="0.55s" begin="M1s4.end;M2s4.end;M3s2.end" fill="freeze"/>
+              <animate attributeName="stroke-width" values="1;2.4;1" dur="0.55s" begin="M1s4.end;M2s4.end;M3s2.end" fill="freeze"/>
+            </rect>
+
+            <!-- hono pulse -->
+            <rect x="180" y="220" width="155" height="38" rx="3" fill="none" stroke="oklch(0.78 0.14 150)" stroke-width="1" opacity="0" pointer-events="none">
+              <animate attributeName="opacity" values="0;0.75;0" dur="0.5s" begin="M1s2.end;M2s2.end" fill="freeze"/>
+              <animate attributeName="stroke-width" values="1;2.4;1" dur="0.5s" begin="M1s2.end;M2s2.end" fill="freeze"/>
+            </rect>
+
+            <!-- mcp-server pulse -->
+            <rect x="25" y="275" width="310" height="38" rx="3" fill="none" stroke="oklch(0.78 0.14 150)" stroke-width="1" opacity="0" pointer-events="none">
+              <animate attributeName="opacity" values="0;0.75;0" dur="0.5s" begin="M3s1.end" fill="freeze"/>
+              <animate attributeName="stroke-width" values="1;2.4;1" dur="0.5s" begin="M3s1.end" fill="freeze"/>
             </rect>
           </svg>
         </div>
