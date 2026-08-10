@@ -180,6 +180,14 @@ function validateSettings(form: Record<string, string>): string | null {
     }
   }
 
+  // Display — font scale
+  if (form.display_font_scale) {
+    const scale = parseFloat(form.display_font_scale);
+    if (!Number.isFinite(scale) || scale < 0.5 || scale > 2.0) {
+      return "Font Scale must be a number between 0.5 and 2.0.";
+    }
+  }
+
   // Display — base URL override
   if (form.display_base_url) {
     try {
@@ -262,6 +270,7 @@ export function createSettingsRoutes(
     const displayMaxTodayEvents = dbSettings.display_max_today_events || "8";
     const displayWidth = dbSettings.display_width || "";
     const displayHeight = dbSettings.display_height || "";
+    const displayFontScale = dbSettings.display_font_scale || "";
     const displayBaseUrl = dbSettings.display_base_url || "";
     // display_calendars is stored as JSON array of calendar display names.
     // The form uses a comma-separated text input for simplicity; empty means "all".
@@ -800,7 +809,14 @@ export function createSettingsRoutes(
                   placeholder="e.g. 480"
                   class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
               </div>
+              <div class="flex flex-col gap-1.5">
+                <label for="display_font_scale" class="text-xs text-muted-foreground">Font Scale</label>
+                <input type="number" id="display_font_scale" name="display_font_scale" value="${escapeHtml(displayFontScale)}" step="0.05" min="0.5" max="2.0"
+                  placeholder="1.0"
+                  class="h-8 rounded-md border border-border bg-transparent px-2.5 text-sm font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder:text-muted-foreground" />
+              </div>
             </div>
+            <span class="text-[10px] text-muted-foreground">Font Scale resizes all display text (0.5–2.0). Leave blank for 1.0. Lower it on small panels like the 800x480 TRMNL OG, raise it for a longer viewing distance.</span>
             <div class="flex flex-col gap-1.5">
               <label for="display_base_url" class="text-xs text-muted-foreground">Base URL Override</label>
               <input type="text" id="display_base_url" name="display_base_url" value="${escapeHtml(displayBaseUrl)}"
@@ -1454,6 +1470,7 @@ export function createSettingsRoutes(
       display_max_today_events: (body.display_max_today_events as string) || "",
       display_width: (body.display_width as string) || "",
       display_height: (body.display_height as string) || "",
+      display_font_scale: ((body.display_font_scale as string) || "").trim(),
       display_base_url: ((body.display_base_url as string) || "").trim(),
       display_calendars_raw: ((body.display_calendars as string) || "").trim(),
     };
@@ -1520,6 +1537,7 @@ export function createSettingsRoutes(
       display_max_today_events: form.display_max_today_events,
       display_width: form.display_width,
       display_height: form.display_height,
+      display_font_scale: form.display_font_scale,
       display_base_url: form.display_base_url,
       display_calendars: parseDisplayCalendars(form.display_calendars_raw),
     };

@@ -30,6 +30,8 @@ export function makeWeather(overrides: Partial<WeatherData> = {}): WeatherData {
     weatherCode: 2,
     high: 18,
     low: 9,
+    tomorrowHigh: 21,
+    tomorrowLow: 11,
     hourly: [
       { time: "08:00", temp: 13 },
       { time: "09:00", temp: 14 },
@@ -48,7 +50,7 @@ export function makeDisplayData(
     time: "07:30",
     weather: makeWeather(),
     todayEvents: [makeEvent()],
-    tomorrowEvents: [],
+    upcomingDays: [],
     tasks: [makeTask()],
     maxTodayEvents: 8,
     ...overrides,
@@ -56,26 +58,28 @@ export function makeDisplayData(
 }
 
 /**
- * Open-Meteo fake response. 24 hourly entries so the slice starting at the
- * current hour always has enough data for the 4-slot strip regardless of
- * fake-clock hour.
+ * Open-Meteo fake response. Two days of hourly entries, matching the
+ * `forecast_days=2` request, so the 4-slot strip has data even late in the
+ * evening — the case that used to run dry.
  */
 export function makeOpenMeteoResponse(
   weatherCode: number,
   temp = 14.3,
 ): object {
+  const hour = (day: string, i: number) =>
+    `${day}T${String(i).padStart(2, "0")}:00`;
   return {
     current: { temperature_2m: temp, weather_code: weatherCode },
     hourly: {
-      time: Array.from(
-        { length: 24 },
-        (_, i) => `2026-03-31T${String(i).padStart(2, "0")}:00`,
-      ),
-      temperature_2m: Array.from({ length: 24 }, (_, i) => 8 + i * 0.5),
+      time: [
+        ...Array.from({ length: 24 }, (_, i) => hour("2026-03-31", i)),
+        ...Array.from({ length: 24 }, (_, i) => hour("2026-04-01", i)),
+      ],
+      temperature_2m: Array.from({ length: 48 }, (_, i) => 8 + (i % 24) * 0.5),
     },
     daily: {
-      temperature_2m_max: [18.7],
-      temperature_2m_min: [5.2],
+      temperature_2m_max: [18.7, 21.4],
+      temperature_2m_min: [5.2, 7.8],
     },
   };
 }

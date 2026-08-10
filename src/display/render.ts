@@ -1,11 +1,16 @@
 // Display rendering pipeline: layout -> Satori (SVG) -> Resvg (PNG).
 
 import satori from "satori";
+// Side-effect import: registers the translation catalogs with i18next.
+// A type-only import would be erased and leave t() resolving to nothing.
+import "../web/i18n/index.js";
+import i18next, { type TFunction } from "i18next";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildLayout } from "./layout.js";
+import { encodeGray4 } from "./png-gray4.js";
 import type { DisplayData } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -29,6 +34,8 @@ export async function renderDisplay(
   data: DisplayData,
   width = 1872,
   height = 1404,
+  fontScale = 1,
+  t: TFunction = i18next.getFixedT("en") as TFunction,
 ): Promise<Buffer> {
   // Load fonts on first call
   loadFonts();
@@ -57,7 +64,7 @@ export async function renderDisplay(
   const renderHeight = Math.round(renderWidth * (height / width));
 
   // Build the Satori element tree
-  const element = buildLayout(data, renderWidth, renderHeight);
+  const element = buildLayout(data, renderWidth, renderHeight, fontScale, t);
 
   // Render to SVG via Satori
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,5 +93,20 @@ export async function renderDisplay(
   });
 
   const pngData = resvg.render();
-  return Buffer.from(pngData.asPng());
+
+  // Resvg only emits 8-bit RGBA. E-ink panels want a device-native image —
+  // TRMNL X renders 4-bit grayscale and mangles anything else — so re-encode
+  // before returning. Also cuts the payload roughly 3x, which matters against
+  // the firmware's image size cap.
+  const png = encodeGray4(pngData.pixels, pngData.width, pngData.height);
+
+  // Both handles own Rust-side memory that the JS garbage collector cannot
+  // reach. Without these, ~10MB leaks per render until wasm32 hits its 4GB
+  // ceiling and traps — around 400 renders, after which EVERY subsequent
+  // render throws `unreachable` until the process restarts. At a 15-minute
+  // device refresh that is a permanently blank panel after about four days.
+  pngData.free();
+  resvg.free();
+
+  return png;
 }

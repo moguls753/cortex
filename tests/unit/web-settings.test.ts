@@ -1053,6 +1053,130 @@ describe("Web Settings", () => {
       expect(saveAllSettings).not.toHaveBeenCalled();
     });
 
+    it("renders display_font_scale with its stored value and numeric constraints", async () => {
+      const { getAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      (getAllSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        display_enabled: "true",
+        display_font_scale: "1.25",
+      });
+
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+      const res = await app.request("/settings", { headers: { Cookie: cookie } });
+      const body = await res.text();
+
+      expect(body).toContain('name="display_font_scale"');
+      expect(body).toContain('value="1.25"');
+      expect(body).toContain('step="0.05"');
+      expect(body).toContain('min="0.5"');
+      expect(body).toContain('max="2.0"');
+      expect(body).toContain('placeholder="1.0"');
+    });
+
+    it("round-trips display_font_scale through save", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ display_font_scale: "1.35" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(saveAllSettings).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ display_font_scale: "1.35" }),
+      );
+    });
+
+    it("accepts an empty display_font_scale as 'use the default'", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+      const { app } = await createTestSettings();
+      const cookie = await loginAndGetCookie(app);
+
+      const res = await app.request("/settings", {
+        method: "POST",
+        body: buildFormData({ display_font_scale: "" }),
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).not.toMatch(/error=/);
+      expect(saveAllSettings).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ display_font_scale: "" }),
+      );
+    });
+
+    it("accepts display_font_scale at the 0.5, 1.0 and 2.0 boundaries", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+
+      for (const value of ["0.5", "1.0", "2.0"]) {
+        vi.clearAllMocks();
+        const { app } = await createTestSettings();
+        const cookie = await loginAndGetCookie(app);
+
+        const res = await app.request("/settings", {
+          method: "POST",
+          body: buildFormData({ display_font_scale: value }),
+          headers: {
+            Cookie: cookie,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        });
+
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).not.toMatch(/error=/);
+        expect(saveAllSettings).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ display_font_scale: value }),
+        );
+      }
+    });
+
+    it("rejects display_font_scale outside 0.5..2.0 or non-numeric", async () => {
+      const { saveAllSettings } = await import(
+        "../../src/web/settings-queries.js"
+      );
+
+      for (const value of ["0.4", "2.1", "abc"]) {
+        vi.clearAllMocks();
+        const { app } = await createTestSettings();
+        const cookie = await loginAndGetCookie(app);
+
+        const res = await app.request("/settings", {
+          method: "POST",
+          body: buildFormData({ display_font_scale: value }),
+          headers: {
+            Cookie: cookie,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        });
+
+        expect(res.status).toBe(302);
+        expect(decodeURIComponent(res.headers.get("location") ?? "")).toContain(
+          "Font Scale must be a number between 0.5 and 2.0.",
+        );
+        expect(saveAllSettings).not.toHaveBeenCalled();
+      }
+    });
+
     it("rejects display_base_url that is not a valid http(s) URL", async () => {
       const { saveAllSettings } = await import(
         "../../src/web/settings-queries.js"

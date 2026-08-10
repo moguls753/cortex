@@ -28,7 +28,7 @@ vi.mock("../../src/display/render.js", () => ({
 }));
 
 vi.mock("../../src/display/calendar-data.js", () => ({
-  getDisplayEvents: vi.fn().mockResolvedValue({ today: [], tomorrow: [] }),
+  getDisplayEvents: vi.fn().mockResolvedValue({ today: [], upcoming: [] }),
 }));
 
 vi.mock("../../src/display/weather-data.js", () => ({
@@ -37,7 +37,10 @@ vi.mock("../../src/display/weather-data.js", () => ({
 
 import { createDisplayRoutes } from "../../src/display/index.js";
 import { renderDisplay } from "../../src/display/render.js";
-import { getDisplayTasks } from "../../src/display/task-data.js";
+import {
+  getDisplayTasks,
+  MAX_COMPLETED_TASKS,
+} from "../../src/display/task-data.js";
 
 const mockRender = renderDisplay as ReturnType<typeof vi.fn>;
 
@@ -163,6 +166,94 @@ describe("Display Integration", () => {
     `;
     const tasks = await getDisplayTasks(db.sql, 7);
     expect(tasks.map((t) => t.name)).toEqual(["B", "A", "C"]);
+  });
+
+  // ─── TS-6.10 … TS-6.14 — the completed block ───────────────
+  // The only place the new ORDER BY runs against real Postgres.
+
+  async function insertTask(
+    name: string,
+    status: string,
+    opts: { hoursAgo?: number; dueDate?: string | null } = {},
+  ): Promise<void> {
+    const fields: Record<string, unknown> = { status };
+    if (opts.dueDate !== undefined) fields.due_date = opts.dueDate;
+    await db.sql`
+      INSERT INTO entries (category, name, fields, source, visibility, updated_at)
+      VALUES ('tasks', ${name}, ${db.sql.json(fields)}, 'webapp', 'shared',
+              now() - (${opts.hoursAgo ?? 1} * interval '1 hour'))
+    `;
+  }
+
+  it("TS-6.10 — completions are capped beside open work", async () => {
+    await insertTask("Open thing", "pending");
+    await insertTask("Done 1h", "done", { hoursAgo: 1 });
+    await insertTask("Done 2h", "done", { hoursAgo: 2 });
+    await insertTask("Done 3h", "done", { hoursAgo: 3 });
+    await insertTask("Done 4h", "done", { hoursAgo: 4 });
+
+    const tasks = await getDisplayTasks(db.sql, 7);
+
+    expect(tasks.map((t) => t.name)).toEqual([
+      "Open thing",
+      "Done 1h",
+      "Done 2h",
+    ]);
+  });
+
+  it("TS-6.11 — the cap still holds when there is no open work", async () => {
+    // The cap used to be waived here. That made the column's best state its
+    // busiest — four struck-through rows, four ticked boxes, and no
+    // affirmative line, because the list was not technically empty. The layout
+    // now leads that case with "All clear" and keeps a short log beneath it.
+    await insertTask("Done 1h", "done", { hoursAgo: 1 });
+    await insertTask("Done 2h", "done", { hoursAgo: 2 });
+    await insertTask("Done 3h", "done", { hoursAgo: 3 });
+    await insertTask("Done 4h", "done", { hoursAgo: 4 });
+
+    const tasks = await getDisplayTasks(db.sql, 7);
+
+    expect(tasks).toHaveLength(MAX_COMPLETED_TASKS);
+    expect(tasks.every((t) => t.done)).toBe(true);
+    // The freshest ticks, not an arbitrary pair.
+    expect(tasks.map((t) => t.name)).toEqual(["Done 1h", "Done 2h"]);
+  });
+
+  it("TS-6.12 — completed rows come back newest-first", async () => {
+    // Inserted out of order so creation order cannot produce the expectation.
+    await insertTask("Done 3h", "done", { hoursAgo: 3 });
+    await insertTask("Done 1h", "done", { hoursAgo: 1 });
+    await insertTask("Done 2h", "done", { hoursAgo: 2 });
+
+    const tasks = await getDisplayTasks(db.sql, 7);
+
+    // Capped at MAX_COMPLETED_TASKS, and the two kept are the freshest — which
+    // is what the completed-block ORDER BY exists to guarantee.
+    expect(tasks.map((t) => t.name)).toEqual(["Done 1h", "Done 2h"]);
+  });
+
+  it("TS-6.13 — a done task with a past due_date has no due label", async () => {
+    await insertTask("Ticked off", "done", { hoursAgo: 1, dueDate: "2020-01-01" });
+
+    const tasks = await getDisplayTasks(db.sql, 7);
+
+    expect(tasks).toEqual([{ name: "Ticked off", due: null, done: true }]);
+  });
+
+  it("TS-6.14 — the open block is still ordered by due date when completions are present", async () => {
+    await insertTask("Later", "pending", { dueDate: "2026-05-01" });
+    await insertTask("Sooner", "pending", { dueDate: "2026-04-01" });
+    await insertTask("Undated", "pending", { dueDate: null });
+    await insertTask("Done 1h", "done", { hoursAgo: 1 });
+
+    const tasks = await getDisplayTasks(db.sql, 7);
+
+    expect(tasks.map((t) => t.name)).toEqual([
+      "Sooner",
+      "Later",
+      "Undated",
+      "Done 1h",
+    ]);
   });
 
   // ─── TS-6.4 ────────────────────────────────────────────────

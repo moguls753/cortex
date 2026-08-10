@@ -253,7 +253,14 @@ describe("Web Settings Integration", () => {
 
       const body = await getRes.text();
       expect(body).toContain("0.7");
-      expect(body).not.toContain("2.0");
+      // Assert on the field itself: "2.0" also appears as the Font Scale
+      // input's max attribute, so a bare substring check is not specific.
+      expect(body).toContain(
+        'id="confidence_threshold" name="confidence_threshold" value="0.7"',
+      );
+      expect(body).not.toContain(
+        'id="confidence_threshold" name="confidence_threshold" value="2.0"',
+      );
     });
   });
 

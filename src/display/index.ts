@@ -8,23 +8,23 @@ import { getWeather } from "./weather-data.js";
 import { getDisplayTasks } from "./task-data.js";
 import { getDisplayEvents } from "./calendar-data.js";
 import type { DisplayData } from "./types.js";
+import i18next, { type TFunction } from "i18next";
+import { SUPPORTED_LOCALES, type Locale } from "../web/i18n/index.js";
 
 type Sql = postgres.Sql;
 
 const log = createLogger("display");
 
-const DAYS = [
-  "Sunday", "Monday", "Tuesday", "Wednesday",
-  "Thursday", "Friday", "Saturday",
-];
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-export function formatDate(now: Date): string {
-  return `${DAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}`;
+/**
+ * "Sunday, August 9" / "Sonntag, 9. August" — the panel has no request context,
+ * so the locale comes from the `ui_language` setting.
+ */
+export function formatDate(now: Date, locale: Locale = "en"): string {
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(now);
 }
 
 export function formatTime(now: Date): string {
@@ -55,6 +55,15 @@ export function createDisplayRoutes(sql: Sql): Hono {
       }
 
       const timezone = settings.timezone || "Europe/Berlin";
+      // The display follows the interface language; the device cannot carry a
+      // locale of its own.
+      const uiLanguage = settings.ui_language;
+      const locale: Locale = (SUPPORTED_LOCALES as readonly string[]).includes(
+        uiLanguage,
+      )
+        ? (uiLanguage as Locale)
+        : "en";
+      const t = i18next.getFixedT(locale) as TFunction;
       // parseFloat returns NaN for unparseable strings; Number.isFinite filters
       // both NaN and infinities so getWeather is never called with bad coords.
       const parsedLat = settings.display_weather_lat
@@ -72,6 +81,16 @@ export function createDisplayRoutes(sql: Sql): Hono {
       const parsedHeight = parseInt(settings.display_height || "1404", 10);
       const width = Number.isFinite(parsedWidth) && parsedWidth > 0 ? parsedWidth : 1872;
       const height = Number.isFinite(parsedHeight) && parsedHeight > 0 ? parsedHeight : 1404;
+      // Font scale is validated in the settings form, but the DB is also
+      // hand-editable — anything unparseable or outside the accepted 0.5..2.0
+      // band falls back to the reference scale rather than rendering garbage.
+      const parsedFontScale = parseFloat(settings.display_font_scale || "1");
+      const fontScale =
+        Number.isFinite(parsedFontScale) &&
+        parsedFontScale >= 0.5 &&
+        parsedFontScale <= 2
+          ? parsedFontScale
+          : 1;
 
       let selectedCalendars: string[] | undefined;
       if (settings.display_calendars) {
@@ -87,8 +106,8 @@ export function createDisplayRoutes(sql: Sql): Hono {
         lat !== undefined && lng !== undefined
           ? getWeather(lat, lng, timezone)
           : Promise.resolve(null),
-        getDisplayEvents(sql, timezone, selectedCalendars),
-        getDisplayTasks(sql, maxTasks),
+        getDisplayEvents(sql, timezone, selectedCalendars, t, locale),
+        getDisplayTasks(sql, maxTasks, t, locale),
       ]);
 
       const now = new Date(
@@ -96,16 +115,16 @@ export function createDisplayRoutes(sql: Sql): Hono {
       );
 
       const data: DisplayData = {
-        date: formatDate(now),
+        date: formatDate(now, locale),
         time: formatTime(now),
         weather,
         todayEvents: calendarData.today,
-        tomorrowEvents: calendarData.tomorrow,
+        upcomingDays: calendarData.upcoming,
         tasks,
         maxTodayEvents,
       };
 
-      const png = await renderDisplay(data, width, height);
+      const png = await renderDisplay(data, width, height, fontScale, t);
 
       return new Response(new Uint8Array(png), {
         status: 200,

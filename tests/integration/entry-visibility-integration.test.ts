@@ -29,7 +29,7 @@ vi.mock("../../src/display/render.js", () => ({
 }));
 
 vi.mock("../../src/display/calendar-data.js", () => ({
-  getDisplayEvents: vi.fn().mockResolvedValue({ today: [], tomorrow: [] }),
+  getDisplayEvents: vi.fn().mockResolvedValue({ today: [], upcoming: [] }),
 }));
 
 vi.mock("../../src/display/weather-data.js", () => ({

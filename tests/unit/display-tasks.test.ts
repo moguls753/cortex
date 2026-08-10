@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { formatDueDate, getDisplayTasks } from "../../src/display/task-data.js";
+import {
+  formatDueDate,
+  getDisplayTasks,
+  MAX_COMPLETED_TASKS,
+} from "../../src/display/task-data.js";
 
 // ─── formatDueDate ─────────────────────────────────────────────
 
@@ -100,11 +104,99 @@ describe("getDisplayTasks", () => {
       expect(tasks).toEqual([
         { name: "Renew passport", due: "due Apr 3", done: false },
         { name: "Buy groceries", due: null, done: false },
-        { name: "File taxes", due: "overdue", done: true },
+        // Change 2: a completed task carries no due state, even though its
+        // due_date is in the past.
+        { name: "File taxes", due: null, done: true },
       ]);
     } finally {
       globalThis.Date = origDate;
       Date.now = realDateNow;
     }
+  });
+});
+
+// ─── Completed-task handling (Changes 1 and 2) ────────────────
+
+describe("getDisplayTasks — completed tasks", () => {
+  const mockSql = (rows: unknown[]) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Object.assign(vi.fn().mockResolvedValue(rows), { unsafe: vi.fn() }) as any;
+
+  const row = (name: string, status: string, due_date: string | null = null) => ({
+    name,
+    fields: { status, due_date },
+    updated_at: new Date(),
+  });
+
+  const past = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const future = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  };
+
+  it("suppresses the due label on a completed task with a past date", async () => {
+    // Direct regression for "✓ Tanz am 20.04. löschen — überfällig".
+    const tasks = await getDisplayTasks(mockSql([row("Tanz löschen", "done", past())]), 7);
+    expect(tasks).toEqual([{ name: "Tanz löschen", due: null, done: true }]);
+  });
+
+  it("keeps the due label on a pending overdue task", async () => {
+    const tasks = await getDisplayTasks(mockSql([row("Still open", "pending", past())]), 7);
+    expect(tasks[0].due).toBe("overdue");
+  });
+
+  it("suppresses the due label on a completed task with a future date", async () => {
+    const tasks = await getDisplayTasks(mockSql([row("Done early", "done", future())]), 7);
+    expect(tasks[0].due).toBeNull();
+  });
+
+  it("caps completions at MAX_COMPLETED_TASKS when open work exists", async () => {
+    const done = Array.from({ length: MAX_COMPLETED_TASKS + 3 }, (_, i) =>
+      row(`Done ${i + 1}`, "done"),
+    );
+    const tasks = await getDisplayTasks(
+      mockSql([row("Open one", "pending"), ...done]),
+      20,
+    );
+
+    expect(tasks).toHaveLength(1 + MAX_COMPLETED_TASKS);
+    // The SQL returns completions freshest-first, so the cap keeps the head.
+    expect(tasks.map((t) => t.name)).toEqual([
+      "Open one",
+      ...done.slice(0, MAX_COMPLETED_TASKS).map((r) => r.name),
+    ]);
+  });
+
+  it("caps completions even when there is no open work", async () => {
+    // The cap used to be lifted here, which made the best state of the column
+    // its busiest: four struck-through rows and four ticked boxes. The layout
+    // now leads that case with "All clear" and keeps a short log beneath it.
+    const tasks = await getDisplayTasks(
+      mockSql(Array.from({ length: 5 }, (_, i) => row(`Done ${i + 1}`, "done"))),
+      20,
+    );
+    expect(tasks).toHaveLength(MAX_COMPLETED_TASKS);
+    expect(tasks.every((t) => t.done)).toBe(true);
+    // Freshest first, per the SQL ordering.
+    expect(tasks.map((t) => t.name)).toEqual(["Done 1", "Done 2"]);
+  });
+
+  it("partitions rather than merely trimming", async () => {
+    const tasks = await getDisplayTasks(
+      mockSql([row("A", "done"), row("B", "pending"), row("C", "done")]),
+      20,
+    );
+    expect(tasks.map((t) => t.name)).toEqual(["B", "A", "C"]);
+  });
+
+  it("leaves a single open task with no completions untouched", async () => {
+    const tasks = await getDisplayTasks(mockSql([row("Only one", "pending")]), 7);
+    expect(tasks).toEqual([{ name: "Only one", due: null, done: false }]);
   });
 });

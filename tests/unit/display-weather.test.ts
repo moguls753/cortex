@@ -13,12 +13,15 @@ function createApiResponse(overrides: Record<string, unknown> = {}) {
   return {
     current: { temperature_2m: 14.3, weather_code: 2 },
     hourly: {
-      time: Array.from({ length: 24 }, (_, i) => `2026-03-31T${String(i).padStart(2, "0")}:00`),
-      temperature_2m: Array.from({ length: 24 }, (_, i) => 8 + i * 0.5),
+      time: [
+        ...Array.from({ length: 24 }, (_, i) => `2026-03-31T${String(i).padStart(2, "0")}:00`),
+        ...Array.from({ length: 24 }, (_, i) => `2026-04-01T${String(i).padStart(2, "0")}:00`),
+      ],
+      temperature_2m: Array.from({ length: 48 }, (_, i) => 8 + (i % 24) * 0.5),
     },
     daily: {
-      temperature_2m_max: [18.7],
-      temperature_2m_min: [5.2],
+      temperature_2m_max: [18.7, 21.4],
+      temperature_2m_min: [5.2, 7.8],
     },
     ...overrides,
   };
@@ -78,17 +81,19 @@ describe("getWeather", () => {
     const result = await getWeather(52.52, 13.41, "Europe/Berlin");
 
     expect(result).not.toBeNull();
-    expect(result!.current).toBe(14); // 14.3 rounded
+    // Values keep the source's precision — the panel formats, the fetcher does
+    // not round.
+    expect(result!.current).toBe(14.3);
     expect(result!.condition).toBe("Partly Cloudy"); // code 2
     expect(result!.weatherCode).toBe(2);
-    expect(result!.high).toBe(19); // 18.7 rounded
-    expect(result!.low).toBe(5); // 5.2 rounded
-    expect(result!.hourly).toHaveLength(4);
-    // Each hourly entry has time and rounded temp
+    expect(result!.high).toBe(18.7);
+    expect(result!.low).toBe(5.2);
+    expect(result!.tomorrowHigh).toBe(21.4);
+    expect(result!.tomorrowLow).toBe(7.8);
+    expect(result!.hourly).toHaveLength(5);
     for (const h of result!.hourly) {
       expect(h).toHaveProperty("time");
       expect(h).toHaveProperty("temp");
-      expect(Number.isInteger(h.temp)).toBe(true);
     }
 
     // Verify fetch was called with correct URL params
@@ -97,7 +102,49 @@ describe("getWeather", () => {
     expect(callUrl).toContain("latitude=52.52");
     expect(callUrl).toContain("longitude=13.41");
     expect(callUrl).toContain("timezone=Europe%2FBerlin");
-    expect(callUrl).toContain("forecast_days=1");
+    expect(callUrl).toContain("forecast_days=2");
+  });
+
+  it("fills every hourly slot late in the evening, rolling into tomorrow", async () => {
+    // 21:54 local: indexing by hour-of-day left only 22:00 and 23:00, and
+    // nothing at all after 23:00. Two-hour steps reach into tomorrow morning.
+    vi.setSystemTime(new Date("2026-03-31T21:54:00+02:00"));
+    mockFetchOk(createApiResponse());
+
+    const result = await getWeather(52.52, 13.41, "Europe/Berlin");
+
+    expect(result!.hourly.map((h) => h.time)).toEqual([
+      "22:00",
+      "00:00",
+      "02:00",
+      "04:00",
+      "06:00",
+    ]);
+  });
+
+  it("still fills the strip after midnight", async () => {
+    vi.setSystemTime(new Date("2026-03-31T23:30:00+02:00"));
+    mockFetchOk(createApiResponse());
+
+    const result = await getWeather(52.52, 13.41, "Europe/Berlin");
+
+    expect(result!.hourly).toHaveLength(5);
+    expect(result!.hourly[0].time).toBe("00:00");
+    // Two-hour steps, not consecutive hours.
+    expect(result!.hourly[1].time).toBe("02:00");
+  });
+
+  it("falls back to today's high/low when only one day is returned", async () => {
+    mockFetchOk(
+      createApiResponse({
+        daily: { temperature_2m_max: [18.7], temperature_2m_min: [5.2] },
+      }),
+    );
+
+    const result = await getWeather(52.52, 13.41, "Europe/Berlin");
+
+    expect(result!.tomorrowHigh).toBe(18.7);
+    expect(result!.tomorrowLow).toBe(5.2);
   });
 
   it("returns cached data on second call (fetch called once)", async () => {
@@ -140,7 +187,7 @@ describe("getWeather", () => {
     expect(callUrl.startsWith("https://api.open-meteo.com/v1/forecast")).toBe(true);
     expect(callUrl).toContain("latitude=52.52");
     expect(callUrl).toContain("longitude=13.41");
-    expect(callUrl).toContain("forecast_days=1");
+    expect(callUrl).toContain("forecast_days=2");
   });
 
   it("TS-7.3 — network error returns null without throwing", async () => {
@@ -174,7 +221,7 @@ describe("getWeather cache TTL", () => {
     vi.useRealTimers();
   });
 
-  it("TS-7.2 — second call within 30 minutes is served from cache", async () => {
+  it("TS-7.2 — second call within the 15-minute TTL is served from cache", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => makeOpenMeteoResponse(2),
@@ -187,14 +234,15 @@ describe("getWeather cache TTL", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("TS-7.2b — second call past 30-minute TTL re-fetches", async () => {
+  it("TS-7.2b — second call past the 15-minute TTL re-fetches", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => makeOpenMeteoResponse(2),
     });
 
     await getWeather(52.52, 13.41, "Europe/Berlin");
-    vi.setSystemTime(new Date("2026-03-31T10:31:00Z"));
+    // Just past the boundary: pins the TTL rather than passing at any value.
+    vi.setSystemTime(new Date("2026-03-31T10:16:00Z"));
     await getWeather(52.52, 13.41, "Europe/Berlin");
 
     expect(fetchMock.mock.calls.length).toBe(2);

@@ -278,4 +278,47 @@ export const en = {
     warming_up: "Warming up",
     warming_up_body: "One or more services are still starting.",
   },
+
+  // Strings rendered into the e-ink PNG. The device sends no cookie, so the
+  // locale comes from the `ui_language` setting rather than the request.
+  display: {
+    today: "Today",
+    tomorrow: "Tomorrow",
+    week_ahead: "Week Ahead",
+    dont_forget: "Don't Forget",
+    no_events: "No events today",
+    all_clear: "All clear",
+    all_day: "all day",
+    last_updated: "Last updated {{time}}",
+    more: "+{{count}} more",
+    more_this_week: "+{{count}} more this week",
+    // The gutter label for a multi-day event, in place of a start time. Only
+    // the end is stated: the span renders on its first visible day, so the day
+    // heading right above it already names the start.
+    event_span_until: "to {{to}}",
+    due: {
+      overdue: "overdue",
+      today: "due today",
+      tomorrow: "due tomorrow",
+      on_date: "due {{date}}",
+    },
+    weather: {
+      clear: "Clear",
+      mainly_clear: "Mainly Clear",
+      partly_cloudy: "Partly Cloudy",
+      overcast: "Overcast",
+      fog: "Fog",
+      drizzle: "Drizzle",
+      freezing_drizzle: "Freezing Drizzle",
+      rain: "Rain",
+      freezing_rain: "Freezing Rain",
+      snow: "Snow",
+      snow_grains: "Snow Grains",
+      rain_showers: "Rain Showers",
+      snow_showers: "Snow Showers",
+      thunderstorm: "Thunderstorm",
+      thunderstorm_with_hail: "Thunderstorm with Hail",
+      cloudy: "Cloudy",
+    },
+  },
 } as const;

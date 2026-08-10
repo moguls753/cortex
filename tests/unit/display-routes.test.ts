@@ -25,7 +25,7 @@ vi.mock("../../src/display/task-data.js", () => ({
 vi.mock("../../src/display/calendar-data.js", () => ({
   getDisplayEvents: vi.fn().mockResolvedValue({
     today: [{ time: "09:00", name: "Meeting", calendar: "WORK" }],
-    tomorrow: [],
+    upcoming: [],
   }),
 }));
 
@@ -165,7 +165,79 @@ describe("display routes", () => {
         }),
         800,
         480,
+        1,
+        // Translator for the display's locale.
+        expect.any(Function),
       );
+    });
+
+    it("calls renderDisplay with the font scale from settings", async () => {
+      mockGetAllSettings.mockResolvedValue({
+        display_enabled: "true",
+        display_font_scale: "1.25",
+        timezone: "Europe/Berlin",
+      });
+
+      const app = buildApp();
+      await app.request("/api/display.png");
+
+      expect(mockRender.mock.calls[0][3]).toBe(1.25);
+    });
+
+    it("accepts the font scale band boundaries 0.5 and 2.0", async () => {
+      for (const value of ["0.5", "2.0"]) {
+        vi.clearAllMocks();
+        mockRender.mockResolvedValue(Buffer.from("fake-png"));
+        mockGetAllSettings.mockResolvedValue({
+          display_enabled: "true",
+          display_font_scale: value,
+          timezone: "Europe/Berlin",
+        });
+
+        const app = buildApp();
+        await app.request("/api/display.png");
+
+        expect(mockRender.mock.calls[0][3]).toBe(parseFloat(value));
+      }
+    });
+
+    it("defaults the font scale to 1 when the setting is absent", async () => {
+      const app = buildApp();
+      await app.request("/api/display.png");
+
+      expect(mockRender.mock.calls[0][3]).toBe(1);
+    });
+
+    it("falls back to a font scale of 1 for non-numeric values", async () => {
+      mockGetAllSettings.mockResolvedValue({
+        display_enabled: "true",
+        display_font_scale: "abc",
+        timezone: "Europe/Berlin",
+      });
+
+      const app = buildApp();
+      const res = await app.request("/api/display.png");
+
+      expect(res.status).toBe(200);
+      expect(mockRender.mock.calls[0][3]).toBe(1);
+    });
+
+    it("falls back to a font scale of 1 for out-of-range values", async () => {
+      for (const value of ["0", "0.4", "2.1", "-3", "99"]) {
+        vi.clearAllMocks();
+        mockRender.mockResolvedValue(Buffer.from("fake-png"));
+        mockGetAllSettings.mockResolvedValue({
+          display_enabled: "true",
+          display_font_scale: value,
+          timezone: "Europe/Berlin",
+        });
+
+        const app = buildApp();
+        const res = await app.request("/api/display.png");
+
+        expect(res.status).toBe(200);
+        expect(mockRender.mock.calls[0][3]).toBe(1);
+      }
     });
 
     it("returns 500 on internal error", async () => {
@@ -561,7 +633,7 @@ describe("display routes", () => {
         name: `E${i + 1}`,
         calendar: "WORK",
       }));
-      mockGetEvents.mockResolvedValue({ today: events, tomorrow: [] });
+      mockGetEvents.mockResolvedValue({ today: events, upcoming: [] });
 
       const app = buildApp();
       await app.request("/api/display.png");
@@ -584,7 +656,7 @@ describe("display routes", () => {
         name: `E${i + 1}`,
         calendar: "WORK",
       }));
-      mockGetEvents.mockResolvedValue({ today: events, tomorrow: [] });
+      mockGetEvents.mockResolvedValue({ today: events, upcoming: [] });
 
       const app = buildApp();
       await app.request("/api/display.png");
@@ -653,7 +725,7 @@ describe("display routes", () => {
       mockGetWeather.mockResolvedValue(null);
       mockGetEvents.mockResolvedValue({
         today: [{ time: "09:00", name: "Standup", calendar: "WORK" }],
-        tomorrow: [],
+        upcoming: [],
       });
       mockGetTasks.mockResolvedValue([
         { name: "Buy milk", due: null, done: false },
@@ -688,7 +760,7 @@ describe("display routes", () => {
         low: 9,
         hourly: [],
       });
-      mockGetEvents.mockResolvedValue({ today: [], tomorrow: [] });
+      mockGetEvents.mockResolvedValue({ today: [], upcoming: [] });
       mockGetTasks.mockResolvedValue([
         { name: "Buy milk", due: null, done: false },
       ]);

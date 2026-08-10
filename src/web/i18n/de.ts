@@ -266,4 +266,46 @@ export const de: Widen<typeof en> = {
     warming_up: "Aufwärmen",
     warming_up_body: "Ein oder mehrere Dienste starten noch.",
   },
+
+  display: {
+    today: "Heute",
+    tomorrow: "Morgen",
+    // Parallel with more_this_week ("… diese Woche"), the summary line that
+    // sits directly under the same list.
+    week_ahead: "Diese Woche",
+    dont_forget: "TODO",
+    no_events: "Heute keine Termine",
+    all_clear: "Alles erledigt",
+    all_day: "ganztägig",
+    last_updated: "Aktualisiert {{time}}",
+    more: "+{{count}} weitere",
+    more_this_week: "+{{count}} weitere diese Woche",
+    // Nur das Ende: Der Zeitraum steht am ersten sichtbaren Tag, die
+    // Tagesüberschrift darüber nennt den Beginn also bereits.
+    event_span_until: "bis {{to}}",
+    due: {
+      overdue: "überfällig",
+      today: "heute fällig",
+      tomorrow: "morgen fällig",
+      on_date: "fällig {{date}}",
+    },
+    weather: {
+      clear: "Klar",
+      mainly_clear: "Überwiegend klar",
+      partly_cloudy: "Teils bewölkt",
+      overcast: "Bedeckt",
+      fog: "Nebel",
+      drizzle: "Nieselregen",
+      freezing_drizzle: "Gefrierender Nieselregen",
+      rain: "Regen",
+      freezing_rain: "Gefrierender Regen",
+      snow: "Schnee",
+      snow_grains: "Schneegriesel",
+      rain_showers: "Regenschauer",
+      snow_showers: "Schneeschauer",
+      thunderstorm: "Gewitter",
+      thunderstorm_with_hail: "Gewitter mit Hagel",
+      cloudy: "Bewölkt",
+    },
+  },
 };
