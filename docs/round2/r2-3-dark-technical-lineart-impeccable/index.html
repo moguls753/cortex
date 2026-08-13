@@ -1,0 +1,1407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crtxboard — you speak, the wall fills itself</title>
+<meta name="description" content="Speak a thought into Telegram. It is transcribed, sorted into fields, and appears on an E-Ink panel on the wall and in a morning email. Run it on your machine or let me run it, €7 a month. AGPL-3.0.">
+<meta name="color-scheme" content="dark">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   crtxboard · dark technical line-art
+   One drawing carries the explanation. Everything else is short.
+   ───────────────────────────────────────────────────────────── */
+
+@font-face{
+  font-family:"crtx Mono";
+  src:url(data:font/woff2;base64,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) format("woff2");
+  font-weight:400; font-style:normal; font-display:swap;
+}
+
+:root{
+  --ink:      #0a0a0b;
+  --ink-2:    #101013;
+  --paper:    #f1eee8;
+  --hot:      #ff5a1f;
+
+  --dim:      rgba(241,238,232,.68);
+  --dimmer:   rgba(241,238,232,.52);
+  --ctrl:     rgba(241,238,232,.44);
+  --line:     rgba(241,238,232,.11);
+  --line-2:   rgba(241,238,232,.20);
+  --hot-soft: rgba(255,90,31,.45);
+
+  --sans: "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", Cantarell,
+          "Noto Sans", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "crtx Mono", ui-monospace, "SF Mono", "Cascadia Mono", "DejaVu Sans Mono",
+          Menlo, Consolas, monospace;
+
+  /* the three vertical clamps of the Rhythm Rule, named. There is no fourth. */
+  --gut: clamp(20px, 4vw, 48px);
+  --sec: clamp(72px, 8vw, 116px);
+  --block: clamp(34px, 4vw, 56px);
+  --split: clamp(30px, 4vw, 72px);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ -webkit-text-size-adjust:100%; }
+body{
+  margin:0; background:var(--ink); color:var(--paper);
+  font-family:var(--sans); font-size:17px; line-height:1.62;
+  font-weight:400; letter-spacing:-.006em;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+::selection{ background:var(--hot); color:#0a0a0b; }
+:focus-visible{ outline:2px solid var(--hot); outline-offset:3px; border-radius:2px; }
+* { scrollbar-color: rgba(241,238,232,.22) var(--ink); scrollbar-width: thin; }
+::-webkit-scrollbar{ width:11px; height:11px; }
+::-webkit-scrollbar-track{ background:var(--ink); }
+::-webkit-scrollbar-thumb{ background:rgba(241,238,232,.18); border:3px solid var(--ink); border-radius:99px; }
+::-webkit-scrollbar-thumb:hover{ background:var(--hot-soft); }
+
+a{ color:var(--paper); text-decoration:underline; text-decoration-color:var(--hot-soft);
+   text-underline-offset:4px; text-decoration-thickness:1px; }
+a:hover{ text-decoration-color:var(--hot); color:#fff; }
+
+h1,h2,h3{ margin:0; font-weight:600; letter-spacing:-.028em; line-height:1.06; }
+p{ margin:0; }
+
+.wrap{ max-width:1392px; margin:0 auto; padding-inline:var(--gut); }
+
+.mono{ font-family:var(--mono); font-weight:400; }
+.vh{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden;
+     clip-path:inset(50%); white-space:nowrap; border:0; }
+.tag{ font-family:var(--mono); font-size:11.5px; letter-spacing:.19em; text-transform:uppercase;
+      color:var(--hot); }
+
+/* ── header ───────────────────────────────────────────────── */
+.top{ position:relative; z-index:3; }
+.top .wrap{ display:flex; align-items:center; justify-content:space-between;
+            gap:20px; padding-block:24px 6px; }
+.brand{ display:flex; align-items:center; gap:11px; text-decoration:none; color:var(--paper); }
+.brand svg{ display:block; overflow:visible; }
+.brand b{ font-weight:600; font-size:19px; letter-spacing:-.01em; }
+.top nav{ display:flex; gap:26px; align-items:baseline; }
+.top nav a{ font-size:14px; color:var(--dim); text-decoration:none; }
+.top nav a:hover{ color:var(--paper); }
+.top nav .lic{ font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; color:var(--dim); }
+
+/* ── section frame ────────────────────────────────────────── */
+section{ padding-block:var(--sec); border-top:1px solid var(--line); }
+section:first-of-type{ border-top:0; padding-top:clamp(18px,2vw,30px); overflow:hidden; }
+h2{ font-size:clamp(29px,3.5vw,45px); max-width:17ch; line-height:1.1; }
+.lede{ color:var(--dim); font-size:clamp(16px,1.25vw,18.5px); max-width:56ch; }
+.h-block{ margin-bottom:clamp(34px,4vw,56px); }
+.h-block .lede{ margin-top:20px; }
+/* editorial header grid: heading left, its one paragraph right */
+@media (min-width:1000px){
+  .h-block{ display:grid; grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);
+            gap:clamp(30px,4vw,72px); align-items:start; }
+  .h-block .lede{ margin-top:.55em; }
+}
+
+/* ── 1 · fold ─────────────────────────────────────────────── */
+.fold-grid{
+  display:grid; grid-template-columns:minmax(0,456px) minmax(0,1fr);
+  gap:clamp(28px,3.2vw,48px); align-items:start;
+}
+h1{ font-size:clamp(38px,4.3vw,58px); letter-spacing:-.034em; }
+h1 .b{ display:block; }
+h1 .b+.b{ color:var(--dim); }
+.fold-lede{ margin-top:24px; color:var(--dim); font-size:17px; max-width:44ch; }
+
+.vm{ margin-top:34px; padding-top:20px; border-top:1px solid var(--line-2); }
+.vm-head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.vm-head .tag{ font-size:11.5px; letter-spacing:.17em; }
+.vm-head .dot{ width:5px; height:5px; border-radius:50%; background:var(--hot); flex:none; }
+.vm q{ quotes:none; display:block; font-size:clamp(19px,1.55vw,22px); line-height:1.42;
+       letter-spacing:-.018em; color:var(--paper); }
+.vm q::before{ content:"“"; color:var(--hot); margin-right:1px; }
+.vm q::after{ content:"”"; color:var(--hot); margin-left:1px; }
+
+.steps{ list-style:none; margin:38px 0 0; padding:0; }
+.steps li{ display:grid; grid-template-columns:38px 1fr; gap:0 14px;
+           padding:13px 0; border-top:1px solid var(--line);
+           transition:opacity .28s cubic-bezier(.2,.8,.25,1); }
+.steps li:last-child{ border-bottom:1px solid var(--line); }
+.steps .n{ font-family:var(--mono); font-size:13px; letter-spacing:.06em; color:var(--hot);
+           padding-top:.42em; opacity:.62; transition:opacity .28s; }
+.steps .lb{ font-size:clamp(21px,1.9vw,27px); font-weight:500; letter-spacing:-.025em;
+            line-height:1.2; opacity:.38; transition:opacity .28s cubic-bezier(.2,.8,.25,1); }
+.steps .ds{ grid-column:2; font-size:14px; line-height:1.5; color:var(--dim); margin-top:4px;
+            transition:opacity .28s cubic-bezier(.2,.8,.25,1); }
+.steps li:first-child .lb,
+.steps li:first-child .n{ opacity:1; }
+.steps:hover li:first-child .lb{ opacity:.38; }
+.steps:hover li:first-child .n{ opacity:.62; }
+.steps li:hover .lb{ opacity:1; }
+.steps li:hover .n{ opacity:1; }
+
+/* ── the drawing ──────────────────────────────────────────── */
+.fig{ position:relative; }
+/* the drawing runs to the viewport edge and is cropped by it, as the world's
+   own drawings are — the hero section clips rather than scrolling the document */
+@media (min-width:1100px){
+  .fold-grid > .fig{
+    margin-right: calc(-1 * (var(--gut) + max(0px, (100vw - 1392px) / 2)) - 30px);
+  }
+}
+.iso{ display:block; width:100%; height:auto; position:relative; overflow:visible; }
+
+.iso .ol{ fill:none; stroke:var(--hot); stroke-width:1.15; }
+.iso .sl{ fill:none; stroke:var(--hot); stroke-width:1; opacity:.48; }
+.iso .in{ fill:none; stroke:var(--hot); stroke-width:1; opacity:.4; }
+.iso .bx{ fill:none; stroke:var(--hot); stroke-width:1; opacity:.55; }
+.iso .rl{ fill:none; stroke:var(--hot); stroke-width:1; opacity:.34; }
+.iso .msh{ fill:none; stroke:var(--hot); stroke-width:1; opacity:.2; }
+.iso .wv{ fill:none; stroke:var(--hot); stroke-width:1.3; opacity:1; stroke-linecap:round; }
+.iso .gl{ fill:none; stroke:var(--hot); stroke-width:1; opacity:.38; stroke-dasharray:5 5; }
+.iso .axis{ fill:none; stroke:var(--hot); stroke-width:1; opacity:.45; stroke-dasharray:17 7 2 7; }
+.iso .ld{ fill:none; stroke:var(--hot); stroke-width:1.1; opacity:.78; stroke-dasharray:4 4; }
+.iso .ldot{ fill:var(--hot); }
+.iso .bub{ fill:none; stroke:var(--hot); stroke-width:1.15; }
+
+.iso text{ font-family:var(--sans); fill:var(--hot); }
+.iso .t-o{ fill:var(--hot); }
+.iso .t-p{ fill:var(--paper); }
+.iso .t-d{ fill:var(--hot); opacity:.92; }
+.iso .t-m{ font-family:var(--mono); }
+.iso .lbl{ font-family:var(--mono); font-size:17px; letter-spacing:.15em; }
+
+.iso .part{ transition:opacity .3s cubic-bezier(.2,.8,.25,1); }
+.iso .num circle{ fill:var(--ink); stroke:var(--hot); stroke-width:1; opacity:.75; }
+.iso .num text{ font-family:var(--mono); font-size:15px; letter-spacing:.02em; opacity:1; }
+
+/* step ⇄ plane correspondence (pointer + keyboard focus, never hides anything) */
+.fold-grid:has(.steps li:nth-child(1):hover) .p-voice,
+.fold-grid:has(.steps li:nth-child(2):hover) .p-struct,
+.fold-grid:has(.steps li:nth-child(3):hover) .p-panel{ opacity:1; }
+.fold-grid:has(.steps li:nth-child(1):hover) .p-struct,
+.fold-grid:has(.steps li:nth-child(1):hover) .p-panel,
+.fold-grid:has(.steps li:nth-child(2):hover) .p-voice,
+.fold-grid:has(.steps li:nth-child(2):hover) .p-panel,
+.fold-grid:has(.steps li:nth-child(3):hover) .p-voice,
+.fold-grid:has(.steps li:nth-child(3):hover) .p-struct{ opacity:.3; }
+
+/* the one authored moment: the assembly comes apart, once, on arrival */
+@media (prefers-reduced-motion:no-preference){
+  .iso .p-panel { animation:ex1 1s cubic-bezier(.16,.86,.24,1) both; }
+  .iso .p-struct{ animation:ex2 1s cubic-bezier(.16,.86,.24,1) .06s both; }
+  .iso .p-voice { animation:ex3 1s cubic-bezier(.16,.86,.24,1) .12s both; }
+  .iso .gl, .iso .axis, .iso .ld, .iso .ldot, .iso .num{
+    animation:fadein .8s ease-out .5s both; }
+  @keyframes ex1{ from{ transform:translate(129px,-75px); } to{ transform:none; } }
+  @keyframes ex2{ from{ transform:translate(26px,-15px); }  to{ transform:none; } }
+  @keyframes ex3{ from{ transform:translate(-129px,75px); } to{ transform:none; } }
+  @keyframes fadein{ from{ opacity:0; } }
+}
+
+.fig-stack{ display:none; }
+
+/* ── 2 · forced choice ────────────────────────────────────── */
+#choice{ scroll-margin-top:24px; }
+.ask h2{ font-size:clamp(32px,4.4vw,58px); max-width:14ch; }
+.ask .pre{ color:var(--dim); margin-top:20px; max-width:42ch; }
+.ask{ display:grid; grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);
+       gap:clamp(30px,4vw,72px) clamp(30px,4vw,72px); align-items:start; }
+.ask-head{ grid-column:1; grid-row:1; }
+.ask .why{ grid-column:2; grid-row:1; }
+.ask form{ grid-column:1 / -1; grid-row:2; margin-top:clamp(4px,1vw,14px); }
+.opts{ border:0; margin:clamp(30px,3.4vw,46px) 0 0; padding:0;
+       display:grid; grid-template-columns:1fr 1fr; gap:clamp(14px,1.6vw,22px); }
+.opts legend{ padding:0; }
+.opt{ display:flex; gap:18px; align-items:flex-start; cursor:pointer;
+      padding:clamp(24px,2.6vw,34px); border:1px solid var(--line-2); border-radius:3px;
+      background:transparent; transition:border-color .2s, background-color .2s; }
+.opt:hover{ border-color:var(--hot-soft); background:rgba(255,90,31,.035); }
+.opt input{ appearance:none; -webkit-appearance:none; margin:0; flex:none;
+            width:22px; height:22px; border-radius:50%; border:1.5px solid var(--ctrl);
+            background:transparent; position:relative; top:4px; cursor:pointer;
+            transition:border-color .2s, box-shadow .2s; }
+.opt input::after{ content:""; position:absolute; inset:4px; border-radius:50%;
+            background:var(--hot); transform:scale(0); transition:transform .18s cubic-bezier(.2,.9,.3,1.4); }
+.opt input:checked{ border-color:var(--hot); }
+.opt input:checked::after{ transform:scale(1); }
+.opt input:focus-visible{ outline:2px solid var(--hot); outline-offset:3px; }
+.opt span{ font-size:clamp(17px,1.45vw,21px); line-height:1.42; letter-spacing:-.016em;
+           color:var(--dim); transition:color .2s; }
+.opt:hover span{ color:var(--paper); }
+.opt:has(input:checked){ border-color:var(--hot); background:rgba(255,90,31,.055); }
+.opt:has(input:checked) span{ color:var(--paper); }
+
+.send{ font-family:var(--sans); font-size:15.5px; font-weight:500; letter-spacing:.01em;
+       color:var(--ink); background:var(--hot); border:1px solid var(--hot);
+       padding:13px 26px; border-radius:2px; cursor:pointer;
+       transition:background-color .18s, color .18s; }
+.send:hover{ background:#ff7440; border-color:#ff7440; }
+.send:disabled{ background:transparent; color:var(--dim); border-color:var(--line-2);
+       cursor:not-allowed; }
+a.send{ display:inline-block; text-decoration:none; }
+/* the free-text action is secondary: orange fill is reserved for the one question */
+.send--ghost{ background:transparent; color:var(--paper); border-color:var(--ctrl); }
+.send--ghost:hover{ background:transparent; border-color:var(--hot); color:var(--hot); }
+.act{ display:flex; align-items:center; gap:22px; flex-wrap:wrap; margin-top:26px; }
+.note{ font-size:14px; color:var(--dim); }
+.done{ display:none; font-size:15.5px; color:var(--hot); }
+.done b{ font-weight:500; color:var(--paper); }
+form.sent .act .send, form.sent .act .note{ display:none; }
+form.sent .done{ display:block; }
+.why{ color:var(--dim); font-size:15.5px; padding-left:clamp(0px,1.4vw,22px);
+      border-left:1px solid var(--line); }
+
+/* ── 3 · free text ────────────────────────────────────────── */
+.ta-wrap{ max-width:1010px; }
+.ta-label{ display:block; margin-bottom:12px; }
+textarea{ width:100%; min-height:132px; resize:vertical; font-family:var(--sans);
+  font-size:17px; line-height:1.6; color:var(--paper); background:var(--ink-2);
+  border:1px solid var(--ctrl); border-radius:3px; padding:16px 18px;
+  caret-color:var(--hot); transition:border-color .2s; }
+textarea::placeholder{ color:rgba(241,238,232,.55); }
+textarea:hover{ border-color:rgba(241,238,232,.3); }
+textarea:focus{ outline:none; border-color:var(--hot); }
+
+/* ── 4 · two screens ──────────────────────────────────────── */
+.screens{ display:grid; grid-template-columns:minmax(0,1.32fr) minmax(0,1fr);
+          gap:clamp(24px,2.6vw,40px); align-items:start; }
+.shot{ border:1px solid var(--hot-soft); border-radius:3px; padding:9px; background:var(--ink-2); }
+.shot img{ display:block; width:100%; height:auto; border-radius:1px; }
+.cap{ margin-top:12px; font-size:14px; color:var(--dim); line-height:1.5; }
+.cap b{ font-weight:500; color:var(--paper); }
+
+.digest{ border:1px solid var(--line-2); border-radius:3px; background:var(--ink-2);
+         padding:clamp(20px,2vw,28px); }
+.digest .dh{ display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+             padding-bottom:14px; border-bottom:1px solid var(--line); }
+.digest .dh .tag{ font-size:11.5px; }
+.digest .dh time{ font-family:var(--mono); font-size:11.5px; color:var(--dimmer); }
+.dgrp{ padding:20px 0; border-bottom:1px solid var(--line); }
+.dgrp:last-of-type{ border-bottom:0; padding-bottom:6px; }
+.dgrp h3{ font-family:var(--mono); font-size:11.5px; letter-spacing:.19em; color:var(--hot);
+          font-weight:400; margin-bottom:12px; }
+.dgrp ol{ margin:0; padding:0; list-style:none; counter-reset:d; }
+.dgrp ol li{ counter-increment:d; display:grid; grid-template-columns:22px 1fr; gap:10px;
+             font-size:15.5px; line-height:1.45; padding:5px 0; }
+.dgrp ol li::before{ content:counter(d); font-family:var(--mono); font-size:11.5px;
+             color:var(--hot); opacity:.7; padding-top:.28em; }
+.dgrp p{ font-size:15.5px; line-height:1.5; color:var(--dim); }
+.dgrp p b{ color:var(--paper); font-weight:400; }
+
+/* ── 5 · what you need ────────────────────────────────────── */
+.bom{ width:100%; border-collapse:collapse; margin-top:8px; }
+.bom caption{ text-align:left; font-family:var(--mono); font-size:11.5px; letter-spacing:.19em;
+              color:var(--dimmer); padding-bottom:14px; }
+.bom th{ text-align:left; font-family:var(--mono); font-weight:400; font-size:11.5px;
+         letter-spacing:.17em; color:var(--hot); padding:0 20px 12px 0;
+         border-bottom:1px solid var(--line-2); }
+.bom td{ padding:20px 20px 20px 0; border-bottom:1px solid var(--line); vertical-align:top;
+         font-size:15.5px; line-height:1.55; color:var(--dim); }
+.bom td:first-child{ color:var(--paper); font-size:17px; letter-spacing:-.015em; width:24%; }
+.bom td.q{ font-family:var(--mono); font-size:14px; color:var(--paper); width:20%; }
+.bom tr:last-child td{ border-bottom:1px solid var(--line-2); }
+
+/* ── 6 · the three operating modes ────────────────────────── */
+.modes{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:var(--split); }
+.mode{ display:flex; flex-direction:column;
+       border-top:1px solid var(--line-2); padding-top:20px; }
+.mode .n{ display:block; font-family:var(--mono); font-size:13px; letter-spacing:.06em;
+          color:var(--hot); margin-bottom:13px; }
+.mode h3{ font-size:clamp(21px,1.9vw,27px); font-weight:500; letter-spacing:-.025em;
+          line-height:1.2; }
+.mode p{ margin-top:14px; color:var(--dim); font-size:15.5px; line-height:1.58; }
+.mode p b{ color:var(--paper); font-weight:500; }
+/* the drawings sit on a shared baseline, whatever the prose above them does */
+.mode .lv-wrap{ margin-top:auto; padding-top:var(--block); }
+/* pinned to 1:1 — a schematic that scaled up would out-weigh the hero's
+   hairlines and out-size its type, which is the one thing it may never do */
+.lv{ display:block; width:100%; max-width:320px; height:auto; }
+.lv .ol{ fill:none; stroke:var(--hot); stroke-width:.92; }
+.lv .mk{ fill:none; stroke:var(--hot); stroke-width:.8; opacity:.55; }
+.lv .rl{ fill:none; stroke:var(--hot); stroke-width:.8; opacity:.34; }
+.lv .gl{ fill:none; stroke:var(--hot); stroke-width:.8; opacity:.38; stroke-dasharray:4 4; }
+.lv .ld{ fill:none; stroke:var(--hot); stroke-width:.88; opacity:.78; stroke-dasharray:3.2 3.2; }
+.lv .ldot{ fill:var(--hot); }
+.lv text{ font-family:var(--sans); fill:var(--hot); }
+.lv .t-o{ fill:var(--hot); }
+.lv .t-p{ fill:var(--paper); }
+.lv .t-m{ font-family:var(--mono); }
+/* one column of modes, prose beside its drawing, so neither runs too wide.
+   The drawing column never drops below 320px, so the schematics never scale down
+   and their mono labels never fall under the 11.5px floor. */
+@media (max-width:1080px){
+  .modes{ grid-template-columns:1fr; gap:var(--block); }
+  .mode{ display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,360px);
+         gap:var(--split); align-items:start; }
+  .mode .lv-wrap{ margin-top:0; padding-top:4px; }
+}
+@media (max-width:760px){
+  .mode{ grid-template-columns:1fr; }
+  .mode .lv-wrap{ padding-top:var(--block); }
+}
+
+/* ── 7 · the two doors ────────────────────────────────────── */
+.doors{ display:grid; grid-template-columns:1fr 1fr; gap:var(--split); }
+.door{ border-top:1px solid var(--line-2); padding-top:20px; }
+.door h3{ font-size:clamp(21px,1.9vw,27px); font-weight:500; letter-spacing:-.025em;
+          line-height:1.2; }
+.door .stat{ margin:20px 0 0; border-top:0; }
+.door .strow{ grid-template-columns:minmax(96px,124px) minmax(0,1fr); padding:18px 0;
+              border-top:1px solid var(--line); border-bottom:0; }
+@media (max-width:900px){
+  .doors{ grid-template-columns:1fr; }
+  .door .strow{ grid-template-columns:1fr; }
+}
+
+/* ── 6/7/8 · text blocks ──────────────────────────────────── */
+.cols2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+        gap:clamp(26px,3vw,56px); }
+.cols2 p + p{ margin-top:16px; }
+.cols2 p{ color:var(--dim); }
+.pull, .cols2 .pull{ color:var(--paper); font-size:clamp(18px,1.6vw,22px); line-height:1.45;
+       letter-spacing:-.02em; }
+.cols2.tail{ margin-top:var(--split); }
+.doors-lead{ max-width:34ch; margin-bottom:var(--block); }
+
+.stat{ border-top:1px solid var(--line-2); max-width:1010px; }
+.strow{ display:grid; grid-template-columns:minmax(150px,190px) minmax(0,1fr);
+        gap:12px clamp(20px,3vw,44px); padding:26px 0; border-bottom:1px solid var(--line); }
+.strow dt{ font-family:var(--mono); font-size:11.5px; letter-spacing:.19em; color:var(--hot);
+           padding-top:.35em; }
+.strow dd{ margin:0; color:var(--dim); font-size:15.5px; line-height:1.6; max-width:62ch; }
+.strow dd b{ color:var(--paper); font-weight:500; }
+.strow.off dt{ color:var(--dimmer); }
+
+.echo{ border:1px solid var(--hot-soft); border-radius:3px; padding:clamp(24px,2.8vw,42px);
+       margin-bottom:clamp(34px,4vw,56px);
+       display:grid; grid-template-columns:minmax(0,.86fr) minmax(0,1fr);
+       gap:clamp(24px,3.4vw,56px); align-items:start; }
+.echo p{ color:var(--dim); font-size:17px; max-width:58ch; }
+.echo p:first-child{ color:var(--paper); font-size:clamp(20px,1.9vw,27px); line-height:1.38;
+       letter-spacing:-.024em; }
+@media (max-width:900px){ .echo{ grid-template-columns:1fr; } }
+
+/* ── 9 · buy ──────────────────────────────────────────────── */
+.nobtn{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+        gap:clamp(26px,3vw,56px); align-items:start; }
+.nobtn p{ color:var(--dim); }
+.nobtn p + p{ margin-top:16px; }
+.slot{ border:1px solid var(--hot-soft); border-radius:3px; padding:clamp(26px,3vw,40px); }
+.slot .amt{ display:block; margin-top:16px; font-family:var(--mono);
+            font-size:clamp(34px,3.6vw,46px); line-height:1.05; letter-spacing:-.01em;
+            color:var(--paper); }
+.slot .amt i{ font-family:var(--sans); font-style:normal; font-size:17px;
+              letter-spacing:-.006em; color:var(--dim); margin-left:10px; }
+.slot p{ margin-top:16px; font-size:15.5px; color:var(--dim); max-width:34ch; }
+.slot .send{ margin-top:26px; }
+
+/* ── footer ───────────────────────────────────────────────── */
+footer{ border-top:1px solid var(--line); padding-block:44px 60px; }
+footer .wrap{ display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap;
+              align-items:baseline; }
+footer p{ font-size:14px; color:var(--dimmer); }
+footer .mono{ font-size:11.5px; letter-spacing:.1em; }
+
+/* ── responsive ───────────────────────────────────────────── */
+@media (max-width:1080px){
+  .fold-grid{ grid-template-columns:1fr; }
+  .fig{ margin-top:12px; }
+}
+@media (max-width:900px){
+  body{ font-size:16.5px; }
+  .screens, .nobtn, .opts{ grid-template-columns:1fr; }
+  .ask{ display:flex; flex-direction:column; gap:0; }
+  .ask form{ margin-top:clamp(30px,3.4vw,46px); }
+  .ask .why{ order:1; border-left:0; padding-left:0; padding-top:22px;
+             border-top:1px solid var(--line); margin-top:34px; }
+  .strow{ grid-template-columns:1fr; gap:8px; }
+  .strow dt{ padding-top:0; }
+  .bom, .bom tbody, .bom tr, .bom td, .bom th{ display:block; width:auto; }
+  .bom thead{ display:none; }
+  .bom tr{ padding:20px 0; border-bottom:1px solid var(--line); }
+  .bom td{ padding:0; border:0; }
+  .bom td:first-child{ width:auto; margin-bottom:4px; }
+  .bom td.q{ width:auto; margin-bottom:8px; color:var(--hot); font-size:13px;
+             letter-spacing:.06em; }
+  .bom tr:last-child td{ border:0; }
+}
+/* below this the isometric drawing's on-plane type stops being legible,
+   so the fold hands over to a flat, full-size version of the same transformation */
+@media (max-width:720px){
+  .fig-iso{ display:none; }
+  .fig-stack{ display:block; margin-top:30px; }
+}
+@media (max-width:660px){
+  .top nav a:not(.lic){ display:none; }
+  .top nav .lic{ white-space:nowrap; }
+}
+
+/* mobile fold: the same transformation, drawn flat and legible */
+.fs-vm{ border:1px solid var(--hot-soft); border-radius:3px; padding:14px 16px 10px;
+        max-width:560px; }
+.fs-vm .lbl{ display:flex; justify-content:space-between; font-family:var(--mono);
+             font-size:11.5px; letter-spacing:.17em; color:var(--hot); margin-bottom:6px; }
+.fs-vm svg{ display:block; width:100%; max-width:340px; height:auto; margin-inline:auto; }
+.fs-vm svg path{ stroke:var(--hot); stroke-width:1.15; fill:none; stroke-linecap:round; }
+.fs-vm svg .pl{ opacity:.8; stroke-width:1.15; }
+.fs-link{ display:grid; grid-template-columns:20px 1fr; gap:14px; align-items:center;
+          padding:14px 0; }
+.fs-link svg{ display:block; overflow:visible; }
+.fs-link span{ font-family:var(--mono); font-size:11.5px; letter-spacing:.15em;
+               color:var(--hot); }
+.fs-board{ border:1px solid var(--hot-soft); border-radius:3px; padding:7px; background:var(--ink-2);
+           max-width:660px; }
+.fs-fields{ border:1px solid var(--hot-soft); border-radius:3px; padding:18px 20px;
+            max-width:660px; display:grid; gap:22px 28px; }
+@media (min-width:520px){ .fs-fields{ grid-template-columns:1fr 1fr; } }
+.fs-h{ display:block; font-family:var(--mono); font-size:11.5px; letter-spacing:.17em;
+       color:var(--hot); margin-bottom:10px; }
+.fs-fields dl{ margin:0; display:grid; grid-template-columns:auto 1fr; gap:7px 16px; }
+.fs-fields dt{ font-family:var(--mono); font-size:11.5px; letter-spacing:.1em;
+               color:var(--hot); opacity:.82; padding-top:.25em; }
+.fs-fields dd{ margin:0; font-size:16px; line-height:1.35; color:var(--paper);
+               letter-spacing:-.012em; }
+.fs-fields dd.none{ color:var(--dim); }
+.fs-board img{ display:block; width:100%; height:auto; }
+</style>
+</head>
+<body>
+<!--
+  DIRECTION CONTRACT · crtxboard landing (Persuade surface, demand-test instrument)
+  THESIS: One exploded technical drawing explains the whole product, so the copy
+    never has to argue. Refuses the SaaS hero: no gradient, no badge row, no feature grid.
+  OWN-WORLD: Near-black #0a0a0b ground, warm off-white #f1eee8, one hot orange #ff5a1f.
+    Hairline vector line-art, no fills, no shading; humanist grotesk with a mono
+    drafting register; hairline rules instead of cards.
+  STORY: Visitor sees a spoken sentence become fields become a wall panel, then
+    answers one forced-choice question, then learns where it can run and what it
+    costs. Two ends: the question at the top, the price at the bottom.
+  DRAWINGS: the exploded isometric hero explains the product; three flat house
+    schematics in section 6 carry the per-mode truth about what leaves the house.
+    They share one stroke vocabulary; only the hero animates.
+  FIRST VIEWPORT: Left column 456px: headline, one sentence, the raw voice
+    message, three steps with only the active one at full weight. Right: a large
+    isometric exploded assembly (voice plane, structure plane, E-Ink panel) with
+    assembly guides, a dash-dot centreline and two data leaders landing on the
+    two board entries the sentence produced.
+  FORM: Brief-pinned direction (Dark Technical Line-Art, edgelabs reference); a
+    pinned direction beats the roll, so no concept-seed key exists.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="crtxboard, home">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none"
+           stroke="#ff5a1f" stroke-width="1.1">
+        <path d="M1.5 12.5 L8 16.2 L18.5 10.6"/>
+        <path d="M1.5 9 L8 12.7 L18.5 7.1"/>
+        <path d="M1.5 5.5 L8 9.2 L18.5 3.6"/>
+      </svg>
+      <b>crtxboard</b>
+    </a>
+    <nav>
+      <a href="#status">Honest status</a>
+      <a href="#tech">Technical</a>
+      <a href="#buy">Price</a>
+      <a class="lic" href="https://github.com/moguls753/cortex">AGPL-3.0</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ════ 1 · THE FOLD: voice message → structured board, and nothing else ════ -->
+<section aria-labelledby="h1">
+  <div class="wrap fold-grid">
+
+    <div>
+      <h1 id="h1"><span class="b">You speak.</span><span class="b">The wall fills itself.</span></h1>
+
+      <p class="fold-lede">Send a voice message. It is transcribed, cut into fields
+        and put on an E-Ink panel on the wall, without you opening anything.</p>
+
+      <div class="vm">
+        <div class="vm-head">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="tag">Telegram · voice message · 0:07</span>
+        </div>
+        <q>day after tomorrow dentist for Lena at half three and don't forget to take the bins out</q>
+      </div>
+
+      <ol class="steps">
+        <li>
+          <span class="n" aria-hidden="true">01</span>
+          <span class="lb">Spoken in</span>
+          <span class="ds">A voice message to a Telegram bot. No form, no fields to pick.</span>
+        </li>
+        <li>
+          <span class="n" aria-hidden="true">02</span>
+          <span class="lb">Sorted into fields</span>
+          <span class="ds">Transcribed first, then a language model cuts the sentence apart. On your machine, or on mine.</span>
+        </li>
+        <li>
+          <span class="n" aria-hidden="true">03</span>
+          <span class="lb">On the wall</span>
+          <span class="ds">The board re-renders and the panel refreshes. Nothing to tap.</span>
+        </li>
+      </ol>
+    </div>
+
+    <!-- ── the drawing ── -->
+    <div class="fig">
+
+      <svg class="iso fig-iso" viewBox="0 0 1096 950" role="img"
+           aria-labelledby="figt figd">
+        <title id="figt">Exploded drawing of the crtxboard pipeline</title>
+        <desc id="figd">Three separated planes joined by assembly guide lines. Top
+          right: a Telegram voice message with a waveform. Middle: the same sentence
+          cut into labelled fields — when Thursday 15:30, who Lena, what Dentist, tag
+          family; and a second reminder, take the bins out, with no date. Bottom left:
+          the E-Ink wall panel showing those two entries under Week Ahead and Don't
+          Forget, the reminder still unticked.</desc>
+
+        <!-- ── plane 1 · the E-Ink panel (front) ── -->
+        <g class="part p-panel">
+          <g transform="matrix(.866 .5 0 1 54 190)">
+            <rect class="sl" x="12" y="-12" width="580" height="435" rx="10"/>
+            <path class="sl" d="M0 0 12-12M580 0 592-12M580 435 592 423M0 435 12 423"/>
+            <rect class="ol" x="0" y="0" width="580" height="435" rx="10"/>
+            <rect class="in" x="25" y="25" width="530" height="385" rx="3"/>
+            <circle class="sl" cx="12" cy="12" r="6"/><circle class="sl" cx="568" cy="12" r="6"/>
+            <circle class="sl" cx="12" cy="423" r="6"/><circle class="sl" cx="568" cy="423" r="6"/>
+
+            <text class="t-o" x="41" y="64" font-size="26" letter-spacing="1">crtxboard</text>
+            <text class="t-d t-m" x="539" y="64" font-size="15" text-anchor="end">Tue 11 Aug  08:41</text>
+            <path class="rl" d="M41 87H539"/>
+            <text class="t-d" x="41" y="120" font-size="17.5">19.4°C   Mainly Clear</text>
+            <text class="t-d t-m" x="539" y="120" font-size="13.5" text-anchor="end">TODAY 14|23°</text>
+            <path class="rl" d="M41 143H539"/>
+
+            <path class="rl" d="M333 163V395"/>
+
+            <text class="t-o lbl" x="41" y="182" font-size="15.5">WEEK AHEAD</text>
+            <path class="rl" d="M41 196H309"/>
+            <text class="t-d" x="41" y="227" font-size="15.5">No events today</text>
+            <text class="t-d t-m" x="41" y="261" font-size="13.5" letter-spacing="1.6">THURSDAY</text>
+            <text class="t-o t-m" x="41" y="299" font-size="19" opacity=".8">15:30</text>
+            <text class="t-p" x="101" y="299" font-size="21.5" letter-spacing="-.3">Dentist — Lena</text>
+            <rect class="bx" x="258" y="278" width="56" height="25" rx="2"/>
+            <text class="t-d t-m" x="264" y="295" font-size="11.5" letter-spacing="1">FAMILY</text>
+
+            <text class="t-o lbl" x="361" y="182" font-size="15.5">DON'T FORGET</text>
+            <path class="rl" d="M361 196H539"/>
+            <rect class="bx" x="361" y="213" width="20" height="20" rx="2"/>
+            <text class="t-p" x="391" y="230" font-size="17" letter-spacing="-.2">Take the bins out</text>
+
+            <path class="rl" d="M41 380H539" opacity=".22"/>
+            <text class="t-d t-m" x="41" y="404" font-size="12.5" opacity=".45">Last updated 08:41</text>
+          </g>
+        </g>
+
+        <!-- ── plane 2 · the structuring step (middle) ── -->
+        <g class="part p-struct">
+          <g transform="matrix(.866 .5 0 1 430.6 135)">
+            <rect class="sl" x="8" y="-8" width="420" height="270" rx="6"/>
+            <path class="sl" d="M0 0 8-8M420 0 428-8M420 270 428 262M0 270 8 262"/>
+            <rect class="ol" x="0" y="0" width="420" height="270" rx="6"/>
+
+            <path class="msh" d="M18 14V256M54 14V256M90 14V256M126 14V256M162 14V256M198 14V256M234 14V256M270 14V256M306 14V256M342 14V256M378 14V256M402 14V256"/>
+            <path class="msh" d="M14 18H406M14 45H406M14 72H406M14 99H406M14 126H406M14 153H406M14 180H406M14 207H406M14 234H406"/>
+
+            <text class="t-o lbl" x="24" y="35" font-size="13.5">APPOINTMENT</text>
+            <rect class="bx" x="24" y="43" width="199" height="32" rx="3"/>
+            <text class="t-d t-m" x="34" y="64" font-size="14" letter-spacing="1">WHEN</text>
+            <text class="t-p" x="86" y="64" font-size="19">Thursday 15:30</text>
+            <rect class="bx" x="24" y="79" width="199" height="32" rx="3"/>
+            <text class="t-d t-m" x="34" y="100" font-size="14" letter-spacing="1">WHO</text>
+            <text class="t-p" x="86" y="100" font-size="19">Lena</text>
+            <rect class="bx" x="24" y="115" width="199" height="32" rx="3"/>
+            <text class="t-d t-m" x="34" y="136" font-size="14" letter-spacing="1">WHAT</text>
+            <text class="t-p" x="86" y="136" font-size="19">Dentist</text>
+            <rect class="bx" x="24" y="151" width="199" height="32" rx="3"/>
+            <text class="t-d t-m" x="34" y="172" font-size="14" letter-spacing="1">TAG</text>
+            <text class="t-p" x="86" y="172" font-size="19">family</text>
+
+            <text class="t-o lbl" x="245" y="35" font-size="13.5">REMINDER</text>
+            <rect class="bx" x="245" y="43" width="154" height="49" rx="3"/>
+            <text class="t-d t-m" x="255" y="63" font-size="14" letter-spacing="1">WHAT</text>
+            <text class="t-p" x="255" y="82" font-size="15">Take the bins out</text>
+            <rect class="bx" x="245" y="101" width="154" height="45" rx="3"/>
+            <text class="t-d t-m" x="255" y="121" font-size="14" letter-spacing="1">WHEN</text>
+            <text class="t-p" x="255" y="139" font-size="15" opacity=".7">none given</text>
+
+            <path class="rl" d="M24 201H399"/>
+            <text class="t-o t-m" x="24" y="223" font-size="15" letter-spacing="1.3">TO: WEEK AHEAD</text>
+            <text class="t-o t-m" x="245" y="223" font-size="15" letter-spacing="1.3">TO: DON'T FORGET</text>
+          </g>
+        </g>
+
+        <!-- ── plane 3 · the spoken sentence (back) ── -->
+        <g class="part p-voice">
+          <g transform="matrix(.866 .5 0 1 785.7 50)">
+            <rect class="sl" x="7" y="-7" width="310" height="140" rx="6"/>
+            <path class="sl" d="M0 0 7-7M310 0 317-7M310 140 317 133M0 140 7 133"/>
+            <rect class="ol" x="0" y="0" width="310" height="140" rx="6"/>
+
+            <text class="t-o lbl" x="21" y="28" font-size="11">TELEGRAM · VOICE</text>
+            <rect class="bub" x="21" y="39" width="268" height="72" rx="13" opacity=".55"/>
+            <path class="bub" d="M40 65 L54 75 L40 85 Z" opacity=".75"/>
+            <path class="wv" d="M65 72.8V77.2M70.5 70.9V79.1M76 68.3V81.7M81.5 71.7V78.3M87 66.5V83.5M92.5 63.2V86.8M98 68.3V81.7M103.5 70.6V79.4M109 65.0V85.0M114.5 60.6V89.4M120 58.4V91.7M125.5 64.3V85.7M131 68.0V82.0M136.5 62.4V87.6M142 59.5V90.5M147.5 66.1V83.9M153 69.8V80.2M158.5 71.7V78.3M164 69.1V80.9M169.5 64.6V85.4M175 61.3V88.7M180.5 58.0V92.0M186 62.4V87.6M191.5 67.2V82.8M197 70.2V79.8M202.5 72.0V78.0M208 69.5V80.5M213.5 65.4V84.6M219 60.2V89.8M224.5 58.7V91.3M230 63.9V86.1M235.5 68.3V81.7M241 70.9V79.1M246.5 66.1V83.9"/>
+            <text class="t-d t-m" x="256" y="79" font-size="12">0:07</text>
+            <path class="msh" d="M21 120V126M42 122V126M63 122V126M84 122V126M105 120V126M126 122V126M147 122V126M168 122V126M189 120V126M210 122V126M231 122V126M252 122V126M273 120V126M294 122V126" opacity=".34"/>
+          </g>
+        </g>
+
+        <!-- ── assembly guides: each part's separation path ── -->
+        <g class="gl">
+          <path d="M22.8 208 85.2 172M525.1 498 587.5 462M525.1 933 587.5 897M22.8 643 85.2 607"/>
+          <path d="M399.4 153 461.8 117M763.1 363 825.5 327M763.1 633 825.5 597M399.4 423 461.8 387"/>
+          <path d="M754.5 68 816.9 32M1023 223 1152 148.5M1023 363 1152 288.5M754.5 208 816.9 172"/>
+        </g>
+        <path class="axis" d="M120.5 659.1 1247 9.2"/>
+        <path class="axis" d="M301.6 546.4 308.6 558.6M609 368.9 616 381.1M916.4 191.4 923.4 203.6" opacity=".6"/>
+
+        <!-- data leaders: where each parsed field lands on the board -->
+        <path class="ld" d="M446 375 148 536"/><circle class="ldot" cx="148" cy="536" r="3.6"/>
+        <path class="ld" d="M637 485 399 612"/><circle class="ldot" cx="399" cy="612" r="3.6"/>
+
+        <!-- part numbers -->
+        <g class="num" aria-hidden="true">
+          <path class="gl" d="M762.7 39 783 48" stroke-dasharray="none" opacity=".55"/>
+          <circle cx="751.7" cy="28" r="15"/>
+          <text class="t-o" x="751.7" y="33" text-anchor="middle">01</text>
+
+          <path class="gl" d="M407.6 124 428.6 133" stroke-dasharray="none" opacity=".55"/>
+          <circle cx="396.6" cy="113" r="15"/>
+          <text class="t-o" x="396.6" y="118" text-anchor="middle">02</text>
+
+          <path class="gl" d="M31 179 52 188" stroke-dasharray="none" opacity=".55"/>
+          <circle cx="20" cy="168" r="15"/>
+          <text class="t-o" x="20" y="173" text-anchor="middle">03</text>
+        </g>
+
+        <!-- callout -->
+        <g>
+          <path class="gl" d="M594 802 558 762" stroke-dasharray="none" opacity=".5"/>
+          <text class="t-o" x="600" y="812" font-size="16">E-Ink panel.</text>
+          <text class="t-d t-m" x="600" y="834" font-size="12.5">4-bit greyscale. Nothing to tap.</text>
+        </g>
+      </svg>
+
+      <!-- mobile: the same transformation, flat and legible -->
+      <div class="fig-stack">
+        <div class="fs-vm">
+          <div class="lbl"><span>TELEGRAM · VOICE</span><span>0:07</span></div>
+          <svg viewBox="0 0 340 96" preserveAspectRatio="xMidYMid meet">
+            <path class="pl" d="M12 40 L28 48 L12 56 Z"/>
+            <path d="M60 45.7V50.3M66 43.7V52.3M72 41.0V55.0M78 44.5V51.5M84 39.0V57.0M90 35.5V60.5M96 41.0V55.0M102 43.3V52.7M108 37.5V58.5M114 32.8V63.2M120 30.4V65.5M126 36.7V59.3M132 40.6V55.4M138 34.7V61.3M144 31.6V64.4M150 38.6V57.4M156 42.5V53.5M162 44.5V51.5M168 41.8V54.2M174 37.1V58.9M180 33.6V62.4M186 30.1V65.9M192 34.7V61.3M198 39.8V56.2M204 42.9V53.1M210 44.9V51.1M216 42.1V53.9M222 37.9V58.1M228 32.4V63.6M234 30.8V65.2M240 36.3V59.7M246 41.0V55.0M252 43.7V52.3M258 38.6V57.4M264 34.0V62.0M270 31.2V64.8M276 37.1V58.9M282 41.8V54.2M288 44.1V51.9M294 39.8V56.2M300 36.3V59.7M306 33.2V62.8M312 38.3V57.8M318 42.5V53.5"/>
+          </svg>
+        </div>
+        <div class="fs-link">
+          <svg width="20" height="46" viewBox="0 0 20 46" fill="none" stroke="#ff5a1f" stroke-width="1.1"
+               aria-hidden="true">
+            <path d="M10 0V38" stroke-dasharray="4 5"/><path d="M4 32 10 40 16 32"/>
+          </svg>
+          <span>SORTED INTO FIELDS</span>
+        </div>
+        <div class="fs-fields">
+          <div>
+            <span class="fs-h">APPOINTMENT</span>
+            <dl>
+              <dt>WHEN</dt><dd>Thursday 15:30</dd>
+              <dt>WHO</dt><dd>Lena</dd>
+              <dt>WHAT</dt><dd>Dentist</dd>
+              <dt>TAG</dt><dd>family</dd>
+            </dl>
+          </div>
+          <div>
+            <span class="fs-h">REMINDER</span>
+            <dl>
+              <dt>WHAT</dt><dd>Take the bins out</dd>
+              <dt>WHEN</dt><dd class="none">none given</dd>
+            </dl>
+          </div>
+        </div>
+        <div class="fs-link">
+          <svg width="20" height="46" viewBox="0 0 20 46" fill="none" stroke="#ff5a1f" stroke-width="1.1"
+               aria-hidden="true">
+            <path d="M10 0V38" stroke-dasharray="4 5"/><path d="M4 32 10 40 16 32"/>
+          </svg>
+          <span>ON THE WALL</span>
+        </div>
+        <div class="fs-board">
+          <img src="../assets/board-crtxboard.png" width="1872" height="1404"
+               alt="The wall board: Thursday 15:30, Dentist — Lena, tagged family; and under Don't Forget, an unticked Take the bins out.">
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ════ 2 · THE FORCED CHOICE · first thing under the fold ════ -->
+<section id="choice" aria-labelledby="h-choice">
+  <div class="wrap">
+    <div class="ask">
+      <div class="ask-head">
+        <h2 id="h-choice">Which would you rather?</h2>
+        <p class="pre">Same thought, same result on the wall. Only the way in is different.</p>
+      </div>
+      <p class="why">This is the only question on the page, and it is the reason the
+        page exists. Both answers are a yes to the wall panel, so politeness cancels
+        out and what is left is the one variable actually in dispute: whether the
+        sorting is the product or just plumbing. If typing wins, then it is plumbing —
+        and I would rather hear that from you than keep my own opinion about it.</p>
+
+      <!-- MEASUREMENT: before this page goes live, wire this submit to the chosen
+           self-hosted analytics (Plausible / GoatCounter / Umami) as a custom event
+           carrying the selected value, with a UTM per channel. Primary metric is the
+           forced-choice distribution divided by unique visitors. No endpoint is
+           invented here on purpose. -->
+      <form id="fc">
+        <fieldset class="opts">
+          <legend class="vh">Which would you rather?</legend>
+          <label class="opt">
+            <input type="radio" name="rather" value="speak" required>
+            <span>I'd speak it in and let it sort itself out</span>
+          </label>
+          <label class="opt">
+            <input type="radio" name="rather" value="type">
+            <span>I'd type it in myself, then it's guaranteed right</span>
+          </label>
+        </fieldset>
+        <div class="act">
+          <button class="send" type="submit">Send my answer</button>
+          <span class="note">No email. No account. One click, then you're done.</span>
+          <span class="done" role="status"><b>Thank you.</b> That is the whole ask.</span>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ════ 3 · HOW DO YOU SOLVE THIS TODAY ════ -->
+<section id="today" aria-labelledby="h-today">
+  <div class="wrap">
+    <div class="h-block">
+      <h2 id="h-today">How do you handle this today?</h2>
+      <p class="lede">A note stuck to the fridge, a shared calendar nobody opens, a
+        chat with yourself, a whiteboard. Or nothing at all, and it just gets
+        forgotten. That is a real answer, and honestly the most useful one I can get.</p>
+    </div>
+    <form id="ft" class="ta-wrap" novalidate>
+      <label for="today-t" class="tag ta-label">Your answer</label>
+      <textarea id="today-t" name="today" placeholder="It usually goes something like…"></textarea>
+      <div class="act">
+        <button class="send send--ghost" type="submit">Send</button>
+        <span class="note">Optional. There is no email field, and there won't be one.</span>
+        <span class="done" role="status"><b>Got it.</b> Five sentences like yours beat a hundred yes-clicks.</span>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ════ 4 · THE SECOND SCREEN ════ -->
+<section id="screens" aria-labelledby="h-screens">
+  <div class="wrap">
+    <div class="h-block">
+      <h2 id="h-screens">Two halves, and only one is on the wall.</h2>
+      <p class="lede">The board sits there all day and changes when something arrives.
+        The briefing turns up once, in the morning, as an email. It is not the board
+        again as a list: it decides what actually counts today, and it names what has
+        been quietly sitting there for a week.</p>
+    </div>
+
+    <div class="screens">
+      <div>
+        <div class="shot">
+          <img src="../assets/board-crtxboard.png" decoding="async" width="1872" height="1404"
+               alt="The rendered board: weather strip, Week Ahead with Thursday 15:30 Dentist — Lena tagged family, and Don't Forget with an unticked Take the bins out.">
+        </div>
+        <p class="cap"><b>The board, all day.</b> Genuine output of the renderer:
+          a PNG in 4-bit greyscale, the same file the panel pulls. Things that just
+          arrived sit there unticked: captured, not done.</p>
+      </div>
+
+      <div>
+        <div class="digest">
+          <div class="dh">
+            <span class="tag">Morning email</span>
+            <time datetime="08:00">08:00</time>
+          </div>
+          <div class="dgrp">
+            <h3>TOP 3 TODAY</h3>
+            <ol>
+              <li>Dentist with Lena, 15:30. Leave by 15:05</li>
+              <li>Call the landlord about the boiler</li>
+              <li>Bins out before bed</li>
+            </ol>
+          </div>
+          <div class="dgrp">
+            <h3>STUCK ON</h3>
+            <p><b>“Reply to Tobias”</b> has moved three mornings in a row now.</p>
+          </div>
+          <div class="dgrp">
+            <h3>SMALL WIN</h3>
+            <p>The passport form you started on Sunday went out yesterday.</p>
+          </div>
+        </div>
+        <p class="cap"><b>The briefing, once.</b> It arrives by email at a time you
+          pick, not in the chat. Illustrative content, written by hand for this page,
+          not a recorded run.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ 5 · WHERE IT APPEARS · free options first, on purpose ════ -->
+<section id="hardware" aria-labelledby="h-hw">
+  <div class="wrap">
+    <div class="h-block">
+      <h2 id="h-hw">It runs on a screen you already have.</h2>
+      <p class="lede">The board is a PNG, fetched over HTTP. Anything that can show a
+        picture can show it, so the list starts with the things that cost nothing and
+        work this afternoon.</p>
+    </div>
+
+    <table class="bom">
+      <caption>Ways to put the board somewhere</caption>
+      <thead>
+        <tr><th scope="col">Surface</th><th scope="col">Roughly</th><th scope="col">What it means</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>The phone in your pocket</td>
+          <td class="q">free</td>
+          <td>Open the board URL. It is one picture, so there is nothing to install and
+            nothing to log into. This is how most people will see it first.</td>
+        </tr>
+        <tr>
+          <td>An old tablet</td>
+          <td class="q">free</td>
+          <td>A browser in kiosk mode on the board URL, propped in the kitchen. It glows
+            and it wants a cable, but the drawer it is in right now is worth nothing.</td>
+        </tr>
+        <tr>
+          <td>A browser tab</td>
+          <td class="q">free</td>
+          <td>On the machine that is already running anyway. Second monitor, spare
+            corner. Refreshes itself.</td>
+        </tr>
+        <tr>
+          <td>A TRMNL</td>
+          <td class="q">from ~€120</td>
+          <td>Battery E-Ink, made to hang on a wall. It speaks the open BYOS protocol,
+            so it can point at your machine instead of theirs, with no TRMNL account
+            needed. That price is theirs, not mine; nothing here goes through me.</td>
+        </tr>
+        <tr>
+          <td>Any bare E-Ink panel</td>
+          <td class="q">varies</td>
+          <td>Same PNG endpoint over BYOS, your own firmware, your own frame. This is
+            the route the drawing at the top is actually of.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="cols2 tail">
+      <p class="pull">E-Ink is not the requirement. It is the version this was built
+        for.</p>
+      <div>
+        <p>No backlight, so it sits in a room the way a printed page does instead of
+          glowing at you from across it. No microphone in it, because there is nothing
+          in it — the panel is a pull-only client, and everything it can do is fetch a
+          picture. And it keeps showing the last board with the power off.</p>
+        <p>The other four work. This one is the one I would hang up.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════ 6 · THREE OPERATING MODES · with the real data flow drawn ════ -->
+<section id="runs" aria-labelledby="h-runs">
+  <div class="wrap">
+    <div class="h-block">
+      <h2 id="h-runs">Three ways to run it.</h2>
+      <p class="lede">The software is the same in all three. What changes is who does
+        the work, who is liable, and who notices when it breaks. Under each one is the
+        honest list of what leaves your house in that mode.</p>
+    </div>
+
+    <div class="modes">
+
+      <!-- ── mode 01 ── -->
+      <div class="mode">
+        <div class="mode-txt">
+          <span class="n" aria-hidden="true">01</span>
+          <h3>All on your machine</h3>
+          <p>One compose file brings up Postgres, Whisper, Ollama and the app. It wants
+            a real box — a NUC, an old desktop, something with about 8 GB free.
+            <b>A Raspberry Pi will run the app, but not the transcription.</b></p>
+        </div>
+        <div class="lv-wrap">
+          <svg class="lv" viewBox="0 0 320 470" role="img" aria-labelledby="lv1t lv1d">
+            <title id="lv1t">What leaves your house when everything runs on your machine</title>
+            <desc id="lv1d">Staying in the house: the transcript, your entries, the board image.
+              Leaving it: the audio, to Telegram's servers, before your box ever
+              sees it; the morning email, by SMTP, to the mail server you point it
+              at; your coordinates, to open-meteo, on every render; your calendar, to
+              Google, if you connect one. Nobody else — no model provider, and not
+              me.</desc>
+
+            <text class="t-o t-m" x="1" y="10" font-size="11.5" letter-spacing="1.9">STAYS IN YOUR HOUSE</text>
+            <rect class="ol" x=".5" y="22" width="319" height="104" rx="6"/>
+            <path class="mk" d="M18 47h11"/>
+            <text class="t-p" x="37" y="52" font-size="15.5">the transcript</text>
+            <path class="mk" d="M18 75h11"/>
+            <text class="t-p" x="37" y="80" font-size="15.5">your entries</text>
+            <path class="mk" d="M18 103h11"/>
+            <text class="t-p" x="37" y="108" font-size="15.5">the board image</text>
+
+            <text class="t-o t-m" x="42" y="156" font-size="11.5" letter-spacing="1.9">LEAVES THE HOUSE</text>
+            <path class="gl" d="M8 126V378"/>
+
+            <path class="ld" d="M8 186H30"/><circle class="ldot" cx="30" cy="186" r="3"/>
+            <text class="t-o t-m" x="42" y="190" font-size="11.5" letter-spacing="1.9">TELEGRAM</text>
+            <text class="t-p" x="42" y="210" font-size="14">the audio, before your box sees it</text>
+            <path class="rl" d="M42 222H319"/>
+
+            <path class="ld" d="M8 250H30"/><circle class="ldot" cx="30" cy="250" r="3"/>
+            <text class="t-o t-m" x="42" y="254" font-size="11.5" letter-spacing="1.9">YOUR MAIL SERVER</text>
+            <text class="t-p" x="42" y="274" font-size="14">the morning email, by SMTP</text>
+            <path class="rl" d="M42 286H319"/>
+
+            <path class="ld" d="M8 314H30"/><circle class="ldot" cx="30" cy="314" r="3"/>
+            <text class="t-o t-m" x="42" y="318" font-size="11.5" letter-spacing="1.9">OPEN-METEO</text>
+            <text class="t-p" x="42" y="338" font-size="14">your coordinates, on every render</text>
+            <path class="rl" d="M42 350H319"/>
+
+            <path class="ld" d="M8 378H30"/><circle class="ldot" cx="30" cy="378" r="3"/>
+            <text class="t-o t-m" x="42" y="382" font-size="11.5" letter-spacing="1.9">GOOGLE</text>
+            <text class="t-p" x="42" y="402" font-size="14">your calendar, if you connect one</text>
+            <path class="rl" d="M42 414H319"/>
+
+            <text class="t-o t-m" x="42" y="446" font-size="11.5" letter-spacing="1.9">AND NOBODY ELSE</text>
+            <text class="t-p" x="42" y="466" font-size="14">no model provider. Not me either.</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- ── mode 02 ── -->
+      <div class="mode">
+        <div class="mode-txt">
+          <span class="n" aria-hidden="true">02</span>
+          <h3>Your machine, heavy parts on APIs you pick</h3>
+          <p>The same install, with transcription and the language model pointed at a
+            provider you choose, on a key that is yours. <b>Your contract, not mine.</b>
+            This one fits on a Pi.</p>
+        </div>
+        <div class="lv-wrap">
+          <svg class="lv" viewBox="0 0 320 470" role="img" aria-labelledby="lv2t lv2d">
+            <title id="lv2t">What leaves your house when the heavy parts run on APIs you pick</title>
+            <desc id="lv2d">Staying in the house: your entries and the board image. Leaving it: the
+              audio, to Telegram's servers; the audio and the text, to the provider
+              you chose, on your key; the morning email, by SMTP, to the mail server
+              you point it at; your coordinates, to open-meteo, on every render; your
+              calendar, to Google, if you connect one.</desc>
+
+            <text class="t-o t-m" x="1" y="10" font-size="11.5" letter-spacing="1.9">STAYS IN YOUR HOUSE</text>
+            <rect class="ol" x=".5" y="22" width="319" height="104" rx="6"/>
+            <path class="mk" d="M18 47h11"/>
+            <text class="t-p" x="37" y="52" font-size="15.5">your entries</text>
+            <path class="mk" d="M18 75h11"/>
+            <text class="t-p" x="37" y="80" font-size="15.5">the board image</text>
+
+            <text class="t-o t-m" x="42" y="156" font-size="11.5" letter-spacing="1.9">LEAVES THE HOUSE</text>
+            <path class="gl" d="M8 126V442"/>
+
+            <path class="ld" d="M8 186H30"/><circle class="ldot" cx="30" cy="186" r="3"/>
+            <text class="t-o t-m" x="42" y="190" font-size="11.5" letter-spacing="1.9">TELEGRAM</text>
+            <text class="t-p" x="42" y="210" font-size="14">the audio</text>
+            <path class="rl" d="M42 222H319"/>
+
+            <path class="ld" d="M8 250H30"/><circle class="ldot" cx="30" cy="250" r="3"/>
+            <text class="t-o t-m" x="42" y="254" font-size="11.5" letter-spacing="1.9">YOUR PROVIDER</text>
+            <text class="t-p" x="42" y="274" font-size="14">the audio and the text, on your key</text>
+            <path class="rl" d="M42 286H319"/>
+
+            <path class="ld" d="M8 314H30"/><circle class="ldot" cx="30" cy="314" r="3"/>
+            <text class="t-o t-m" x="42" y="318" font-size="11.5" letter-spacing="1.9">YOUR MAIL SERVER</text>
+            <text class="t-p" x="42" y="338" font-size="14">the morning email, by SMTP</text>
+            <path class="rl" d="M42 350H319"/>
+
+            <path class="ld" d="M8 378H30"/><circle class="ldot" cx="30" cy="378" r="3"/>
+            <text class="t-o t-m" x="42" y="382" font-size="11.5" letter-spacing="1.9">OPEN-METEO</text>
+            <text class="t-p" x="42" y="402" font-size="14">your coordinates, on every render</text>
+            <path class="rl" d="M42 414H319"/>
+
+            <path class="ld" d="M8 442H30"/><circle class="ldot" cx="30" cy="442" r="3"/>
+            <text class="t-o t-m" x="42" y="446" font-size="11.5" letter-spacing="1.9">GOOGLE</text>
+            <text class="t-p" x="42" y="466" font-size="14">your calendar, if you connect one</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- ── mode 03 ── -->
+      <div class="mode">
+        <div class="mode-txt">
+          <span class="n" aria-hidden="true">03</span>
+          <h3>My machine</h3>
+          <p>No install, no server, no updates, nothing to keep an eye on. You tap an
+            invite link, and the bot is already awake. <b>This is the one that is for
+            sale.</b></p>
+        </div>
+        <div class="lv-wrap">
+          <svg class="lv" viewBox="0 0 320 470" role="img" aria-labelledby="lv3t lv3d">
+            <title id="lv3t">What leaves your house when I run it</title>
+            <desc id="lv3d">Nothing stays in the house but the panel on the wall. Leaving it: the
+              audio, to Telegram's servers; the audio, the text and your entries, to
+              my box; the morning email, sent from my box to your inbox; your
+              coordinates, to open-meteo, on every render; your calendar, to Google,
+              if you connect one.</desc>
+
+            <text class="t-o t-m" x="1" y="10" font-size="11.5" letter-spacing="1.9">STAYS IN YOUR HOUSE</text>
+            <rect class="ol" x=".5" y="22" width="319" height="104" rx="6"/>
+            <path class="mk" d="M18 47h11"/>
+            <text class="t-p" x="37" y="52" font-size="15.5">the panel on the wall</text>
+
+            <text class="t-o t-m" x="42" y="156" font-size="11.5" letter-spacing="1.9">LEAVES THE HOUSE</text>
+            <path class="gl" d="M8 126V442"/>
+
+            <path class="ld" d="M8 186H30"/><circle class="ldot" cx="30" cy="186" r="3"/>
+            <text class="t-o t-m" x="42" y="190" font-size="11.5" letter-spacing="1.9">TELEGRAM</text>
+            <text class="t-p" x="42" y="210" font-size="14">the audio</text>
+            <path class="rl" d="M42 222H319"/>
+
+            <path class="ld" d="M8 250H30"/><circle class="ldot" cx="30" cy="250" r="3"/>
+            <text class="t-o t-m" x="42" y="254" font-size="11.5" letter-spacing="1.9">MY BOX</text>
+            <text class="t-p" x="42" y="274" font-size="14">the audio, the text, your entries</text>
+            <path class="rl" d="M42 286H319"/>
+
+            <path class="ld" d="M8 314H30"/><circle class="ldot" cx="30" cy="314" r="3"/>
+            <text class="t-o t-m" x="42" y="318" font-size="11.5" letter-spacing="1.9">MY MAIL SENDER</text>
+            <text class="t-p" x="42" y="338" font-size="14">the morning email, on its way to you</text>
+            <path class="rl" d="M42 350H319"/>
+
+            <path class="ld" d="M8 378H30"/><circle class="ldot" cx="30" cy="378" r="3"/>
+            <text class="t-o t-m" x="42" y="382" font-size="11.5" letter-spacing="1.9">OPEN-METEO</text>
+            <text class="t-p" x="42" y="402" font-size="14">your coordinates, on every render</text>
+            <path class="rl" d="M42 414H319"/>
+
+            <path class="ld" d="M8 442H30"/><circle class="ldot" cx="30" cy="442" r="3"/>
+            <text class="t-o t-m" x="42" y="446" font-size="11.5" letter-spacing="1.9">GOOGLE</text>
+            <text class="t-p" x="42" y="466" font-size="14">your calendar, if you connect one</text>
+          </svg>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cols2 tail">
+      <div>
+        <p class="pull">“Nothing leaves your house” is not a sentence I can write.</p>
+        <p>A Telegram bot works by downloading the voice file
+          back off Telegram's servers, so the recording is there before anything of
+          yours or mine has touched it. The weather calls open-meteo on every render,
+          in every mode. The morning digest goes out over SMTP, so a mail server sees
+          it. A connected calendar means Google. Those three drawings are the whole
+          list.</p>
+      </div>
+      <div>
+        <p>Local transcription is still worth having, for a narrower reason than the
+          usual one: <b>the audio is not handed to a second company</b>, and the text
+          only ever goes where you point it. That is a smaller promise than other pages
+          make. It has the advantage of being true.</p>
+        <p>And the objection mode 02 always gets — “so now I need an API subscription
+          too”. Not really. A household puts in maybe five things a day; call it 150
+          sentences a month, roughly 1,200 tokens in and 150 out for each one. At
+          small-model rates that is about <b>€0.03–0.05 a month</b>. Transcribing a
+          seven-second clip is a rounding error next to it, and nothing at all if you
+          keep Whisper at home.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ 7 · TWO DOORS · neither is the "real" one ════ -->
+<section id="doors" aria-labelledby="h-doors">
+  <div class="wrap">
+    <div class="h-block">
+      <h2 id="h-doors">Two doors, for two kinds of people.</h2>
+      <p class="lede">No feature gates, no licence check, no code path that behaves
+        differently depending on who is running it. The difference is not in the
+        software. It is in who is holding it when it falls over.</p>
+    </div>
+
+    <p class="pull doors-lead">What is
+      sold is not hosting. It is this: I transcribe, I sort, and I notice when it
+      breaks.</p>
+
+    <div class="doors">
+      <div class="door">
+        <h3>You run it.</h3>
+        <dl class="stat">
+          <div class="strow">
+            <dt>You get</dt>
+            <dd><b>Nothing of yours reaches me at all.</b> Not the audio, not the
+              text, not a usage ping. There is nothing pointed at me that could be
+              switched off, sold, or subpoenaed, because there is nothing pointed at
+              me.</dd>
+          </div>
+          <div class="strow">
+            <dt>The law</dt>
+            <dd>The strongest thing I can say about self-hosting is legal, not
+              technical: <b>one person running a box for their own household sits
+              inside the GDPR household exemption, Article 2(2)(c)</b>. Nobody is
+              anybody's data controller. There is no processing agreement, because
+              there is nothing to agree about.</dd>
+          </div>
+          <div class="strow">
+            <dt>You give</dt>
+            <dd>A box, the power it draws, and the attention it wants the evening
+              something stops working.</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="door">
+        <h3>I run it.</h3>
+        <dl class="stat">
+          <div class="strow">
+            <dt>You get</dt>
+            <dd><b>It runs without you.</b> Transcription and sorting happen on
+              hardware that is already warm, and the boring half — updates, backups,
+              the model that fell over at three in the morning — is mine.</dd>
+          </div>
+          <div class="strow">
+            <dt>The catch</dt>
+            <dd><b>A self-hosted setup fails silently.</b> The bot stops answering, the
+              panel shows Tuesday for three days, and you never notice — because this
+              is precisely the thing you never open. That is not a flaw in the code, it
+              is what an appliance is. Run by me, somebody notices.</dd>
+          </div>
+          <div class="strow">
+            <dt>On my box</dt>
+            <dd>Encrypted in transit and on disk. Subprocessors named in the terms, by
+              company. No training, no resale, no advertising. Delete the account and it
+              is gone. The recording is thrown away as soon as it is text.</dd>
+          </div>
+          <div class="strow">
+            <dt>You give</dt>
+            <dd>Money.</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ 7 · HONEST STATUS ════ -->
+<section id="status" aria-labelledby="h-status">
+  <div class="wrap">
+    <div class="h-block">
+      <h2 id="h-status">What is true, and what I cannot tell you.</h2>
+    </div>
+
+    <div class="echo">
+      <p>Voice at the wall is not new. An Echo Show has done it for years, for €329,
+        and it does it well.</p>
+      <p>What is different here is narrower than a category, so here it is exactly:
+        you speak a free-form thought rather than a list command; something actually
+        structures it into fields instead of appending a string; you choose whose
+        hardware it runs on, including your own; and the output is E-Ink, a surface
+        that is simply there on a wall, not a screen you have to wake. That is the
+        whole claim. If a smart display already covers what you need, it probably
+        does.</p>
+    </div>
+
+    <dl class="stat">
+      <div class="strow">
+        <dt>What it does</dt>
+        <dd>Telegram bot, text and voice. Transcription. Structuring by a language
+          model. The board rendered server-side to a PNG (Satori → resvg, 4-bit
+          greyscale) and served over BYOS. The morning email.</dd>
+      </div>
+      <div class="strow off">
+        <dt>Not measured</dt>
+        <dd><b>How often the sorting gets it right is unmeasurable</b>, and not in the
+          "we haven't got round to it" sense. There is no test set, no ground truth and
+          no benchmark for "did it file this sentence the way a person would have". So
+          there is no accuracy figure on this page, and anyone quoting you one for this
+          kind of system, me included, would be making it up.</dd>
+      </div>
+      <div class="strow off">
+        <dt>When it is wrong</dt>
+        <dd>It files something under the wrong heading, or misses a date and leaves the
+          reminder without one. Nothing is lost when that happens: the entry is still
+          there, the original message is still in the chat, and you say what it should
+          have been and it changes. It is wrong the way a person is wrong, not the way
+          a form is wrong.</dd>
+      </div>
+      <div class="strow off">
+        <dt>What it asks</dt>
+        <dd>Self-hosting means a compose file, a terminal, a Telegram bot token of your
+          own, and — if you want the morning email — an SMTP server you point it at.
+          None of that is hard. All of it is an evening. The hosted mode is where that
+          evening goes away.</dd>
+      </div>
+      <div class="strow off">
+        <dt>One household</dt>
+        <dd>One install serves one household. There are no separate accounts inside it
+          and no per-person view, which is deliberate: the household is the unit here,
+          and it is why the price is per household rather than per head.</dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<!-- ════ 8 · TECHNICAL ════ -->
+<section id="tech" aria-labelledby="h-tech">
+  <div class="wrap">
+    <div class="h-block">
+      <h2 id="h-tech">For the people who scrolled straight down here.</h2>
+      <p class="lede">Everything below is checkable. If something here turns out not to
+        match the repository, that is a bug in this page and worth telling me about.</p>
+    </div>
+    <dl class="stat">
+      <div class="strow">
+        <dt>Repository</dt>
+        <dd><a href="https://github.com/moguls753/cortex">github.com/moguls753/cortex</a>.
+          Still under the old name; the rename to crtxboard is from 11 August 2026
+          and the repository has not caught up.</dd>
+      </div>
+      <div class="strow">
+        <dt>Licence</dt>
+        <dd>AGPL-3.0.</dd>
+      </div>
+      <div class="strow">
+        <dt>Input</dt>
+        <dd>A Telegram bot, text or voice. The voice file is fetched back off
+          Telegram's own servers before anything else happens to it — that is how the
+          Bot API works, and it is true in all three modes. Whichever box you chose
+          then transcribes it, with Whisper.</dd>
+      </div>
+      <div class="strow">
+        <dt>Structuring</dt>
+        <dd>A language model, local or behind an API, whichever your hardware and your
+          taste allow.</dd>
+      </div>
+      <div class="strow">
+        <dt>Board</dt>
+        <dd>Rendered server-side to a PNG through Satori → resvg, 4-bit greyscale,
+          served over the open BYOS protocol. The device pulls; nothing is pushed at it,
+          and there is no interaction on the panel itself.</dd>
+      </div>
+      <div class="strow">
+        <dt>Morning email</dt>
+        <dd>A second pass over the same store, delivered by SMTP at a time you set —
+          an email, not a chat message. Self-hosted, that means giving it a mail
+          server.</dd>
+      </div>
+      <div class="strow">
+        <dt>Calendar</dt>
+        <dd>Optional. If you connect one it is the Google Calendar API over OAuth,
+          against <span class="mono">googleapis.com/calendar/v3</span>, and the
+          board's Week Ahead is read from it. Leave it unconnected and no request is
+          ever made.</dd>
+      </div>
+      <div class="strow">
+        <dt>Weather</dt>
+        <dd>open-meteo, called on every render, in every mode. Coordinates only; no
+          key, no account, no other endpoint involved.</dd>
+      </div>
+      <div class="strow">
+        <dt>Also in there</dt>
+        <dd>An MCP server over the same store, and semantic search across what you have
+          said, on a local embedding model that is <b>about 4.7 GB</b> on disk. Neither
+          is the point of the product, which is why they are down here and not at the
+          top.</dd>
+      </div>
+      <div class="strow">
+        <dt>What it wants</dt>
+        <dd>Mode 01 wants roughly <b>8 GB of RAM free</b>: Whisper, a language model
+          and that embedding model, with Postgres underneath. Mode 02 fits on a
+          Raspberry Pi, because the two heavy things have left the box. Mode 03 wants a
+          phone.</dd>
+      </div>
+      <div class="strow">
+        <dt>Deployment</dt>
+        <dd>Your machine, or mine. One configuration field, not a fork, and no licence
+          check anywhere in it.</dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<!-- ════ 9 · BUY ════ -->
+<section id="buy" aria-labelledby="h-buy">
+  <div class="wrap">
+    <div class="h-block">
+      <h2 id="h-buy">Let me run it.</h2>
+      <p class="lede">One household, one invite link, one board URL for whatever you
+        decide to hang on the wall.</p>
+    </div>
+    <div class="nobtn">
+      <div>
+        <p>You get a bot that is already awake, transcription and sorting on hardware
+          that is already warm, the morning email, and — the part you cannot install —
+          somebody who notices when it stops.</p>
+        <p>Self-hosting stays free, and it stays the same software: same repository,
+          same code path, nothing held back and nothing to unlock. If you would rather
+          run it yourself, <a href="https://github.com/moguls753/cortex">the repository
+          is right there</a> and this page has already told you what it costs you in
+          evenings.</p>
+        <p>If you are somewhere in between, mode 02 is the middle door: your box, your
+          provider, your key.</p>
+      </div>
+      <div class="slot">
+        <span class="tag">Hosted · per household</span>
+        <span class="amt">€7<i>a month</i></span>
+        <p>Per household, not per person. Monthly, cancel whenever you like.</p>
+        <a class="send" href="#buy">Get your invite link</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>crtxboard. You speak, the wall fills itself.</p>
+    <p class="mono">AGPL-3.0 · <a href="https://github.com/moguls753/cortex">github.com/moguls753/cortex</a></p>
+  </div>
+</footer>
+
+<script>
+/* The page works without this: the radios are real inputs and the form is a real
+   form. This only enables the button once a choice exists and swaps in an
+   acknowledgement instead of a page reload. Wire the real recording where marked. */
+(function(){
+  var fc = document.getElementById('fc');
+  if (fc) {
+    var btn = fc.querySelector('.send');
+    // only script may disable it — with scripting off the button stays live and
+    // the radio group's `required` does the blocking natively.
+    btn.disabled = !fc.querySelector('input:checked');
+    fc.addEventListener('change', function(){ btn.disabled = !fc.querySelector('input:checked'); });
+    fc.addEventListener('submit', function(e){
+      e.preventDefault();
+      if (!fc.querySelector('input:checked')) return;
+      fc.classList.add('sent');
+    });
+  }
+  var ft = document.getElementById('ft');
+  if (ft) {
+    ft.addEventListener('submit', function(e){
+      e.preventDefault();
+      var ta = ft.querySelector('textarea');
+      if (!ta.value.trim()) { ta.focus(); return; }
+      ft.classList.add('sent');
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Runde 2 — 5 Richtungen aus der Geschmacksbibliothek × 2 Skills</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:#0d0d0e;color:#e8e6e3;overflow:hidden;
+       font:12px/1.3 ui-monospace,"JetBrains Mono","DejaVu Sans Mono",monospace}
+  #bar{display:flex;align-items:stretch;height:46px;background:#141416;
+       border-bottom:1px solid #2a2a2e;user-select:none;white-space:nowrap;
+       overflow-x:auto;scrollbar-width:none}
+  #bar::-webkit-scrollbar{display:none}
+  .brand{display:flex;align-items:center;gap:8px;padding:0 16px;
+         border-right:1px solid #2a2a2e;letter-spacing:.08em;flex:none}
+  .brand b{letter-spacing:.12em}
+  .brand span{color:#6f6c68}
+  .tab{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 14px;
+       border-right:1px solid #2a2a2e;cursor:pointer;background:none;color:inherit;
+       font:inherit;text-align:left;border-top:2px solid transparent;flex:none}
+  .tab:hover{background:#1c1c1f}
+  .tab .k{font-size:12px;font-weight:700;letter-spacing:.1em}
+  .tab .n{font-size:9.5px;color:#85817c;letter-spacing:.07em;text-transform:uppercase}
+  .tab[aria-selected="true"]{background:#1c1c1f;border-top-color:#e8722a}
+  .tab[aria-selected="true"] .k{color:#e8722a}
+  .tab[aria-selected="true"] .n{color:#c8c4bf}
+  .seg{display:flex;align-items:center;padding:0 10px;gap:6px;
+       border-right:1px solid #2a2a2e;flex:none}
+  .seg button{background:#1c1c1f;color:#a9a5a0;border:1px solid #33333a;padding:5px 9px;
+              font:inherit;font-size:10.5px;letter-spacing:.08em;cursor:pointer}
+  .seg button:hover{color:#e8e6e3;border-color:#4a4a52}
+  .seg button[aria-pressed="true"]{background:#e8722a;border-color:#e8722a;color:#17130f;
+              font-weight:700}
+  .hint{display:flex;align-items:center;padding:0 14px;margin-left:auto;color:#57544f;
+        font-size:10px;letter-spacing:.07em;flex:none}
+  #stage{position:absolute;inset:46px 0 0 0;background:#0d0d0e}
+  #stage.single iframe{width:100%;height:100%;border:0}
+  #stage.split{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#2a2a2e}
+  #stage.grid{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:1fr 1fr;
+              gap:1px;background:#2a2a2e}
+  .pane{position:relative;overflow:hidden;background:#fff}
+  #stage.grid .pane{cursor:pointer}
+  .pane>iframe{position:absolute;top:0;left:0;transform-origin:0 0;border:0}
+  .cap{position:absolute;left:0;right:0;bottom:0;z-index:2;background:rgba(13,13,14,.94);
+       padding:5px 9px;font-size:10px;letter-spacing:.09em;display:flex;
+       justify-content:space-between;gap:10px;border-top:1px solid #2a2a2e;
+       pointer-events:none}
+  .cap span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cap .tool{color:#e8722a;font-weight:700}
+  #stage.grid .pane:hover .cap{background:#e8722a;color:#17130f}
+  #stage.grid .pane:hover .cap .tool{color:#17130f}
+  .missing{display:flex;align-items:center;justify-content:center;height:100%;
+           background:#141416;color:#57544f;font-size:11px;letter-spacing:.1em;
+           text-align:center;padding:20px}
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div class="brand"><b>RUNDE 2</b> <span>AUS DER GESCHMACKSBIBLIOTHEK</span></div>
+  <div id="tabs" style="display:flex"></div>
+  <div class="seg" id="toolseg">
+    <button data-tool="impeccable">IMPECCABLE</button>
+    <button data-tool="tasteskill">TASTE SKILL</button>
+  </div>
+  <div class="seg" id="modeseg">
+    <button data-mode="split">SPLIT</button>
+    <button data-mode="grid">ALLE 10</button>
+  </div>
+  <div class="hint">TASTEN 1–5 · I / T · S = SPLIT · G = GRID · ← →</div>
+</div>
+
+<div id="stage"></div>
+
+<script>
+const DIRS = [
+  { n:1, slug:'r2-1-warm-editorial-block',    name:'Warm Editorial Block',  ref:'Niko Kane' },
+  { n:2, slug:'r2-2-dark-atmospheric',        name:'Dark Atmospheric',      ref:'Aether' },
+  { n:3, slug:'r2-3-dark-technical-lineart',  name:'Dark Technical Line-Art', ref:'Edgelabs' },
+  { n:4, slug:'r2-4-light-material-object',   name:'Light Material Object', ref:'Whel' },
+  { n:5, slug:'r2-5-textured-organic',        name:'Textured Organic',      ref:'Material study' },
+];
+const TOOLS = { impeccable:'IMPECCABLE', tasteskill:'TASTE SKILL' };
+const W = 1440, H = 900;
+
+let state = { dir:1, tool:'impeccable', mode:'single' };
+
+function readHash(){
+  if (location.hash === '#grid') { state.mode = 'grid'; return; }
+  const m = /^#v(\d)(?:-(impeccable|tasteskill))?(?:-(split))?$/.exec(location.hash);
+  if (!m) return;
+  state.dir = +m[1] || 1;
+  if (m[2]) state.tool = m[2];
+  state.mode = m[3] || 'single';
+}
+function writeHash(){
+  const h = state.mode === 'grid' ? '#grid'
+    : state.mode === 'split' ? `#v${state.dir}-split`
+    : `#v${state.dir}-${state.tool}`;
+  if (location.hash !== h) history.replaceState(null, '', h);
+}
+
+const tabsEl = document.getElementById('tabs');
+DIRS.forEach(d => {
+  const b = document.createElement('button');
+  b.className = 'tab';
+  b.innerHTML = `<span class="k">V${d.n}</span><span class="n">${d.name}</span>`;
+  b.onclick = () => { state.dir = d.n; if (state.mode==='grid') state.mode='single'; render(); };
+  tabsEl.appendChild(b);
+});
+document.querySelectorAll('#toolseg button').forEach(b => {
+  b.onclick = () => { state.tool = b.dataset.tool;
+    if (state.mode !== 'split') state.mode = 'single'; render(); };
+});
+document.querySelectorAll('#modeseg button').forEach(b => {
+  b.onclick = () => { state.mode = state.mode === b.dataset.mode ? 'single' : b.dataset.mode;
+    render(); };
+});
+function syncChrome(){
+  [...tabsEl.children].forEach((el,i) =>
+    el.setAttribute('aria-selected', String(DIRS[i].n===state.dir && state.mode!=='grid')));
+  document.querySelectorAll('#toolseg button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.tool===state.tool && state.mode==='single')));
+  document.querySelectorAll('#modeseg button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.mode===state.mode)));
+}
+
+const src = (dir, tool) => `./${DIRS[dir-1].slug}-${tool}/`;
+
+function makePane(dir, tool, clickable){
+  const p = document.createElement('div');
+  p.className = 'pane';
+  const f = document.createElement('iframe');
+  f.src = src(dir, tool); f.width = W; f.height = H; f.loading = 'lazy';
+  f.setAttribute('scrolling','no');
+  p.appendChild(f);
+  const c = document.createElement('div');
+  c.className = 'cap';
+  c.innerHTML = `<span>V${dir} · ${DIRS[dir-1].name}</span><span class="tool">${TOOLS[tool]}</span>`;
+  p.appendChild(c);
+  if (clickable) p.onclick = () => { state.dir=dir; state.tool=tool; state.mode='single'; render(); };
+  return p;
+}
+function fit(){
+  document.querySelectorAll('.pane').forEach(p => {
+    const f = p.querySelector('iframe'), s = p.clientWidth / W;
+    f.style.transform = `scale(${s})`;
+    f.style.height = Math.ceil(p.clientHeight / s) + 'px';
+  });
+}
+
+const stage = document.getElementById('stage');
+function render(){
+  writeHash(); syncChrome();
+  stage.className = state.mode;
+  stage.innerHTML = '';
+  if (state.mode === 'single') {
+    const f = document.createElement('iframe');
+    f.src = src(state.dir, state.tool);
+    stage.appendChild(f);
+  } else if (state.mode === 'split') {
+    stage.appendChild(makePane(state.dir,'impeccable',false));
+    stage.appendChild(makePane(state.dir,'tasteskill',false));
+    requestAnimationFrame(fit);
+  } else {
+    for (const tool of ['impeccable','tasteskill'])
+      for (const d of DIRS) stage.appendChild(makePane(d.n, tool, true));
+    requestAnimationFrame(fit);
+  }
+}
+
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k >= '1' && k <= '5') { state.dir = +k; if (state.mode==='grid') state.mode='single'; }
+  else if (k === 'i') { state.tool='impeccable'; if (state.mode!=='split') state.mode='single'; }
+  else if (k === 't') { state.tool='tasteskill'; if (state.mode!=='split') state.mode='single'; }
+  else if (k === 's') { state.mode = state.mode==='split' ? 'single' : 'split'; }
+  else if (k === 'g') { state.mode = state.mode==='grid' ? 'single' : 'grid'; }
+  else if (k === 'arrowright') { state.dir = state.dir % 5 + 1; }
+  else if (k === 'arrowleft')  { state.dir = (state.dir + 3) % 5 + 1; }
+  else return;
+  e.preventDefault(); render();
+});
+addEventListener('resize', fit);
+addEventListener('hashchange', () => { readHash(); render(); });
+
+readHash();
+render();
+</script>
+</body>
+</html>

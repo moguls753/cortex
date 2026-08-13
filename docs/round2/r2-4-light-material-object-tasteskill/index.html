@@ -1,0 +1,1191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crtxboard</title>
+<meta name="description" content="You speak a thought into Telegram. It is transcribed and structured, on your machine or on mine, and appears on an E-Ink panel on your wall. AGPL-3.0, about 7 euros a month hosted.">
+<meta name="color-scheme" content="light">
+<style>
+/* ============================================================
+   crtxboard landing page
+   Light Material Object direction.
+   White ground, black type, one violet accent, one material
+   object (the stacked plates in the hero) carrying the fold.
+   No build step, no CDN, no network requests. System fonts.
+   Radius system: artefacts 14px, form controls 10px,
+   radio inputs are circles (a square box invites picking both).
+   ============================================================ */
+
+:root{
+  /* This direction is a light page by design: white ground, black
+     type, one violet accent. It is locked rather than dual-mode so
+     the material object keeps its light. */
+  color-scheme:light;
+  --white:#ffffff;
+  --paper:#f3f2f0;
+  --ink:#0b0b0d;
+  --ink-body:rgba(11,11,13,.70);
+  --ink-mute:rgba(11,11,13,.60);
+  --ink-hair:rgba(11,11,13,.12);
+  --violet:#7c3aed;
+  --violet-lift:#8b5cf6;
+  --violet-deep:#4c1d95;
+  --violet-wash:rgba(124,58,237,.07);
+
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Helvetica,"Liberation Sans",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"JetBrains Mono","DejaVu Sans Mono",Menlo,Consolas,monospace;
+
+  --r-art:14px;
+  --r-ctl:10px;
+  --gap:clamp(24px,3vw,40px);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--white);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+img{max-width:100%;display:block}
+a{color:inherit}
+
+.wrap{max-width:1240px;margin:0 auto;padding:0 clamp(20px,4vw,40px)}
+.band{padding:clamp(72px,9vw,124px) 0}
+.band-paper{background:var(--paper)}
+.band-ink{background:var(--ink);color:var(--paper)}
+
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.03em;line-height:1.04}
+h1{font-size:clamp(2.35rem,4.2vw,3.5rem)}
+h2{font-size:clamp(1.75rem,2.9vw,2.6rem);letter-spacing:-.028em;line-height:1.06}
+h3{font-size:1.0625rem;letter-spacing:-.012em;line-height:1.3}
+p{margin:0}
+
+.lead{font-size:clamp(1.0625rem,1.35vw,1.1875rem);line-height:1.55;color:var(--ink-body)}
+.body{font-size:1rem;line-height:1.62;color:var(--ink-body)}
+.small{font-size:.9375rem;line-height:1.6;color:var(--ink-mute)}
+.mono{font-family:var(--mono);font-size:.8125rem;letter-spacing:-.01em}
+.measure{max-width:62ch}
+.measure-tight{max-width:52ch}
+
+.band-ink .lead,.band-ink .body{color:rgba(243,242,240,.72)}
+.band-ink .small{color:rgba(243,242,240,.60)}
+
+/* ---------- masthead ---------------------------------------- */
+
+.mast{
+  position:sticky;top:0;z-index:40;
+  background:rgba(255,255,255,.86);
+  backdrop-filter:saturate(150%) blur(12px);
+  -webkit-backdrop-filter:saturate(150%) blur(12px);
+}
+.mast-in{
+  height:68px;display:flex;align-items:center;justify-content:space-between;gap:24px;
+}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none;font-weight:600;letter-spacing:-.02em;font-size:1.0625rem}
+.brand .mark{position:relative;width:21px;height:21px;flex:none}
+.brand .mark i{
+  position:absolute;width:15px;height:11px;border-radius:3px;
+  border:1px solid var(--violet);display:block;background:#fff;
+}
+.brand .mark i:nth-child(1){top:1px;left:0;opacity:.40}
+.brand .mark i:nth-child(2){top:5px;left:3px;opacity:.66}
+.brand .mark i:nth-child(3){top:9px;left:6px;background:var(--violet);border-color:var(--violet)}
+.navlinks{display:flex;align-items:center;gap:clamp(16px,2.2vw,30px);font-size:.9375rem}
+.navlinks a{color:var(--ink-body);text-decoration:none;transition:color .18s ease}
+.navlinks a:hover{color:var(--ink)}
+.navlinks a.repo{color:var(--violet)}
+.navlinks a.repo:hover{color:var(--violet-deep)}
+
+/* ---------- 1 · hero ---------------------------------------- */
+
+.hero{padding-top:clamp(36px,4vw,52px);padding-bottom:clamp(72px,7vw,96px);overflow:hidden}
+.hero-grid{
+  display:grid;grid-template-columns:minmax(0,.84fr) minmax(0,1.16fr);
+  gap:clamp(32px,4vw,64px);align-items:start;
+}
+.hero-copy{padding-top:clamp(24px,7.5vw,118px)}
+.hero-copy h1{max-width:12ch}
+.hero-copy .lead{margin-top:22px;max-width:34ch}
+
+/* --- the material object --------------------------------- */
+
+.object{
+  position:relative;width:100%;max-width:640px;margin-left:auto;
+  aspect-ratio:20/21;
+  perspective:2400px;perspective-origin:46% 46%;
+}
+.obj-glow{
+  position:absolute;left:0;top:4%;width:98%;height:92%;
+  background:
+    radial-gradient(42% 32% at 32% 26%,rgba(139,92,246,.32),rgba(139,92,246,0) 72%),
+    radial-gradient(44% 34% at 20% 74%,rgba(124,58,237,.24),rgba(124,58,237,0) 72%),
+    radial-gradient(56% 44% at 64% 60%,rgba(124,58,237,.17),rgba(124,58,237,0) 74%);
+  filter:blur(16px);
+}
+.obj-shadow{
+  position:absolute;left:14%;right:6%;bottom:0;height:74px;
+  background:radial-gradient(50% 50% at 50% 50%,rgba(48,20,104,.32),rgba(48,20,104,0) 70%);
+  filter:blur(16px);
+}
+.stack{
+  position:absolute;inset:0;
+  transform-style:preserve-3d;
+  transform:rotateX(-9deg) rotateY(11deg) rotateZ(-1.4deg);
+}
+.plate{
+  position:absolute;left:8%;top:36%;width:78%;
+  aspect-ratio:4/3;border-radius:16px;
+  transform-style:preserve-3d;
+}
+/* the slab: a second face 14px behind the front face, so the
+   plate reads as a solid piece of material with a real edge */
+.plate::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;
+  transform:translateZ(-15px);
+  background:linear-gradient(158deg,rgba(124,58,237,.34),rgba(76,29,149,.26) 60%,rgba(124,58,237,.30));
+}
+.plate-voice{
+  transform:translateZ(0) translateY(-60%);
+  background:
+    radial-gradient(112% 84% at 16% 6%,rgba(255,255,255,.94),rgba(255,255,255,.32) 48%,rgba(124,58,237,.15)),
+    linear-gradient(158deg,rgba(124,58,237,.15),rgba(124,58,237,.05) 58%,rgba(255,255,255,.24));
+  border:1px solid rgba(124,58,237,.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.92),
+    inset 0 -26px 44px -28px rgba(124,58,237,.62),
+    0 30px 54px -38px rgba(48,20,104,.55);
+}
+.plate-parse{
+  transform:translateZ(104px) translateY(-31%);
+  background:
+    radial-gradient(112% 84% at 16% 6%,rgba(255,255,255,.97),rgba(255,255,255,.52) 50%,rgba(124,58,237,.13)),
+    linear-gradient(158deg,rgba(124,58,237,.13),rgba(255,255,255,.34) 62%,rgba(124,58,237,.09));
+  border:1px solid rgba(124,58,237,.20);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.96),
+    inset 0 -26px 44px -28px rgba(124,58,237,.50),
+    0 34px 58px -38px rgba(48,20,104,.50);
+}
+.plate-board{
+  transform:translateZ(208px);
+  background:linear-gradient(158deg,#ffffff,#f4f3f1 62%,#eceaf3);
+  border:1px solid rgba(11,11,13,.09);
+  padding:3.4%;
+  box-shadow:
+    inset 0 2px 0 rgba(139,92,246,.30),
+    inset 0 -1px 0 rgba(124,58,237,.14),
+    0 44px 70px -36px rgba(37,14,84,.44),
+    0 6px 16px -8px rgba(11,11,13,.14);
+}
+/* the panel is a white object, so its body is not violet */
+.plate-board::before{
+  background:linear-gradient(158deg,rgba(180,168,214,.72),rgba(120,106,158,.62) 60%,rgba(160,148,196,.68));
+}
+.plate-board::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(206deg,rgba(255,255,255,.46),rgba(255,255,255,.05) 32%,rgba(255,255,255,0) 56%);
+}
+.plate-board img{width:100%;border-radius:7px;box-shadow:0 0 0 1px rgba(11,11,13,.07) inset}
+/* light living inside the stack, between the first and second plate */
+.leak{
+  position:absolute;left:10%;top:12%;width:62%;height:26%;
+  transform:translateZ(56px);
+  background:radial-gradient(closest-side,rgba(139,92,246,.60),rgba(139,92,246,0) 76%);
+  filter:blur(26px);
+}
+.leak-2{
+  position:absolute;left:16%;top:26%;width:58%;height:20%;
+  transform:translateZ(150px);
+  background:radial-gradient(closest-side,rgba(167,139,250,.42),rgba(167,139,250,0) 78%);
+  filter:blur(24px);
+}
+
+/* --- content sitting on the exposed band of each plate ---- */
+
+.band-slip{position:absolute;left:0;right:0;top:0;padding:4.4% 6.5% 0}
+.slip-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.slip-tag{
+  font-family:var(--mono);font-size:.625rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--violet-deep);opacity:.8;flex:none;white-space:nowrap;
+}
+.wave{display:flex;align-items:center;gap:2.5px;height:22px;flex:1;min-width:0;overflow:hidden}
+.wave span{
+  display:block;width:2.5px;border-radius:2px;background:var(--violet);
+  height:calc(var(--h) * 22px);opacity:.62;
+}
+.slip-dur{font-family:var(--mono);font-size:.6875rem;color:var(--violet-deep);opacity:.75}
+.transcript{
+  font-family:var(--mono);font-size:.8125rem;line-height:1.5;color:rgba(11,11,13,.76);
+  max-width:47ch;
+}
+.parse{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font-family:var(--mono);font-size:.8125rem;line-height:1.4}
+.parse dt{color:var(--violet-deep);opacity:.82}
+.parse dd{margin:0;color:rgba(11,11,13,.82)}
+
+/* ---------- 2 · forced choice ------------------------------- */
+
+.choice-head{max-width:22ch}
+.choice-sub{margin-top:16px;max-width:46ch}
+.choices{margin:clamp(30px,3.6vw,44px) 0 0;display:grid;gap:12px;max-width:760px}
+.opt{
+  display:flex;align-items:flex-start;gap:16px;
+  padding:22px 24px;border-radius:var(--r-ctl);
+  background:var(--white);border:1px solid rgba(11,11,13,.10);
+  cursor:pointer;transition:border-color .18s ease,background .18s ease,transform .12s ease;
+}
+.opt:hover{border-color:rgba(124,58,237,.42)}
+.opt:active{transform:translateY(1px)}
+.opt input[type=radio]{
+  appearance:none;-webkit-appearance:none;margin:2px 0 0;flex:none;
+  width:20px;height:20px;border-radius:50%;
+  border:1.5px solid rgba(11,11,13,.30);background:#fff;
+  display:grid;place-content:center;cursor:pointer;
+  transition:border-color .18s ease;
+}
+.opt input[type=radio]::after{
+  content:"";width:10px;height:10px;border-radius:50%;background:var(--violet);
+  transform:scale(0);transition:transform .16s cubic-bezier(.16,1,.3,1);
+}
+.opt input[type=radio]:checked{border-color:var(--violet)}
+.opt input[type=radio]:checked::after{transform:scale(1)}
+.opt input[type=radio]:focus-visible{outline:2px solid var(--violet);outline-offset:3px}
+.opt span{font-size:1.0625rem;line-height:1.4;letter-spacing:-.012em}
+.opt:has(input:checked){border-color:var(--violet);background:var(--violet-wash)}
+.ack{
+  margin-top:20px;max-width:52ch;color:var(--violet-deep);
+  font-size:.9375rem;line-height:1.55;
+  opacity:0;transform:translateY(4px);
+  transition:opacity .3s ease,transform .3s ease;
+}
+.ack[data-on="1"]{opacity:1;transform:none}
+
+/* ---------- 3 · free text ----------------------------------- */
+
+.ft{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(24px,3vw,36px);max-width:760px}
+.field{display:grid;gap:8px}
+.field label{font-size:.875rem;font-weight:600;letter-spacing:-.005em}
+.field textarea{
+  width:100%;min-height:132px;resize:vertical;
+  font-family:var(--sans);font-size:1rem;line-height:1.55;color:var(--ink);
+  padding:14px 16px;border-radius:var(--r-ctl);
+  border:1px solid rgba(11,11,13,.20);background:#fff;
+  transition:border-color .18s ease,box-shadow .18s ease;
+}
+.field textarea::placeholder{color:rgba(11,11,13,.62)}
+.field textarea:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(124,58,237,.16)}
+.field .hint{font-size:.8125rem;color:var(--ink-mute)}
+.btn{
+  justify-self:start;
+  font-family:var(--sans);font-size:.9375rem;font-weight:500;letter-spacing:-.005em;
+  color:#fff;background:var(--ink);border:0;border-radius:var(--r-ctl);
+  padding:12px 22px;cursor:pointer;white-space:nowrap;
+  transition:background .18s ease,transform .12s ease;
+}
+.btn:hover{background:#26262b}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:2px solid var(--violet);outline-offset:3px}
+.sent{display:none;font-size:1.0625rem;color:var(--violet-deep);line-height:1.5}
+.ft[data-sent="1"] .field,.ft[data-sent="1"] .btn,.ft[data-sent="1"] .lead{display:none}
+.ft[data-sent="1"] .sent{display:block}
+
+/* ---------- 4 · the second screen --------------------------- */
+
+.g12{display:grid;grid-template-columns:repeat(12,1fr);gap:clamp(20px,2.4vw,32px)}
+.digest-head{grid-column:1/8}
+.digest-body{grid-column:1/7}
+.digest-slot{grid-column:3/13;margin-top:clamp(26px,3.2vw,42px)}
+.digest-cols{display:grid;grid-template-columns:1.3fr 1fr;gap:clamp(26px,4vw,60px)}
+
+.sheet{
+  position:relative;border-radius:var(--r-art);
+  background:
+    radial-gradient(90% 70% at 12% 0%,rgba(255,255,255,.98),rgba(255,255,255,.62) 46%,rgba(124,58,237,.09)),
+    linear-gradient(160deg,rgba(124,58,237,.11),rgba(255,255,255,.42) 58%,rgba(124,58,237,.08));
+  border:1px solid rgba(124,58,237,.20);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    inset 0 -40px 80px -60px rgba(124,58,237,.55),
+    0 40px 64px -44px rgba(48,20,104,.42);
+  padding:clamp(26px,3.4vw,46px);
+}
+.sheet::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(202deg,rgba(255,255,255,.5),rgba(255,255,255,0) 40%);
+}
+.digest-top{
+  display:flex;justify-content:space-between;align-items:baseline;gap:20px;
+  font-family:var(--mono);font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--violet-deep);opacity:.85;margin-bottom:26px;
+}
+.dgroup{margin-top:26px}
+.dgroup:first-of-type{margin-top:0}
+.dgroup h4{
+  margin:0 0 10px;font-family:var(--mono);font-size:.75rem;font-weight:400;
+  letter-spacing:.11em;text-transform:uppercase;color:rgba(11,11,13,.66);
+}
+.dgroup ul{margin:0;padding:0;list-style:none;display:grid;gap:7px}
+.dgroup li{
+  font-size:clamp(.9375rem,1.15vw,1.0625rem);line-height:1.45;color:rgba(11,11,13,.86);
+  letter-spacing:-.008em;
+}
+.dgroup li .n{font-family:var(--mono);font-size:.8125rem;color:var(--violet);margin-right:12px}
+
+/* ---------- 5 · what you need ------------------------------- */
+
+.need-copy{grid-column:1/7}
+.need-shot{grid-column:7/13;align-self:center}
+.need-copy .lead{margin-top:20px}
+.optlist{margin:clamp(28px,3vw,38px) 0 0;padding:0;list-style:none;display:grid;gap:0}
+.optlist li{padding:18px 0;border-top:1px solid var(--ink-hair)}
+.optlist strong{display:block;font-size:1.0625rem;font-weight:600;letter-spacing:-.014em}
+.optlist span{display:block;margin-top:5px;font-size:.9375rem;color:var(--ink-mute);line-height:1.5}
+.shot{
+  border-radius:var(--r-art);overflow:hidden;
+  box-shadow:0 30px 60px -40px rgba(11,11,13,.42),0 0 0 1px rgba(11,11,13,.07);
+}
+.shot img{width:100%;aspect-ratio:4/3;object-fit:cover;object-position:80% 48%}
+/* E-Ink is one of the five options in the list above and also the one
+   the thing was built for, so it gets weight the list cannot give it. */
+.eink-note{
+  margin-top:clamp(26px,3vw,38px);
+  border-left:2px solid var(--violet);padding-left:clamp(18px,2vw,26px);
+  max-width:56ch;
+}
+.eink-note strong{font-weight:600}
+
+/* ---------- 6 · where it runs ------------------------------- */
+
+.diagram-head{max-width:26ch}
+.diagram-scroll{
+  margin-top:clamp(34px,4vw,52px);overflow-x:auto;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+.diagram-scroll svg{display:block;width:100%;min-width:920px;height:auto}
+.diag-text{font-family:var(--mono);font-size:13px;letter-spacing:-.2px}
+.diag-note{
+  margin-top:clamp(28px,3vw,40px);
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(20px,3vw,44px);
+}
+.diag-note p{max-width:46ch}
+
+.modes{
+  margin-top:clamp(40px,4.6vw,62px);
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(22px,2.8vw,44px);
+}
+.mode{border-top:2px solid var(--violet);padding-top:16px}
+.mode h3{margin-bottom:10px}
+.mode p{font-size:.9375rem;line-height:1.6;color:var(--ink-body)}
+.mode .said{color:var(--violet-deep);font-weight:600}
+.sold{
+  margin-top:clamp(32px,3.6vw,48px);
+  font-size:clamp(1.125rem,1.7vw,1.4375rem);line-height:1.3;letter-spacing:-.022em;
+  max-width:30ch;
+}
+
+.leaves-head{margin-top:clamp(46px,5.4vw,76px)}
+.leaves-head h3{font-size:clamp(1.125rem,1.7vw,1.4375rem);letter-spacing:-.022em;line-height:1.24}
+.leaves-head p{margin-top:12px;max-width:60ch}
+.leaves-wrap{margin-top:clamp(20px,2.4vw,30px);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.leaves{border-collapse:collapse;width:100%;min-width:760px;text-align:left}
+.leaves th,.leaves td{
+  padding:15px 24px 15px 0;border-bottom:1px solid var(--ink-hair);
+  vertical-align:top;font-size:.9375rem;line-height:1.5;font-weight:400;
+}
+.leaves thead th{
+  font-family:var(--mono);font-size:.6875rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--violet-deep);padding-bottom:11px;width:26%;
+}
+.leaves thead th:first-child{width:22%}
+.leaves tbody th{font-weight:600;color:var(--ink)}
+.leaves td{color:var(--ink-body)}
+.leaves tbody tr:last-child th,.leaves tbody tr:last-child td{border-bottom:0}
+.leaves .span td{color:var(--ink-body)}
+.leaves-after{margin-top:clamp(24px,2.8vw,34px);max-width:64ch}
+
+/* ---------- 6b · the two doors ------------------------------ */
+
+.doors{
+  margin-top:clamp(38px,4.4vw,58px);
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(28px,3.6vw,60px);
+}
+.door{display:flex;flex-direction:column;align-items:stretch}
+.door h3{margin-bottom:14px}
+.door p{font-size:.9375rem;line-height:1.6;color:var(--ink-body);margin-top:12px}
+.door p:first-of-type{margin-top:0}
+.door .key{
+  font-size:1.0625rem;line-height:1.45;letter-spacing:-.012em;color:var(--ink);
+}
+/* the two ledgers close on the same line, whichever column runs longer */
+.door .give{
+  margin-top:auto;padding-top:22px;border-top:1px solid var(--ink-hair);
+  font-family:var(--mono);font-size:.75rem;letter-spacing:.02em;color:var(--ink-mute);
+}
+.subproc{
+  margin-top:clamp(36px,4vw,54px);
+  background:var(--paper);border-radius:var(--r-art);
+  padding:clamp(26px,3.4vw,46px);
+  display:grid;grid-template-columns:.92fr 1.08fr;gap:clamp(24px,3.4vw,54px);align-items:start;
+}
+.subproc h3{font-size:clamp(1.125rem,1.6vw,1.375rem);letter-spacing:-.02em;line-height:1.26}
+
+/* ---------- 7 · honest status ------------------------------- */
+
+.status-head{max-width:20ch}
+.ledger{
+  margin-top:clamp(36px,4vw,54px);
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(24px,3vw,48px);
+}
+.ledger h3{margin-bottom:14px}
+.ledger ul{margin:0;padding:0;list-style:none;display:grid;gap:9px}
+.ledger li{
+  font-size:.9375rem;line-height:1.5;color:var(--ink-body);
+  padding-left:18px;position:relative;
+}
+.ledger li::before{
+  content:"";position:absolute;left:0;top:.62em;width:7px;height:1.5px;background:rgba(11,11,13,.28);
+}
+.ledger .col-open li::before{background:var(--violet)}
+.unmeasured{
+  margin-top:clamp(36px,4vw,54px);
+  background:var(--paper);border-radius:var(--r-art);
+  padding:clamp(26px,3.4vw,48px);
+  display:grid;grid-template-columns:.92fr 1.08fr;gap:clamp(26px,4vw,60px);align-items:start;
+}
+.band-paper .unmeasured{background:#fff}
+.unmeasured h3{font-size:clamp(1.125rem,1.7vw,1.4375rem);letter-spacing:-.022em;line-height:1.24}
+.unmeasured p{margin-top:0}
+.narrow-diff{
+  margin-top:clamp(28px,3vw,40px);
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(24px,3vw,44px);
+}
+.narrow-diff h3{margin-bottom:12px}
+
+/* ---------- 8 · technical ----------------------------------- */
+
+.tech-head{max-width:24ch;color:var(--paper)}
+.term{
+  margin-top:clamp(34px,4vw,50px);
+  border-radius:var(--r-art);overflow:hidden;
+  background:#17171d;
+  box-shadow:0 40px 70px -44px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.06);
+  max-width:920px;
+}
+.term-bar{
+  display:flex;align-items:center;gap:8px;padding:11px 16px;
+  background:#1e1e26;
+}
+.term-bar i{width:10px;height:10px;border-radius:50%;background:rgba(243,242,240,.20);display:block}
+.term-bar .title{
+  margin-left:10px;font-family:var(--mono);font-size:.75rem;color:rgba(243,242,240,.56);
+}
+.term-body{
+  padding:20px clamp(18px,2.4vw,26px) 24px;
+  font-family:var(--mono);font-size:.8125rem;line-height:1.85;
+  color:rgba(243,242,240,.86);overflow-x:auto;
+}
+.term-body .p{color:var(--violet-lift)}
+.term-body .o{color:rgba(243,242,240,.48)}
+.term-body .c{color:rgba(243,242,240,.54)}
+.specs{
+  margin-top:clamp(38px,4.4vw,56px);
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(22px,2.6vw,40px);
+}
+.specs h4{
+  margin:0 0 12px;font-family:var(--mono);font-size:.75rem;font-weight:400;
+  letter-spacing:.11em;text-transform:uppercase;color:rgba(243,242,240,.52);
+}
+.specs ul{margin:0;padding:0;list-style:none;display:grid;gap:7px}
+.specs li{font-size:.9375rem;line-height:1.45;color:rgba(243,242,240,.84)}
+.specs a{color:var(--violet-lift);text-decoration:none}
+.specs a:hover{text-decoration:underline}
+
+/* ---------- 9 · buy ----------------------------------------- */
+
+.buy{max-width:none}
+.buy>*{max-width:62ch}
+.buy h2{max-width:16ch}
+.buy .lead{margin-top:22px}
+.buy .body{margin-top:18px}
+.buy .legal{
+  margin-top:26px;font-family:var(--mono);font-size:.8125rem;line-height:1.7;color:var(--ink-mute);
+}
+.buy-actions{
+  margin-top:clamp(28px,3vw,38px);
+  display:flex;flex-wrap:wrap;align-items:center;gap:16px 26px;
+}
+.btn-buy{
+  font-family:var(--sans);font-size:1.0625rem;font-weight:500;letter-spacing:-.012em;
+  color:#fff;background:var(--violet);border:0;border-radius:var(--r-ctl);
+  padding:16px 30px;cursor:pointer;white-space:nowrap;
+  transition:background .18s ease,transform .12s ease;
+}
+.btn-buy:hover{background:var(--violet-deep)}
+.btn-buy:active{transform:translateY(1px)}
+.btn-buy:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.buy-alt{font-size:.9375rem;line-height:1.5;color:var(--ink-body)}
+.buy-alt a{color:var(--violet-deep);text-decoration:none;border-bottom:1px solid rgba(124,58,237,.42)}
+.buy-alt a:hover{color:var(--violet)}
+
+/* ---------- footer ------------------------------------------ */
+
+.foot{background:var(--paper);padding:44px 0}
+.foot-in{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:center;justify-content:space-between}
+.foot a{color:var(--violet);text-decoration:none}
+.foot a:hover{text-decoration:underline}
+.foot .mono{color:var(--ink-mute)}
+
+/* No entrance animation and no scroll-driven motion. The object is
+   a still thing on a wall; the page behaves like one. Motion is
+   limited to hover, focus and the checked state of the two radios,
+   where it is feedback rather than decoration. */
+
+/* ---------- responsive -------------------------------------- */
+
+@media (max-width:1080px){
+  .hero-grid{grid-template-columns:1fr;gap:44px}
+  .object{margin:0 auto;max-width:600px}
+  .hero-copy h1{max-width:16ch}
+  .hero-copy .lead{max-width:52ch}
+  .digest-head,.digest-body{grid-column:1/10}
+  .digest-slot{grid-column:1/13}
+  .need-copy{grid-column:1/13}
+  .need-shot{grid-column:1/13;margin-top:8px}
+  .ledger{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .specs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .unmeasured,.subproc{grid-template-columns:minmax(0,1fr);gap:16px}
+  .modes{gap:22px}
+  .doors{gap:28px}
+}
+
+@media (max-width:760px){
+  .navlinks{gap:16px;font-size:.875rem}
+  .navlinks a.hide-sm{display:none}
+  /* the object flattens: no 3D on small screens, the plates
+     become a legible vertical stack of the same material */
+  .object{aspect-ratio:auto;perspective:none;max-width:100%;padding-bottom:8px}
+  .obj-glow,.obj-shadow,.leak,.leak-2{display:none}
+  .stack{position:static;transform:none;display:grid;gap:14px}
+  .plate{position:static;width:100%;aspect-ratio:auto;transform:none!important}
+  .plate::before{display:none}
+  .plate-voice,.plate-parse{padding:20px 20px 22px}
+  .plate-board{padding:10px}
+  .band-slip{position:static;padding:0}
+  .transcript{max-width:none}
+  .ledger,.narrow-diff,.diag-note,.specs,.digest-cols,.modes,.doors{grid-template-columns:minmax(0,1fr)}
+  .modes{gap:28px}
+  .doors{gap:34px}
+  .digest-cols>div+div .dgroup:first-of-type{margin-top:26px}
+  .digest-top{flex-direction:column;gap:6px}
+  .foot-in{flex-direction:column;align-items:flex-start}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap mast-in">
+    <a class="brand" href="#top">
+      <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      crtxboard
+    </a>
+    <nav class="navlinks" aria-label="Primary">
+      <a href="#runs" class="hide-sm">Where it runs</a>
+      <a href="#status" class="hide-sm">Status</a>
+      <a href="#buy">Price</a>
+      <a class="repo" href="https://github.com/moguls753/cortex">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ 1 · the two plates and one sentence ============ -->
+<section class="wrap hero">
+  <div class="hero-grid">
+
+    <div class="hero-copy">
+      <h1>You speak.<br>It's on the wall.</h1>
+      <p class="lead">A voice message in Telegram. Transcribed and structured, on your machine or on mine. Rendered to the E-Ink panel on your wall.</p>
+    </div>
+
+    <div class="object">
+      <div class="obj-glow" aria-hidden="true"></div>
+      <div class="stack">
+
+        <div class="plate plate-voice">
+          <div class="band-slip">
+            <div class="slip-head">
+              <span class="slip-tag">voice note</span>
+              <span class="wave" aria-hidden="true">
+                <span style="--h:.18"></span><span style="--h:.32"></span><span style="--h:.55"></span><span style="--h:.78"></span>
+                <span style="--h:.46"></span><span style="--h:.62"></span><span style="--h:.94"></span><span style="--h:.70"></span>
+                <span style="--h:.38"></span><span style="--h:.52"></span><span style="--h:.86"></span><span style="--h:1"></span>
+                <span style="--h:.64"></span><span style="--h:.30"></span><span style="--h:.44"></span><span style="--h:.72"></span>
+                <span style="--h:.90"></span><span style="--h:.58"></span><span style="--h:.26"></span><span style="--h:.40"></span>
+                <span style="--h:.68"></span><span style="--h:.88"></span><span style="--h:.54"></span><span style="--h:.34"></span>
+                <span style="--h:.22"></span><span style="--h:.50"></span><span style="--h:.76"></span><span style="--h:.96"></span>
+                <span style="--h:.60"></span><span style="--h:.42"></span><span style="--h:.28"></span><span style="--h:.56"></span>
+                <span style="--h:.82"></span><span style="--h:.66"></span><span style="--h:.36"></span><span style="--h:.20"></span>
+                <span style="--h:.48"></span><span style="--h:.74"></span><span style="--h:.44"></span><span style="--h:.24"></span>
+              </span>
+              <span class="slip-dur">0:07</span>
+            </div>
+            <p class="transcript">day after tomorrow dentist for Lena at half three and don't forget to take the bins out</p>
+          </div>
+        </div>
+
+        <div class="leak" aria-hidden="true"></div>
+
+        <div class="plate plate-parse">
+          <div class="band-slip">
+            <dl class="parse">
+              <dt>when</dt><dd>Thursday 13 August, 15:30</dd>
+              <dt>what</dt><dd>Dentist, Lena</dd>
+              <dt>also</dt><dd>Take the bins out</dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="leak-2" aria-hidden="true"></div>
+
+        <div class="plate plate-board">
+          <img src="../assets/board-crtxboard.png"
+               alt="The crtxboard E-Ink panel: Tuesday 11 August, 08:41, 19.4 degrees and mainly clear. Week ahead: no events today, Thursday 15:30 Dentist, Lena, tagged family. Don't forget: Take the bins out, with an empty checkbox.">
+        </div>
+
+      </div>
+      <div class="obj-shadow" aria-hidden="true"></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 2 · the forced choice ========================= -->
+<section class="band band-paper" id="choice">
+  <div class="wrap">
+    <h2 class="choice-head">Which would you rather?</h2>
+    <p class="lead choice-sub">Pick one. It takes a second, and this one answer is the reason the page exists.</p>
+
+    <form class="choices" id="forced-choice">
+      <label class="opt">
+        <input type="radio" name="capture" value="speak">
+        <span>I'd speak it in and let it sort itself out</span>
+      </label>
+      <label class="opt">
+        <input type="radio" name="capture" value="type">
+        <span>I'd type it in myself, then it's guaranteed right</span>
+      </label>
+    </form>
+
+    <p class="ack" id="choice-ack">That is the whole question. If you have ten more seconds, there is one more below, and it is worth more than the click.</p>
+  </div>
+</section>
+
+<!-- ============ 3 · how do you solve this today =============== -->
+<section class="band" id="today">
+  <div class="wrap">
+    <h2>How do you solve this today?</h2>
+    <form class="ft" id="scenario-form" style="margin-top:22px">
+      <p class="lead measure-tight">Optional, and more useful to me than the answer above. &ldquo;I don't, I just forget it&rdquo; is a real answer, and a good one.</p>
+      <div class="field">
+        <label for="scenario">Your answer</label>
+        <textarea id="scenario" name="scenario" placeholder="Whatever you actually do. Paper on the fridge, a shared list nobody reads, shouting it at someone."></textarea>
+        <p class="hint">It goes to me, and nowhere else.</p>
+      </div>
+      <button class="btn" type="submit">Send it</button>
+      <p class="sent">Thanks. That is the sentence I needed.</p>
+    </form>
+  </div>
+</section>
+
+<!-- ============ 4 · the second screen ========================= -->
+<section class="band band-paper" id="digest">
+  <div class="wrap g12">
+    <h2 class="digest-head">The other screen is the morning.</h2>
+    <div class="digest-body">
+      <p class="lead measure">The wall holds the week. At seven in the morning a digest reads the same entries, decides what today is actually about, and lands in your inbox as an email. It is not a list dump: it picks three things, and it says out loud what has stopped moving.</p>
+    </div>
+
+    <div class="digest-slot">
+      <div class="sheet">
+        <div class="digest-top">
+          <span>Morning digest</span>
+          <span>Tuesday 11 August, 07:00</span>
+        </div>
+
+        <div class="digest-cols">
+          <div class="dgroup">
+            <h4>Top 3 today</h4>
+            <ul>
+              <li><span class="n">1</span>Call the Kita back about the August closure</li>
+              <li><span class="n">2</span>Sign the school trip form, it closes today</li>
+              <li><span class="n">3</span>Bins out tonight</li>
+            </ul>
+          </div>
+
+          <div>
+            <div class="dgroup">
+              <h4>Stuck on</h4>
+              <ul>
+                <li>The bike service. You have moved it three times since July.</li>
+              </ul>
+            </div>
+
+            <div class="dgroup">
+              <h4>Small win</h4>
+              <ul>
+                <li>The kitchen tap is fixed. That one was open for six weeks.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 · what you need ============================= -->
+<section class="band" id="hardware">
+  <div class="wrap g12">
+    <div class="need-copy">
+      <h2>It runs on a screen you already have.</h2>
+      <p class="lead measure">The board is a PNG, fetched over HTTP. Anything that can pull an image and keep it on screen will do, and the first three of these cost nothing.</p>
+
+      <ul class="optlist">
+        <li>
+          <strong>The phone in your pocket</strong>
+          <span>Open the board URL, add it to the home screen. Free, and it works before you have decided anything else.</span>
+        </li>
+        <li>
+          <strong>An old tablet on the wall</strong>
+          <span>A browser in kiosk mode pointed at the same URL. Free, if the tablet is already in a drawer.</span>
+        </li>
+        <li>
+          <strong>A browser tab on the box that is already running</strong>
+          <span>If something in the house is on all day anyway, the board can just live in a tab next to the dashboard.</span>
+        </li>
+        <li>
+          <strong>A TRMNL, from about &euro;120</strong>
+          <span>Bought from TRMNL, not from me. The path with the least fiddling, and the one most people take.</span>
+        </li>
+        <li>
+          <strong>Any bare E-Ink panel</strong>
+          <span>Anything that speaks the open BYOS protocol. No TRMNL account needed, and no account with me either.</span>
+        </li>
+      </ul>
+
+      <p class="body eink-note"><strong>E-Ink is the one this was built for.</strong> No backlight, so it does not glow at the dinner table. No microphone, so there is nothing listening in the room. And it keeps showing the last board with the power off, which is the difference between a screen and a piece of paper that updates. It is the best surface for this. It is not the requirement.</p>
+    </div>
+
+    <div class="need-shot">
+      <figure class="shot" style="margin:0">
+        <img src="../assets/hero-plate-wide.jpg"
+             alt="The crtxboard panel mounted on a mint green kitchen wall, showing the week ahead and a reminder to take the bins out.">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6 · where it runs ============================= -->
+<section class="band band-paper" id="runs">
+  <div class="wrap">
+    <h2 class="diagram-head">Three ways to run it.</h2>
+    <p class="lead choice-sub">What changes is who does the work, who is liable, and who notices when it breaks.</p>
+
+    <div class="diagram-scroll">
+      <svg viewBox="0 0 1180 490" role="img" aria-labelledby="diagram-title diagram-desc">
+        <title id="diagram-title">How crtxboard is wired</title>
+        <desc id="diagram-desc">Telegram messages and MCP tools arrive from outside the install and feed a single crtxboard process. Voice goes through faster-whisper, locally or at an API you name. An LLM, local or an API, structures the text. Entries are stored in PostgreSQL with pgvector. The output leaves again for an E-Ink panel over BYOS, a morning digest sent by email, and a web dashboard in the browser. The dashed boundary is one install, which sits either on your hardware or on mine.</desc>
+
+        <defs>
+          <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#7c3aed" stop-opacity=".42"/>
+            <stop offset="55%" stop-color="#7c3aed" stop-opacity=".14"/>
+            <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="coreFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#8b5cf6"/>
+            <stop offset="100%" stop-color="#6d28d9"/>
+          </linearGradient>
+        </defs>
+
+        <!-- the install boundary. Telegram and MCP clients sit outside it
+             on the left, the three output surfaces outside it on the right. -->
+        <rect x="320" y="26" width="548" height="436" rx="20"
+              fill="none" stroke="rgba(11,11,13,.16)" stroke-width="1" stroke-dasharray="3 6"/>
+        <text class="diag-text" x="336" y="18" fill="rgba(11,11,13,.64)">one install: yours, or mine</text>
+        <text class="diag-text" x="42" y="18" fill="rgba(11,11,13,.64)">comes in from outside</text>
+        <text class="diag-text" x="1154" y="18" text-anchor="end" fill="rgba(11,11,13,.64)">goes back out</text>
+
+        <!-- traces -->
+        <g fill="none" stroke="rgba(11,11,13,.24)" stroke-width="1.25" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M290 130 H400 V232 H538"/>
+          <path d="M290 350 H444 V266 H538"/>
+          <path d="M445 84 V146 H562 V188"/>
+          <path d="M760 84 V172 H620 V188"/>
+          <path d="M590 396 V292"/>
+          <path d="M642 240 H700 V110 H890"/>
+          <path d="M642 240 H890"/>
+          <path d="M642 240 H700 V370 H880"/>
+        </g>
+
+        <!-- vias at the bends -->
+        <g fill="#f3f2f0" stroke="rgba(11,11,13,.30)" stroke-width="1">
+          <rect x="396.5" y="126.5" width="7" height="7" rx="1.5"/>
+          <rect x="396.5" y="228.5" width="7" height="7" rx="1.5"/>
+          <rect x="440.5" y="346.5" width="7" height="7" rx="1.5"/>
+          <rect x="440.5" y="262.5" width="7" height="7" rx="1.5"/>
+          <rect x="558.5" y="142.5" width="7" height="7" rx="1.5"/>
+          <rect x="616.5" y="168.5" width="7" height="7" rx="1.5"/>
+          <rect x="696.5" y="106.5" width="7" height="7" rx="1.5"/>
+          <rect x="696.5" y="366.5" width="7" height="7" rx="1.5"/>
+        </g>
+
+        <!-- nodes -->
+        <g class="diag-text">
+          <g>
+            <rect x="40" y="110" width="250" height="40" rx="9" fill="#ffffff" stroke="rgba(11,11,13,.16)"/>
+            <text x="165" y="135" text-anchor="middle" fill="#0b0b0d">Telegram, text or voice</text>
+          </g>
+          <g>
+            <rect x="40" y="330" width="250" height="40" rx="9" fill="#ffffff" stroke="rgba(11,11,13,.16)"/>
+            <text x="165" y="355" text-anchor="middle" fill="#0b0b0d">MCP, from any AI tool</text>
+          </g>
+          <g>
+            <rect x="330" y="44" width="230" height="40" rx="9" fill="#ffffff" stroke="rgba(124,58,237,.34)"/>
+            <text x="445" y="69" text-anchor="middle" fill="#0b0b0d">whisper, or an API</text>
+          </g>
+          <g>
+            <rect x="645" y="44" width="230" height="40" rx="9" fill="#ffffff" stroke="rgba(124,58,237,.34)"/>
+            <text x="760" y="69" text-anchor="middle" fill="#0b0b0d">an LLM, or an API</text>
+          </g>
+          <g>
+            <rect x="470" y="396" width="240" height="40" rx="9" fill="#ffffff" stroke="rgba(11,11,13,.16)"/>
+            <text x="590" y="421" text-anchor="middle" fill="#0b0b0d">PostgreSQL + pgvector</text>
+          </g>
+          <g>
+            <rect x="890" y="90" width="250" height="40" rx="9" fill="#ffffff" stroke="rgba(11,11,13,.16)"/>
+            <text x="1015" y="115" text-anchor="middle" fill="#0b0b0d">E-Ink panel, over BYOS</text>
+          </g>
+          <g>
+            <rect x="890" y="220" width="250" height="40" rx="9" fill="#ffffff" stroke="rgba(11,11,13,.16)"/>
+            <text x="1015" y="245" text-anchor="middle" fill="#0b0b0d">morning digest, by email</text>
+          </g>
+          <g>
+            <rect x="880" y="350" width="270" height="40" rx="9" fill="#ffffff" stroke="rgba(11,11,13,.16)"/>
+            <text x="1015" y="375" text-anchor="middle" fill="#0b0b0d">dashboard, in a browser</text>
+          </g>
+        </g>
+
+        <!-- the core -->
+        <ellipse cx="590" cy="240" rx="150" ry="112" fill="url(#coreGlow)"/>
+        <rect x="538" y="188" width="104" height="104" rx="24" fill="url(#coreFill)"/>
+        <g fill="none" stroke="#ffffff">
+          <rect x="562" y="212" width="42" height="30" rx="6" stroke-opacity=".42" stroke-width="1.4"/>
+          <rect x="571" y="220" width="42" height="30" rx="6" stroke-opacity=".62" stroke-width="1.4"/>
+          <rect x="580" y="228" width="42" height="30" rx="6" stroke-opacity=".95" stroke-width="1.4" fill="#ffffff" fill-opacity=".22"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="diag-note">
+      <p class="body">The dashed line is one install: one process, a database and two model containers, brought up together. It sits on your hardware or on mine, and that is the only thing the three modes below argue about. Everything on the left arrives from outside it. Everything on the right leaves again.</p>
+      <p class="body">The two boxes that say &ldquo;or an API&rdquo; are where the expensive work can be handed to someone else, and both are a line in a config file, decided by what your hardware can actually carry. They are not the only things that talk to the outside world. The table further down says exactly what does.</p>
+    </div>
+
+    <div class="modes">
+      <div class="mode">
+        <h3>All on your machine</h3>
+        <p>Compose brings up Postgres, whisper, Ollama and the app together. It wants a real box: a NUC, an old desktop, roughly 8 GB of RAM free, because the embedding model alone is about 4.7 GB on disk. A Raspberry Pi will run the application, but it will not run the transcription.</p>
+      </div>
+      <div class="mode">
+        <h3>Your machine, heavy parts on APIs you pick</h3>
+        <p>The same install, with transcription and the language model pointed at a provider you choose, using your key and your billing. <span class="said">Your contract, not mine.</span> This is the version that fits on a Pi.</p>
+      </div>
+      <div class="mode">
+        <h3>My machine</h3>
+        <p>No install, no server, no updates, and no mail server to set up so the morning digest can go out. You tap an invite link, add the bot, and start talking. The screen on the wall is still yours to choose.</p>
+      </div>
+    </div>
+
+    <p class="sold">What you get in the third one is not hosting. I transcribe, I sort, and I notice when it breaks.</p>
+
+    <div class="leaves-head">
+      <h3>What actually leaves the house</h3>
+      <p class="body">Every message goes through Telegram&rsquo;s servers before anything of yours or mine touches it. That is true in all three modes, and it is the first thing you should know, so here is the rest of it.</p>
+    </div>
+
+    <div class="leaves-wrap">
+      <table class="leaves">
+        <thead>
+          <tr>
+            <th scope="col">What</th>
+            <th scope="col">All on your machine</th>
+            <th scope="col">APIs you pick</th>
+            <th scope="col">My machine</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">The audio</th>
+            <td>Telegram, then your box.</td>
+            <td>Telegram, then your box, then the transcription provider you named.</td>
+            <td>Telegram, then my box.</td>
+          </tr>
+          <tr>
+            <th scope="row">The text</th>
+            <td>Your box, and no further.</td>
+            <td>Your box, plus the model provider you named.</td>
+            <td>My box, plus the model provider I name below.</td>
+          </tr>
+          <tr>
+            <th scope="row">The board image</th>
+            <td>Your box, pulled by whatever screen you pointed at it.</td>
+            <td>Your box, pulled by whatever screen you pointed at it.</td>
+            <td>My box, pulled by whatever screen you pointed at it.</td>
+          </tr>
+          <tr class="span">
+            <th scope="row">The weather</th>
+            <td colspan="3">open-meteo is called on every render, in every mode. It gets a coordinate and gives back a forecast.</td>
+          </tr>
+          <tr class="span">
+            <th scope="row">Your calendar</th>
+            <td colspan="3">Google, in every mode, but only if you connect a calendar. Connect nothing and nothing is called.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="body leaves-after">So &ldquo;nothing leaves your house&rdquo; would be a lie, in all three modes, and you would find that out in ten minutes with a packet capture. What local transcription is actually worth is narrower and still worth having: the recording is never handed to a <em>second</em> company, and the text only goes where you pointed it.</p>
+  </div>
+</section>
+
+<!-- ============ 6b · the two doors =========================== -->
+<section class="band" id="doors">
+  <div class="wrap">
+    <h2 class="diagram-head">Two doors, for two different people.</h2>
+    <p class="lead choice-sub">No feature is gated, no licence is checked, and there is no code path that behaves differently depending on who runs it. Same repository, same AGPL-3.0, both sides. What differs is what you get and what you give.</p>
+
+    <div class="doors">
+      <div class="door">
+        <h3>You run it</h3>
+        <p class="key">Nothing of yours reaches me at all. Not the audio, not the text, not a crash report.</p>
+        <p>And the part that gets missed: one person running a box for their own household sits inside the GDPR household exemption, Article 2(2)(c). Nobody is anybody&rsquo;s data controller. There is no processing agreement, no register of activities, nothing to sign, because none of it applies to you.</p>
+        <p>The usual objection is &ldquo;so now I need an API subscription too&rdquo;. Barely. Call it twenty messages a day, six hundred a month, about 700 tokens in and 200 out each. On a small hosted model that is three to five cents a month for the whole household. Transcription is the part that costs real money, and transcription is exactly the part you can keep local.</p>
+        <p class="give">You give: a box, power, and attention.</p>
+      </div>
+
+      <div class="door">
+        <h3>I run it</h3>
+        <p class="key">It runs without you. Updates, migrations, the model that quietly changed its output format overnight.</p>
+        <p>And the honest one, which argues against the column you are reading: a self-hosted setup fails silently. The bot stops answering, the panel shows Tuesday for three days, and you do not notice, because this is precisely the thing you never open. There is no error message, because nothing is watching for one.</p>
+        <p>That is what the money is for. Someone notices, and it is fixed before you would have found it. It is the same product either way, so the only question is whether you want that job.</p>
+        <p class="give">You give: money.</p>
+      </div>
+    </div>
+
+    <div class="subproc">
+      <h3>What I do with what reaches me, stated plainly.</h3>
+      <div>
+        <p class="body">Encrypted in transit and encrypted at rest. Your entries never train a model and are never sold or passed on for anyone else&rsquo;s purposes. There are four subprocessors and they are named: Telegram for delivery, Hetzner in Germany for the machines, open-meteo for the weather, and Anthropic for the structuring step.</p>
+        <p class="body" style="margin-top:14px">Transcription runs on my own machines, which is the whole point of doing it that way: the recording is not handed on to a second company, and it is discarded once the text exists. Every entry is exportable and every entry is deletable, including all of them at once, including the account.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7 · honest status ============================= -->
+<section class="band band-paper" id="status">
+  <div class="wrap">
+    <h2 class="status-head">Where it will let you down.</h2>
+
+    <div class="ledger">
+      <div>
+        <h3>Does this</h3>
+        <ul>
+          <li>Telegram in, text or voice</li>
+          <li>Transcription, on your box or on mine</li>
+          <li>Structuring into appointments, tasks and notes</li>
+          <li>The board, served over BYOS to whatever screen you point at it</li>
+          <li>The morning digest, sent as an email at seven</li>
+          <li>An MCP server, so an assistant can read and write the same entries</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Rough</h3>
+        <ul>
+          <li>Self-hosting is Docker, an .env file and a wizard. Nothing about it is one click.</li>
+          <li>Self-hosting the digest means giving it a mail server to send from. That is the step that surprises people.</li>
+          <li>English and German only.</li>
+          <li>The dashboard exists, but it is not the point, and it looks like it.</li>
+        </ul>
+      </div>
+      <div class="col-open">
+        <h3>Open</h3>
+        <ul>
+          <li>How well it structures a sentence it has never seen before. That one is below, at length.</li>
+          <li>Whether a panel on the wall really beats the phone already in your hand.</li>
+          <li>Whether speaking is what people want at all. That is what the question at the top is for.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="unmeasured">
+      <h3>The accuracy of the structuring step is structurally unmeasurable, and I am not going to pretend otherwise.</h3>
+      <div>
+        <p class="body measure">There is no ground truth for &ldquo;this thought was filed correctly&rdquo;. No public benchmark covers it, and a set I label myself only measures my agreement with my own judgement on my own messages. So there is no percentage on this page. Anyone quoting you a number for this class of task is guessing, including me.</p>
+        <p class="body measure" style="margin-top:16px">What matters more is what happens when it gets one wrong, because it will. It puts the dentist on the wrong Thursday. It files something as a note that you meant as a task. The sentence you actually said is kept beside whatever it was turned into, so you can see what it did and change it, in the dashboard or by telling the bot. A wrong call costs you ten seconds. It does not cost you the thought, and that is the part I would not compromise on.</p>
+      </div>
+    </div>
+
+    <div class="narrow-diff">
+      <div>
+        <h3>What this is not</h3>
+        <p class="body">Echo Show has done voice at the wall for years, at &euro;329, and does it well. Saying nobody else does this would be a lie. The difference here is narrow, and worth stating exactly: you speak one free-form thought instead of a list command, something structures it instead of filing it verbatim, it runs on hardware you picked, and the surface is E-Ink that sits still and does not ask for anything.</p>
+      </div>
+      <div>
+        <h3>The neighbours</h3>
+        <p class="body">Wall tablets like D&aelig;ly, Hearth and Skylight expect somebody to type. TRMNL has no input at all, by design. hass-eink-dashboard renders entities you have already filled in somewhere else. None of them are bad. They just answer a different question than &ldquo;what do I do with the thought I had on the stairs&rdquo;.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8 · technical, at the bottom ================== -->
+<section class="band band-ink" id="tech">
+  <div class="wrap">
+    <h2 class="tech-head">For the people who read the code first.</h2>
+
+    <div class="term">
+      <div class="term-bar">
+        <i></i><i></i><i></i>
+        <span class="title">~/cortex</span>
+      </div>
+      <pre class="term-body"><span class="c"># one repo, AGPL-3.0</span>
+<span class="p">$</span> git clone https://github.com/moguls753/cortex.git &amp;&amp; cd cortex
+<span class="p">$</span> echo "POSTGRES_PASSWORD=changeme" &gt; .env
+<span class="p">$</span> docker compose up -d
+<span class="o">   Container cortex-postgres-1   Started</span>
+<span class="o">   Container cortex-ollama-1     Started</span>
+<span class="o">   Container cortex-whisper-1    Started</span>
+<span class="o">   Container cortex-app-1        Started</span>
+<span class="c"># the setup wizard is at localhost:3000, and it wants a
+# Telegram bot token and one model endpoint. That is the whole install.</span></pre>
+    </div>
+
+    <div class="specs">
+      <div>
+        <h4>Stack</h4>
+        <ul>
+          <li>TypeScript on Node, Hono</li>
+          <li>grammy for the Telegram bot</li>
+          <li>Drizzle over PostgreSQL with pgvector</li>
+          <li>node-cron for the digest, SMTP to deliver it</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Models</h4>
+        <ul>
+          <li>faster-whisper for voice, in its own container</li>
+          <li>Embeddings via Ollama: qwen3-embedding, about 4.7 GB on disk, 4096 dimensions</li>
+          <li>Structuring is LLM-agnostic: Anthropic, OpenAI, or any compatible endpoint</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Display</h4>
+        <ul>
+          <li>Satori to SVG, resvg to PNG</li>
+          <li>Greyscale, sized to the panel you point at it</li>
+          <li>Served over BYOS, so any client that can fetch it works</li>
+          <li>Seven MCP tools over the same data</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Licence</h4>
+        <ul>
+          <li>AGPL-3.0</li>
+          <li><a href="https://github.com/moguls753/cortex">github.com/moguls753/cortex</a></li>
+          <li>Issues are the right place to tell me this is wrong</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9 · buy ====================================== -->
+<section class="band" id="buy">
+  <div class="wrap buy">
+    <h2>About &euro;7 a month.</h2>
+    <p class="lead">Per household, not per person. Monthly, cancel whenever you like.</p>
+    <p class="body">That is me running it: the machine, the transcription, the structuring, the digest going out at seven, and someone noticing when it stops. You get an invite link, a bot to talk to, and a board URL to point a screen at.</p>
+
+    <div class="buy-actions">
+      <button class="btn-buy" type="button" id="buy-btn">Start the household plan</button>
+      <p class="buy-alt">Or <a href="#runs">run it yourself</a>, free, for as long as you like.</p>
+    </div>
+
+    <p class="legal">The same code either way, AGPL-3.0. Nothing is gated and nothing checks a licence.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <span class="mono">crtxboard, self-hosted or hosted, AGPL-3.0</span>
+    <span class="mono"><a href="https://github.com/moguls753/cortex">github.com/moguls753/cortex</a></span>
+  </div>
+</footer>
+
+<script>
+/* No network. Both handlers are local only.
+   record() is the single seam where the self-hosted analytics
+   event goes when this page is deployed (Plausible / GoatCounter /
+   Umami custom event). It deliberately does nothing here. */
+function record(name, value){ /* wire the analytics event here on deploy */ }
+
+(function(){
+  var form = document.getElementById('forced-choice');
+  var ack  = document.getElementById('choice-ack');
+  if (form && ack){
+    form.addEventListener('change', function(e){
+      if (e.target && e.target.name === 'capture'){
+        record('forced-choice', e.target.value);
+        ack.setAttribute('data-on','1');
+      }
+    });
+  }
+
+  var buy = document.getElementById('buy-btn');
+  if (buy){
+    buy.addEventListener('click', function(){
+      record('buy-intent', 'household');
+    });
+  }
+
+  var ft = document.getElementById('scenario-form');
+  if (ft){
+    ft.addEventListener('submit', function(e){
+      e.preventDefault();
+      var t = ft.querySelector('#scenario');
+      if (t && t.value.trim().length === 0){ t.focus(); return; }
+      record('scenario', 'submitted');
+      ft.setAttribute('data-sent','1');
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

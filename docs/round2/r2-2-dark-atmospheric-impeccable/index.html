@@ -1,0 +1,1345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crtxboard — you speak, the wall fills in</title>
+<meta name="description" content="Speak a thought into Telegram. It is transcribed, sorted, and shows up on a screen you already have — and in a morning briefing by e-mail. Run it yourself under AGPL-3.0, or let me run it for about €7 a month.">
+<meta name="theme-color" content="#05100d">
+<meta name="color-scheme" content="dark">
+
+<style>
+/* ─── faces ────────────────────────────────────────────────────────────────
+   Nimbus Sans Narrow  · display voice, condensed grotesk over the photograph
+   Nimbus Sans         · reading voice
+   JetBrains Mono      · the face the wall panel itself is rendered in
+                         (taken from the renderer: main/src/display/fonts)
+   All three self-hosted and subset. No network request is made by this page. */
+@font-face{font-family:"Nimbus Sans";src:url(fonts/NimbusSans-Regular.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Nimbus Sans";src:url(fonts/NimbusSans-Bold.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:"Nimbus Sans Narrow";src:url(fonts/NimbusSansNarrow-Regular.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Nimbus Sans Narrow";src:url(fonts/NimbusSansNarrow-Bold.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url(fonts/JetBrainsMono-Regular.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url(fonts/JetBrainsMono-Medium.woff2) format("woff2");font-weight:500;font-style:normal;font-display:swap}
+
+:root{
+  /* the ground, from near-black to the green of the fridge in the photograph */
+  --ground:#05100d;
+  --field:#0b1a15;
+  --field-2:#0d1f1a;
+  --field-3:#122b23;
+
+  --paper:#e8f4f0;
+  --paper-2:#a8c3ba;
+  --paper-3:#93b0a6;
+  --paper-4:#7fa196;
+  /* the one stop that only ever sits on photography, where the dimmest
+     label stop would drop under 4.5:1 against a lit wall */
+  --paper-lit:#cfe0d9;
+
+  --accent:#4fe3c1;
+  --accent-deep:#1e8a72;
+
+  /* the panel: what 4-bit greyscale on E-Ink actually looks like */
+  --plate:#ececea;
+  --plate-2:#e0e0dd;
+  --plate-ink:#15201c;
+  --plate-ink-2:#4d5a55;
+
+  --rule:rgba(232,244,240,.13);
+  --rule-soft:rgba(232,244,240,.07);
+  --rule-strong:rgba(232,244,240,.24);
+
+  --sans:"Nimbus Sans",Helvetica,Arial,sans-serif;
+  --narrow:"Nimbus Sans Narrow","Nimbus Sans",Helvetica,Arial,sans-serif;
+  --mono:"JetBrains Mono","DejaVu Sans Mono",ui-monospace,monospace;
+
+  --gutter:clamp(20px,5vw,88px);
+  --measure:66ch;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--paper);
+  font-family:var(--sans);
+  font-size:17px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+/* the browser's own surfaces, themed rather than inherited */
+::selection{background:var(--accent);color:var(--ground)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+:where(input,textarea){caret-color:var(--accent)}
+html{scrollbar-color:var(--field-3) var(--ground);scrollbar-width:thin}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:var(--ground)}
+::-webkit-scrollbar-thumb{background:var(--field-3);border:3px solid var(--ground);border-radius:99px}
+::-webkit-scrollbar-thumb:hover{background:#1b3b31}
+a{color:inherit}
+a:where(.lnk){
+  color:var(--accent);text-decoration:underline;
+  text-decoration-thickness:1px;text-underline-offset:.22em;
+  text-decoration-color:rgba(79,227,193,.42);
+  transition:text-decoration-color .18s ease,color .18s ease;
+}
+a:where(.lnk):hover{text-decoration-color:var(--accent)}
+img{max-width:100%;display:block}
+
+h1,h2,h3{margin:0;font-weight:400;text-wrap:balance}
+
+/* ─── type scale ───────────────────────────────────────────────────────── */
+.display{
+  font-family:var(--narrow);font-weight:400;
+  font-size:clamp(2.6rem,6.1vw,5.1rem);
+  line-height:1.02;letter-spacing:-.024em;
+}
+.h-sec{
+  font-family:var(--narrow);font-weight:700;
+  font-size:clamp(1.9rem,3.5vw,2.85rem);
+  line-height:1.06;letter-spacing:-.022em;
+}
+.h-sub{
+  font-family:var(--narrow);font-weight:700;
+  font-size:clamp(1.15rem,1.7vw,1.3rem);
+  line-height:1.2;letter-spacing:-.01em;
+}
+.lede{font-size:clamp(1.06rem,1.35vw,1.24rem);line-height:1.58;color:var(--paper-2);max-width:var(--measure)}
+.body{max-width:var(--measure);color:var(--paper-2)}
+.body strong{color:var(--paper);font-weight:700}
+.small{font-size:.95rem;line-height:1.55;color:var(--paper-3)}
+.label{
+  font-family:var(--mono);font-weight:500;font-size:.72rem;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--paper-4);
+}
+
+/* ─── section grounds — the page is separated by changing the ground ────── */
+section{position:relative}
+.sec{padding:clamp(84px,10vw,148px) var(--gutter)}
+.wrap{max-width:1220px;margin-inline:auto}
+.g-ground{background:var(--ground);color:var(--paper)}
+.g-field{background:var(--field);color:var(--paper)}
+.g-field2{background:var(--field-2);color:var(--paper)}
+
+/* E-Ink dither: the 4-bit greyscale screen the renderer actually emits,
+   used as the ground texture instead of a rule between sections */
+.dither::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    radial-gradient(circle at 1px 1px,rgba(232,244,240,.115) 1px,transparent 1.6px),
+    radial-gradient(circle at 2px 2px,rgba(232,244,240,.055) 1px,transparent 1.6px);
+  background-size:5px 5px,9px 9px;
+  -webkit-mask-image:radial-gradient(112% 62% at 50% 0%,#000 0%,rgba(0,0,0,.45) 38%,transparent 72%);
+  mask-image:radial-gradient(112% 62% at 50% 0%,#000 0%,rgba(0,0,0,.45) 38%,transparent 72%);
+}
+.dither > *{position:relative;z-index:1}
+
+/* the horizontal banding an E-Ink panel shows mid full-refresh */
+.banding{
+  height:96px;pointer-events:none;
+  background-image:repeating-linear-gradient(to bottom,rgba(232,244,240,.06) 0 1px,transparent 1px 5px);
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000);
+  mask-image:linear-gradient(to bottom,transparent,#000);
+}
+.banding.flip{
+  -webkit-mask-image:linear-gradient(to bottom,#000,transparent);
+  mask-image:linear-gradient(to bottom,#000,transparent);
+}
+
+/* ─── masthead ─────────────────────────────────────────────────────────── */
+.masthead{
+  position:absolute;top:0;left:0;right:0;z-index:5;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:26px var(--gutter) 0;
+}
+.wordmark{
+  font-family:var(--mono);font-weight:500;font-size:1.02rem;
+  letter-spacing:-.01em;color:var(--paper);text-decoration:none;
+}
+.mast-link{
+  font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;
+  color:var(--paper-3);text-decoration:none;
+  display:inline-flex;align-items:center;gap:7px;
+  transition:color .18s ease;
+}
+.mast-link:hover{color:var(--paper)}
+.ico{width:11px;height:11px;flex:0 0 auto;stroke:currentColor;stroke-width:1.5;fill:none;stroke-linecap:square}
+
+/* ─── 1 · hero: the transformation, and nothing else ───────────────────── */
+.hero{background:var(--ground);color:var(--paper);position:relative;overflow:hidden}
+.hero-say{
+  padding:112px var(--gutter) 42px;
+  text-align:center;
+}
+.hero-say .display{max-width:16ch;margin-inline:auto}
+/* the message and the caption are positioned against the photograph itself,
+   not against the section, so their placement on the wall is stable */
+.voice-shell{position:relative}
+.hero-stage{
+  position:relative;
+  background:var(--ground);
+  /* tall enough that the panel never loses its own edges to the crop:
+     the device occupies the middle 80% of the plate's height */
+  height:clamp(400px,49vw,880px);
+}
+.hero-stage img{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:50% 38%;
+}
+/* no grade. the plate is already the room at night; the only gradient left
+   is the seam where the photograph has to become the page's own ground */
+.grade{position:absolute;inset:0;pointer-events:none}
+.grade.g1{
+  background:
+    /* the lamp's falloff is carried a little further into the page's own
+       ground, so the photograph starts without an edge */
+    radial-gradient(46% 26% at 0% 0%,rgba(5,16,13,.72) 0%,rgba(5,16,13,.34) 44%,rgba(5,16,13,0) 78%),
+    linear-gradient(to bottom,
+      var(--ground) 0%,rgba(5,16,13,.5) 4%,rgba(5,16,13,0) 13%,
+      rgba(5,16,13,0) 86%,rgba(5,16,13,.5) 96%,var(--ground) 100%);
+}
+
+.voice{
+  position:absolute;z-index:3;
+  left:var(--gutter);
+  /* the message sits in the wall's dark half, below the lamp's falloff */
+  top:58%;
+  width:min(392px,33vw);
+}
+/* over the wall, the label stop the page uses on flat ground would fall
+   under 4.5:1 — the lit stop carries it instead */
+.voice .label,.voice-meta{color:var(--paper-lit)}
+.voice .label{display:block;margin-bottom:14px}
+.wave{display:block;width:100%;height:34px;margin-bottom:18px;overflow:visible}
+.wave rect{fill:var(--accent);opacity:.55}
+.wave rect.q{opacity:.26}
+.voice-text{
+  font-family:var(--sans);
+  font-size:clamp(1.02rem,1.28vw,1.19rem);
+  line-height:1.5;color:var(--paper);margin:0;
+  text-wrap:pretty;
+}
+.voice-meta{margin:16px 0 0;font-family:var(--mono);font-size:.72rem;letter-spacing:.11em;text-transform:uppercase}
+
+/* shown only where the photograph cannot carry the board legibly */
+.board-small{display:none;margin:0}
+.board-small img{
+  width:100%;height:auto;border-radius:3px;
+  box-shadow:0 20px 46px -16px rgba(0,0,0,.8);
+}
+.board-small figcaption{display:block;margin-top:14px}
+
+.stage-caption{
+  position:absolute;z-index:3;right:var(--gutter);bottom:22px;
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--paper-lit);
+  text-align:right;max-width:42ch;
+  text-shadow:0 1px 14px rgba(5,16,13,.95),0 0 34px rgba(5,16,13,.85);
+}
+
+/* ─── 2 · the forced choice ────────────────────────────────────────────── */
+.choice-wrap{max-width:820px;margin-inline:auto;text-align:center}
+.choice-wrap .h-sec{margin-bottom:10px}
+.choice-note{color:var(--paper-3);font-size:.95rem;margin:0 auto 40px;max-width:56ch}
+.choice-list{display:flex;flex-direction:column;gap:14px;text-align:left}
+.opt{
+  display:flex;align-items:flex-start;gap:18px;
+  padding:24px clamp(20px,2.6vw,32px);
+  background:var(--field);color:var(--paper);
+  border:1px solid var(--rule);
+  border-radius:14px;
+  cursor:pointer;
+  transition:background .2s ease,border-color .2s ease;
+}
+.opt:hover{background:var(--field-2);border-color:var(--rule-strong)}
+.opt input[type=radio]{
+  appearance:none;-webkit-appearance:none;
+  margin:0;flex:0 0 auto;
+  width:22px;height:22px;border-radius:50%;
+  border:1.5px solid var(--paper-4);
+  background:transparent;cursor:pointer;
+  display:grid;place-content:center;
+  transition:border-color .2s ease,box-shadow .2s ease;
+  translate:0 3px;
+}
+.opt input[type=radio]::after{
+  content:"";width:10px;height:10px;border-radius:50%;
+  background:var(--accent);
+  transform:scale(0);transition:transform .22s cubic-bezier(.16,1,.3,1);
+}
+.opt input[type=radio]:checked{border-color:var(--accent)}
+.opt input[type=radio]:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:50%}
+.opt input[type=radio]:checked::after{transform:scale(1)}
+.opt:has(input:checked){background:var(--field-3);border-color:rgba(79,227,193,.55)}
+.opt-text{font-size:clamp(1.04rem,1.4vw,1.21rem);line-height:1.42;color:var(--paper)}
+.choice-ack{
+  margin:20px auto 0;max-width:56ch;min-height:1.7em;
+  font-family:var(--mono);font-size:.78rem;line-height:1.7;letter-spacing:.03em;
+  color:var(--accent);
+  opacity:0;transform:translateY(4px);
+  transition:opacity .4s ease,transform .4s cubic-bezier(.16,1,.3,1);
+}
+.choice-ack[data-on]{opacity:1;transform:none}
+.choice-rule{
+  margin:30px auto 0;max-width:58ch;
+  font-size:.95rem;line-height:1.65;color:var(--paper-3);
+  padding-top:24px;border-top:1px solid var(--rule-soft);
+}
+
+/* ─── 3 · free text ────────────────────────────────────────────────────── */
+.today-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:clamp(34px,5vw,84px);align-items:start}
+.field-stack{display:flex;flex-direction:column;gap:16px}
+textarea{
+  width:100%;min-height:172px;resize:vertical;
+  font-family:var(--sans);font-size:1.02rem;line-height:1.6;
+  color:var(--paper);background:var(--ground);
+  border:1px solid var(--rule);border-radius:12px;
+  padding:20px 22px;
+  transition:border-color .2s ease,background .2s ease;
+}
+textarea::placeholder{color:var(--paper-4);opacity:1}
+textarea:hover{border-color:var(--rule-strong)}
+textarea:focus{border-color:var(--accent);outline:none;background:var(--field-2)}
+.btn{
+  align-self:flex-start;
+  font-family:var(--mono);font-weight:500;font-size:.78rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ground);background:var(--accent);
+  border:1px solid var(--accent);border-radius:10px;
+  padding:14px 26px;cursor:pointer;
+  transition:background .18s ease,border-color .18s ease,transform .18s cubic-bezier(.16,1,.3,1);
+}
+.btn:hover{background:#6cecce;border-color:#6cecce}
+.btn:active{transform:translateY(1px)}
+a.btn{display:inline-block;text-decoration:none;align-self:auto}
+.btn-buy{margin-top:30px;padding:18px 34px}
+.btn[disabled]{background:transparent;color:var(--paper-4);border-color:var(--rule);cursor:default;transform:none}
+.form-ack{margin:0;font-family:var(--mono);font-size:.78rem;line-height:1.7;color:var(--accent);display:none}
+.form-ack[data-on]{display:block}
+
+/* ─── the field: comparison matrix ─────────────────────────────────────── */
+.table-note{margin:24px 0 0;max-width:78ch;color:var(--paper-3);font-size:.95rem;line-height:1.6}
+.table-scroll{overflow-x:auto;margin-top:30px;padding-bottom:6px}
+.table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:6px}
+table{border-collapse:collapse;width:100%;min-width:840px;font-size:.9rem}
+caption{caption-side:top;text-align:left;padding-bottom:20px;color:var(--paper-3);font-size:.9rem;line-height:1.6;max-width:78ch}
+th,td{padding:15px 16px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--rule-soft)}
+thead th{
+  font-family:var(--mono);font-weight:500;font-size:.72rem;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--paper-3);vertical-align:bottom;
+  border-bottom:1px solid var(--rule);padding-bottom:12px;
+}
+thead th.self{color:var(--paper);border-bottom:2px solid var(--accent)}
+tbody th{
+  font-family:var(--sans);font-weight:400;font-size:.95rem;color:var(--paper);
+  width:33%;min-width:270px;padding-left:0;line-height:1.45;
+}
+td{text-align:center;width:13.4%}
+td.self{background:rgba(79,227,193,.045)}
+thead th.self{background:rgba(79,227,193,.045)}
+tbody tr:last-child th,tbody tr:last-child td{border-bottom:none}
+.mark{width:15px;height:15px;stroke:var(--paper);stroke-width:1.6;fill:none;stroke-linecap:square;stroke-linejoin:miter}
+.mark.no{stroke:var(--paper-3);opacity:.9}
+.mark-cell{display:inline-flex;align-items:center;justify-content:center;width:100%}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.footnote{margin:34px 0 0;max-width:74ch;color:var(--paper-2);font-size:1.02rem;line-height:1.66}
+.footnote strong{color:var(--paper);font-weight:700}
+
+/* the two prose matrices reuse the comparison table wholesale; only the
+   column split changes, because their cells carry sentences, not marks */
+table.prose td{text-align:left;vertical-align:top;color:var(--paper-2);line-height:1.5}
+table.prose tbody th{vertical-align:top}
+table.prose td b{color:var(--paper);font-weight:700}
+/* the column split only exists while there are columns; below the reflow
+   breakpoint every cell is a block and must not inherit a percentage width */
+@media (min-width:941px){
+  table.prose{min-width:760px}
+  table.prose tbody th{width:26%;min-width:190px}
+  table.prose.doors td{width:37%}
+  table.prose.leaves td{width:24.6%}
+}
+@media (max-width:940px){
+  /* a caption inside a display:block table shrink-wraps to nothing; below the
+     reflow breakpoint it is a paragraph like any other */
+  table.prose caption{display:block;max-width:none;padding-bottom:16px}
+  table.prose tbody td{display:block;width:auto;padding:0 0 14px}
+  table.prose tbody td::before{display:block;margin-bottom:5px}
+  table.prose tbody td:last-child{padding-bottom:0}
+  table.prose tbody td.self{padding:10px 12px}
+}
+
+/* a heading inside a long section: more air above it than below, no rule —
+   the page still separates by space, never by a drawn line */
+.subhead{margin:clamp(58px,6.2vw,92px) 0 0}
+.subhead + .body,.subhead + .lede{margin-top:18px}
+
+/* ─── 4 · the second screen ────────────────────────────────────────────── */
+.plate{
+  background:var(--plate);color:var(--plate-ink);
+  font-family:var(--mono);
+  padding:clamp(22px,3vw,40px) clamp(20px,3vw,44px);
+  border-radius:3px;
+  box-shadow:0 26px 64px -18px rgba(0,0,0,.72),0 2px 0 rgba(255,255,255,.06);
+  max-width:840px;
+}
+.plate-head{display:flex;justify-content:space-between;align-items:baseline;gap:18px;flex-wrap:wrap;
+  padding-bottom:12px;border-bottom:1px solid rgba(21,32,28,.42);font-size:.9rem}
+.plate-head b{font-weight:500}
+.plate-head span{color:var(--plate-ink-2);font-size:.78rem}
+.plate-sec{margin-top:26px}
+.plate-sec h3{
+  font-family:var(--mono);font-weight:500;font-size:.76rem;letter-spacing:.17em;text-transform:uppercase;
+  padding-bottom:7px;border-bottom:1px solid rgba(21,32,28,.42);color:var(--plate-ink);
+}
+.plate-sec ol,.plate-sec p{margin:12px 0 0;padding:0;list-style:none}
+.plate-sec li{display:flex;gap:16px;font-size:.9rem;line-height:1.55;padding:5px 0}
+.plate-sec li i{font-style:normal;color:var(--plate-ink-2);flex:0 0 auto;font-variant-numeric:tabular-nums}
+.plate-sec p{font-size:.9rem;line-height:1.55;color:var(--plate-ink)}
+.plate-foot{display:flex;justify-content:space-between;gap:18px;margin-top:30px;padding-top:11px;
+  border-top:1px solid rgba(21,32,28,.42);font-size:.78rem;color:var(--plate-ink-2)}
+.plate-note{margin:18px 0 0;font-family:var(--mono);font-size:.78rem;letter-spacing:.02em;color:var(--paper-3)}
+.morning-grid{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:clamp(34px,5vw,80px);align-items:start}
+
+/* one authored moment: the full refresh an E-Ink panel does when it redraws */
+@keyframes eink-refresh{
+  0%{filter:none}
+  8%{filter:invert(1)}
+  26%{filter:invert(1)}
+  100%{filter:none}
+}
+.plate.is-refreshing{animation:eink-refresh 460ms cubic-bezier(.33,0,.15,1) 1 both}
+
+/* ─── 5 / 6 · spec rows, in the panel's own grammar ────────────────────── */
+.rows{border-top:1px solid var(--rule);margin-top:40px}
+.row{
+  display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);
+  gap:clamp(16px,3vw,42px);
+  padding:22px 0;border-bottom:1px solid var(--rule-soft);
+}
+.row dt{font-family:var(--mono);font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--paper-4);padding-top:4px}
+.row dd{margin:0;color:var(--paper-2);max-width:58ch}
+.row dd b{color:var(--paper);font-weight:700}
+.shout{
+  font-family:var(--narrow);font-weight:700;
+  font-size:clamp(2.1rem,4.3vw,3.5rem);line-height:1.04;letter-spacing:-.026em;
+  color:var(--paper);margin:34px 0 0;max-width:13ch;
+}
+
+/* ─── 7 · honest status ────────────────────────────────────────────────── */
+.status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(28px,3.4vw,52px);margin-top:52px}
+.status-col h3{margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--rule)}
+.status-col ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:15px}
+.status-col li{color:var(--paper-2);font-size:.95rem;line-height:1.56;padding-left:18px;position:relative}
+.status-col li::before{
+  content:"";position:absolute;left:0;top:.62em;
+  width:7px;height:1px;background:var(--paper-4);
+}
+/* the one frame on the page that was actually photographed, kept because it
+   is the only proof that this hangs on a real wall */
+.proof{margin:clamp(46px,5vw,72px) 0 0;max-width:var(--measure)}
+.proof img{width:100%;height:auto;border-radius:3px}
+.proof figcaption{display:block;margin-top:14px}
+
+.unmeasured{
+  margin-top:clamp(58px,6vw,86px);
+  padding-top:clamp(34px,4vw,48px);
+  border-top:1px solid var(--rule);
+  display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);
+  gap:clamp(30px,5vw,80px);align-items:start;
+}
+.unmeasured-lead{
+  font-family:var(--narrow);font-weight:400;
+  font-size:clamp(1.75rem,3.4vw,2.7rem);line-height:1.15;letter-spacing:-.024em;
+  color:var(--paper);margin:0;max-width:16ch;
+}
+.unmeasured .body{margin:0;max-width:58ch}
+.unmeasured .body p{font-size:1.02rem}
+/* ─── 8 · technical ────────────────────────────────────────────────────── */
+.spec{font-family:var(--mono)}
+.spec .row dd{font-family:var(--mono);font-size:.9rem;line-height:1.62;color:var(--paper-2);max-width:72ch}
+.spec .row dd a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.9em}
+
+/* ─── 9 · the close ────────────────────────────────────────────────────── */
+.close{position:relative;overflow:hidden;background:var(--ground);color:var(--paper)}
+/* the page closes on the same wall it opened on, cropped hard onto the bare
+   unlit left of the frame — no panel, no room, just the lamp's last falloff */
+.close-bg{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:0% 50%;
+  transform:scale(2.7);transform-origin:0% 67%;
+  opacity:1;
+}
+/* the wall keeps falling away as the page ends: the lamp's last light at the
+   top, shadow by the footer */
+.close-grade{position:absolute;inset:0;pointer-events:none;
+  background:
+    linear-gradient(to bottom,var(--ground) 0%,rgba(5,16,13,.5) 5%,rgba(5,16,13,.1) 16%,
+      rgba(5,16,13,.5) 46%,rgba(5,16,13,.72) 74%,rgba(5,16,13,.86) 92%,var(--ground) 100%),
+    linear-gradient(to right,rgba(5,16,13,0) 46%,rgba(5,16,13,.34) 74%,rgba(5,16,13,.6) 100%);
+}
+.close-inner{position:relative;z-index:2}
+.close .h-sec{max-width:16ch}
+.back{
+  display:inline-flex;align-items:baseline;gap:12px;margin-top:38px;
+  font-family:var(--mono);font-size:.9rem;letter-spacing:.02em;
+  color:var(--accent);text-decoration:underline;text-decoration-color:rgba(79,227,193,.4);
+  text-underline-offset:.3em;text-decoration-thickness:1px;
+  transition:text-decoration-color .18s ease;
+}
+.back:hover{text-decoration-color:var(--accent)}
+
+footer{
+  padding:44px var(--gutter) 54px;
+  border-top:1px solid var(--rule-soft);
+  background:var(--ground);color:var(--paper);position:relative;z-index:2;
+}
+.foot-inner{max-width:1220px;margin-inline:auto;display:flex;flex-wrap:wrap;gap:14px 34px;align-items:baseline;
+  font-family:var(--mono);font-size:.78rem;letter-spacing:.02em;color:var(--paper-4)}
+.foot-inner a{color:var(--paper-3);text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:.25em}
+.foot-inner a:hover{color:var(--paper);text-decoration-color:var(--paper-3)}
+
+/* ─── responsive ───────────────────────────────────────────────────────── */
+
+/* Below the width where all six columns fit, the matrix stops being a grid
+   and becomes one block per capability. A phone never has to drag the page
+   sideways to read it, and a screen reader gets the same sentence order. */
+@media (max-width:940px){
+  .table-scroll{overflow-x:visible;margin-top:26px;padding-bottom:0}
+  table{display:block;min-width:0;width:100%;font-size:1rem}
+  /* the column heads move into the cells themselves, so the row reads as one
+     sentence: capability, then each product and its mark */
+  thead{display:none}
+  tbody,tbody tr,tbody th,tbody td{display:block;width:auto}
+  tbody tr{padding:22px 0;border-bottom:1px solid var(--rule)}
+  tbody tr:last-child{border-bottom:none;padding-bottom:0}
+  tbody th{
+    width:auto;min-width:0;padding:0 0 12px;border-bottom:none;
+    font-size:1.02rem;line-height:1.4;
+  }
+  tbody td{
+    display:flex;align-items:center;justify-content:space-between;gap:18px;
+    width:auto;text-align:left;padding:9px 0;border-bottom:none;
+  }
+  tbody td::before{
+    content:attr(data-col);
+    font-family:var(--mono);font-size:.72rem;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--paper-3);
+  }
+  tbody td.self{padding-left:12px;padding-right:12px;border-radius:3px}
+  tbody td.self::before{color:var(--paper)}
+  .mark-cell{width:auto;flex:0 0 auto}
+  .mark{width:17px;height:17px}
+}
+
+@media (max-width:1120px){
+  .today-grid,.morning-grid{grid-template-columns:minmax(0,1fr)}
+  .status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  /* the wall's unlit half is only wide enough to carry type at desktop
+     widths; below that the message stacks above the photograph and the
+     board is shown at a size it can actually be read at */
+  .hero-stage{height:clamp(300px,46vw,516px)}
+  .voice-shell{display:flex;flex-direction:column;background:var(--ground)}
+  .voice{
+    position:static;width:auto;order:-1;
+    padding:0 var(--gutter) 36px;
+  }
+  .voice .label,.voice-meta{color:var(--paper-4)}
+  /* the panel's own bottom edge is where this line would land at these
+     widths, so it steps off the photograph and becomes a caption under it */
+  .stage-caption{
+    position:static;padding:16px var(--gutter) 0;
+    text-align:left;max-width:none;color:var(--paper-4);text-shadow:none;
+  }
+  .board-small{display:block;padding:28px var(--gutter) 56px}
+  .board-small img{max-width:760px}
+}
+@media (max-width:860px){
+  body{font-size:16px}
+  .hero-say{padding:96px var(--gutter) 30px}
+  .hero-say .display{max-width:none}
+  .hero-stage{height:clamp(210px,45vw,387px)}
+  .board-small img{max-width:none}
+  .unmeasured{grid-template-columns:minmax(0,1fr);gap:24px}
+  .unmeasured-lead{max-width:none}
+  .status-grid{grid-template-columns:minmax(0,1fr);gap:36px}
+  .row{grid-template-columns:minmax(0,1fr);gap:8px;padding:20px 0}
+  .row dt{padding-top:0}
+  .sec{padding:clamp(66px,11vw,96px) var(--gutter)}
+  .banding{height:64px}
+  .close-bg{transform:scale(2.6);transform-origin:0% 88%}
+}
+@media (max-width:520px){
+  .opt{padding:20px 18px;gap:14px}
+  .plate{padding:20px 18px}
+  .plate-sec li{gap:12px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+  .plate.is-refreshing{animation:none}
+}
+@media print{
+  body{background:#fff;color:#000}
+  .hero-stage,.close-bg,.dither::before,.banding{display:none}
+}
+</style>
+</head>
+
+<body>
+<!--
+  THESIS: the photograph is the ground of the page, not an illustration beside
+  it; the fold shows one spoken run-on sentence and the wall it landed on,
+  refusing the feature-grid landing page.
+  OWN-WORLD: near-black #05100d through a deep green field to #4fe3c1, used only
+  on the chosen radio, the send button, a focus ring and one 4.5%-alpha column
+  wash; Nimbus Sans Narrow display over Nimbus Sans text over JetBrains Mono —
+  the renderer's own face; grounds change by dither field and E-Ink refresh
+  banding, never by a rule.
+  STORY: a skeptic sees speech become structure, answers one forced-choice
+  question, reads exactly what is unproven, and leaves without being sold to.
+  FIRST VIEWPORT: centred one-line sentence on near-black; below it the wall at
+  night, ungraded — voice message in the unlit half left, the panel right.
+  PHOTOGRAPHY: the hero and the close are a staged night scene carrying the real
+  device and the real renderer output; the one frame that was actually
+  photographed is the fridge in "Honest status", and only that one says so.
+  FORM: brief-pinned direction 2, Dark Atmospheric (BRIEF.txt); no roll — a
+  brief-pinned direction beats the seed.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->
+
+<!-- shared marks for the comparison matrix: one stroke grammar, drawn not glyphed -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <symbol id="m-yes" viewBox="0 0 16 16"><path d="M2.5 8.6 6 12l7.5-8"/></symbol>
+  <symbol id="m-no" viewBox="0 0 16 16"><path d="M3 8h10"/></symbol>
+  <symbol id="m-arrow" viewBox="0 0 12 12"><path d="M3 9 9 3M4.4 3H9v4.6"/></symbol>
+</svg>
+
+<header class="masthead">
+  <a class="wordmark" href="#top">crtxboard</a>
+  <a class="mast-link" href="https://github.com/moguls753/cortex" rel="noopener">
+    source <svg class="ico" aria-hidden="true"><use href="#m-arrow"/></svg>
+  </a>
+</header>
+
+<!-- ══ 1 · the two panels + one sentence ═══════════════════════════════════ -->
+<section class="hero" id="top">
+  <div class="hero-say">
+    <h1 class="display">You speak. The wall fills in.</h1>
+  </div>
+
+  <div class="voice-shell">
+  <div class="hero-stage">
+    <img src="../assets/scene-dark-wide.jpg"
+         srcset="../assets/scene-dark-1600.jpg 1600w, ../assets/scene-dark-wide.jpg 2048w"
+         sizes="100vw" width="2048" height="1152" fetchpriority="high" decoding="async"
+         alt="A dark wall at night, one lamp glowing far off to the left. The E-Ink panel is the calmest lit thing in the room. It reads: crtxboard, Tuesday 11 August 08:41, 19.4 °C. Under Week Ahead: Thursday, 15:30, Dentist — Lena, tagged Family. Under Don't Forget, an unticked box: Take the bins out.">
+    <div class="grade g1"></div>
+  </div>
+
+    <p class="stage-caption">on the wall — you opened nothing</p>
+
+    <div class="voice">
+      <span class="label">Voice message · Telegram</span>
+      <svg class="wave" viewBox="0 0 300 34" preserveAspectRatio="none" aria-hidden="true">
+        <rect x="0"   y="14" width="3" height="6"  rx="1.5" class="q"/>
+        <rect x="6"   y="11" width="3" height="12" rx="1.5"/>
+        <rect x="12"  y="7"  width="3" height="20" rx="1.5"/>
+        <rect x="18"  y="4"  width="3" height="26" rx="1.5"/>
+        <rect x="24"  y="9"  width="3" height="16" rx="1.5"/>
+        <rect x="30"  y="12" width="3" height="10" rx="1.5"/>
+        <rect x="36"  y="6"  width="3" height="22" rx="1.5"/>
+        <rect x="42"  y="2"  width="3" height="30" rx="1.5"/>
+        <rect x="48"  y="8"  width="3" height="18" rx="1.5"/>
+        <rect x="54"  y="13" width="3" height="8"  rx="1.5" class="q"/>
+        <rect x="60"  y="15" width="3" height="4"  rx="1.5" class="q"/>
+        <rect x="66"  y="10" width="3" height="14" rx="1.5"/>
+        <rect x="72"  y="5"  width="3" height="24" rx="1.5"/>
+        <rect x="78"  y="3"  width="3" height="28" rx="1.5"/>
+        <rect x="84"  y="7"  width="3" height="20" rx="1.5"/>
+        <rect x="90"  y="11" width="3" height="12" rx="1.5"/>
+        <rect x="96"  y="14" width="3" height="6"  rx="1.5" class="q"/>
+        <rect x="102" y="9"  width="3" height="16" rx="1.5"/>
+        <rect x="108" y="4"  width="3" height="26" rx="1.5"/>
+        <rect x="114" y="6"  width="3" height="22" rx="1.5"/>
+        <rect x="120" y="12" width="3" height="10" rx="1.5"/>
+        <rect x="126" y="15" width="3" height="4"  rx="1.5" class="q"/>
+        <rect x="132" y="15" width="3" height="4"  rx="1.5" class="q"/>
+        <rect x="138" y="10" width="3" height="14" rx="1.5"/>
+        <rect x="144" y="5"  width="3" height="24" rx="1.5"/>
+        <rect x="150" y="2"  width="3" height="30" rx="1.5"/>
+        <rect x="156" y="6"  width="3" height="22" rx="1.5"/>
+        <rect x="162" y="9"  width="3" height="16" rx="1.5"/>
+        <rect x="168" y="13" width="3" height="8"  rx="1.5" class="q"/>
+        <rect x="174" y="8"  width="3" height="18" rx="1.5"/>
+        <rect x="180" y="4"  width="3" height="26" rx="1.5"/>
+        <rect x="186" y="7"  width="3" height="20" rx="1.5"/>
+        <rect x="192" y="11" width="3" height="12" rx="1.5"/>
+        <rect x="198" y="14" width="3" height="6"  rx="1.5" class="q"/>
+        <rect x="204" y="10" width="3" height="14" rx="1.5"/>
+        <rect x="210" y="5"  width="3" height="24" rx="1.5"/>
+        <rect x="216" y="3"  width="3" height="28" rx="1.5"/>
+        <rect x="222" y="8"  width="3" height="18" rx="1.5"/>
+        <rect x="228" y="12" width="3" height="10" rx="1.5"/>
+        <rect x="234" y="9"  width="3" height="16" rx="1.5"/>
+        <rect x="240" y="6"  width="3" height="22" rx="1.5"/>
+        <rect x="246" y="10" width="3" height="14" rx="1.5"/>
+        <rect x="252" y="13" width="3" height="8"  rx="1.5" class="q"/>
+        <rect x="258" y="15" width="3" height="4"  rx="1.5" class="q"/>
+        <rect x="264" y="12" width="3" height="10" rx="1.5"/>
+        <rect x="270" y="8"  width="3" height="18" rx="1.5"/>
+        <rect x="276" y="11" width="3" height="12" rx="1.5"/>
+        <rect x="282" y="14" width="3" height="6"  rx="1.5" class="q"/>
+        <rect x="288" y="15" width="3" height="4"  rx="1.5" class="q"/>
+        <rect x="294" y="16" width="3" height="2"  rx="1"   class="q"/>
+      </svg>
+      <p class="voice-text">day after tomorrow dentist for Lena at half three and don&rsquo;t forget to take the bins out</p>
+      <p class="voice-meta">Tuesday 08:41</p>
+    </div>
+
+    <!-- the board itself, legibly, where the photograph is too small to read it -->
+    <figure class="board-small">
+      <img src="../assets/board-crtxboard.png" width="1872" height="1404" loading="lazy" decoding="async"
+           alt="The rendered board: Week Ahead shows Thursday, 15:30, Dentist — Lena, tagged Family. Don't Forget shows one unticked box, Take the bins out.">
+      <figcaption class="label">What the panel above is showing</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ══ 2 · the forced choice — above 2 160 px, radios, never checkboxes ════ -->
+<section class="sec g-ground dither" id="choice">
+  <div class="wrap choice-wrap">
+    <h2 class="h-sec" id="choice-q">Which would you rather?</h2>
+    <p class="choice-note">Nothing opens after you click, and it doesn&rsquo;t ask you for anything.</p>
+
+    <!--
+      IMPLEMENTER: wire this to the self-hosted analytics chosen in
+      landingpage-inhaltsplan.md (Plausible / GoatCounter / Umami) before the
+      page goes live. One event per change, value = the input's value:
+        rather:speak   ·   rather:type
+      Primary metric is the distribution over unique visitors; the page must not
+      ship without it, or the forced choice measures nothing.
+    -->
+    <div class="choice-list" role="radiogroup" aria-labelledby="choice-q">
+      <label class="opt">
+        <input type="radio" name="rather" value="speak" data-choice>
+        <span class="opt-text">I&rsquo;d speak it in and let it sort itself out</span>
+      </label>
+      <label class="opt">
+        <input type="radio" name="rather" value="type" data-choice>
+        <span class="opt-text">I&rsquo;d type it in myself, then it&rsquo;s guaranteed right</span>
+      </label>
+    </div>
+    <p class="choice-ack" id="choice-ack" role="status">Counted. Thank you &mdash; that one is genuinely useful.</p>
+
+    <p class="choice-rule">
+      Both answers are a yes, so the politeness cancels out. It is the one question on this
+      page whose answer I cannot guess, and it decides which half of this is the product.
+    </p>
+  </div>
+</section>
+
+<!-- ══ 3 · how do you solve this today? ═══════════════════════════════════ -->
+<section class="sec g-field" id="today">
+  <div class="wrap today-grid">
+    <div>
+      <h2 class="h-sec">How do you solve this today?</h2>
+      <p class="lede" style="margin-top:22px">
+        Optional, and more useful to me than the click above. Whiteboard, shared calendar,
+        a note on your hand, nothing at all: whatever it actually is.
+      </p>
+      <p class="small" style="margin-top:26px;max-width:46ch">
+        The single most useful sentence this page can collect is
+        &ldquo;I don&rsquo;t &mdash; I just forget.&rdquo; Five of your own scenarios are worth more
+        than a hundred agreeable clicks.
+      </p>
+    </div>
+
+    <!--
+      IMPLEMENTER: point action= at the self-hosted collector and delete the
+      preventDefault in the script at the foot of this file. Nothing is
+      transmitted from this build.
+    -->
+    <form class="field-stack" id="scenario" method="post" action="/answers">
+      <label class="label" for="scenario-text">Right now, I&hellip;</label>
+      <textarea id="scenario-text" name="scenario" rows="6"
+        placeholder="…write it on the whiteboard and then nobody reads the whiteboard."></textarea>
+      <button class="btn" type="submit">Send it</button>
+      <p class="form-ack" id="form-ack" role="status">Thank you. That is the sentence this page was built to collect.</p>
+    </form>
+  </div>
+</section>
+
+<div class="banding" aria-hidden="true"></div>
+
+<!-- ══ what else is already on the wall — the honest field ════════════════ -->
+<section class="sec g-field2 dither" id="field">
+  <div class="wrap">
+    <h2 class="h-sec">What else is already on the wall</h2>
+    <p class="lede" style="margin-top:22px">
+      Voice at the wall is not new. The narrow thing crtxboard does differently is one
+      free-form sentence instead of a list command, sorted on a machine you chose,
+      onto a display that isn&rsquo;t lit.
+    </p>
+
+    <p class="table-note">
+      Compiled by hand in August 2026 from public product pages, not from testing.
+      Nothing in it is benchmarked. If a cell is wrong, open an issue and it changes.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"><span class="sr">Capability</span></th>
+            <th scope="col" class="self">crtxboard</th>
+            <th scope="col">Dæly · Hearth · Skylight</th>
+            <th scope="col">Echo Show</th>
+            <th scope="col">TRMNL</th>
+            <th scope="col">hass-eink-dashboard</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Takes spoken input at all</th>
+            <td class="self" data-col="crtxboard"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="Dæly · Hearth · Skylight"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="Echo Show"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="TRMNL"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="hass-eink-dashboard"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+          </tr>
+          <tr>
+            <th scope="row">One free-form sentence, several things in it, no command form</th>
+            <td class="self" data-col="crtxboard"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="Dæly · Hearth · Skylight"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="Echo Show"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="TRMNL"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="hass-eink-dashboard"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+          </tr>
+          <tr>
+            <th scope="row">Turns what you said into dated entries and open loops</th>
+            <td class="self" data-col="crtxboard"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="Dæly · Hearth · Skylight"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="Echo Show"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="TRMNL"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="hass-eink-dashboard"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+          </tr>
+          <tr>
+            <th scope="row">Transcription and structuring can stay on hardware you own</th>
+            <td class="self" data-col="crtxboard"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="Dæly · Hearth · Skylight"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="Echo Show"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="TRMNL"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="hass-eink-dashboard"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+          </tr>
+          <tr>
+            <th scope="row">Output is unlit E-Ink, not a backlit tablet</th>
+            <td class="self" data-col="crtxboard"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="Dæly · Hearth · Skylight"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="Echo Show"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="TRMNL"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="hass-eink-dashboard"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+          </tr>
+          <tr>
+            <th scope="row">You can buy the hardware from them today</th>
+            <td class="self" data-col="crtxboard"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+            <td data-col="Dæly · Hearth · Skylight"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="Echo Show"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="TRMNL"><span class="mark-cell"><svg class="mark" role="img" aria-label="yes"><use href="#m-yes"/></svg></span></td>
+            <td data-col="hass-eink-dashboard"><span class="mark-cell"><svg class="mark no" role="img" aria-label="no"><use href="#m-no"/></svg></span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="footnote">
+      <strong>Echo Show has done voice at the wall for years, at &euro;329.</strong> That is not in
+      dispute and nothing here claims otherwise. The difference is rows two and four: a whole
+      thought said the way you&rsquo;d say it to a person, taken apart on a machine you picked
+      rather than one picked for you. Whether that is worth anything to you is the question above.
+    </p>
+  </div>
+</section>
+
+<!-- ══ 4 · the second screen ══════════════════════════════════════════════ -->
+<section class="sec g-ground" id="morning">
+  <div class="wrap morning-grid">
+    <div>
+      <h2 class="h-sec">In the morning, a different screen.</h2>
+      <p class="lede" style="margin-top:22px">
+        The wall is what&rsquo;s true all day. The briefing arrives once, by e-mail, before the
+        day starts &mdash; and it is not the same list again: it decides what counts today and it
+        says out loud what has been sitting untouched.
+      </p>
+      <p class="small" style="margin-top:26px;max-width:44ch">
+        This is the second half of the product, and the point at which it stops being a
+        calendar. It goes out over SMTP, so hosting it yourself means giving it a mail server
+        to send through.
+      </p>
+    </div>
+
+    <div>
+      <div class="plate" id="digest">
+        <div class="plate-head">
+          <b>crtxboard &mdash; morning briefing</b>
+          <span>Thursday, 13 August&nbsp;&nbsp;07:00</span>
+        </div>
+
+        <div class="plate-sec">
+          <h3>Top 3 today</h3>
+          <ol>
+            <li><i>1</i><span>Dentist with Lena at 15:30, and the form still isn&rsquo;t signed</span></li>
+            <li><i>2</i><span>Call the landlord back about the heating</span></li>
+            <li><i>3</i><span>Twenty minutes on the tax folder is enough today</span></li>
+          </ol>
+        </div>
+
+        <div class="plate-sec">
+          <h3>Stuck on</h3>
+          <p>The bike service. Said twice, nothing since Friday.</p>
+        </div>
+
+        <div class="plate-sec">
+          <h3>Small win</h3>
+          <p>The bins went out on time.</p>
+        </div>
+
+        <div class="plate-foot">
+          <span>sent by e-mail 07:00</span>
+          <span>crtxboard</span>
+        </div>
+      </div>
+      <p class="plate-note">Example briefing, same household as the panel above</p>
+    </div>
+  </div>
+</section>
+
+<div class="banding flip" aria-hidden="true"></div>
+
+<!-- ══ 5 · where it appears ═══════════════════════════════════════════════ -->
+<section class="sec g-field" id="hardware">
+  <div class="wrap">
+    <h2 class="h-sec">Where it appears</h2>
+    <p class="shout">It runs on a screen you already have.</p>
+
+    <p class="lede" style="margin-top:34px">
+      The board is a PNG fetched over HTTP. Anything that can open a URL can show it, so the
+      cheapest way in costs nothing and the list starts there.
+    </p>
+
+    <dl class="rows">
+      <div class="row">
+        <dt>Free, in your pocket</dt>
+        <dd>The <b>phone you already carry</b>. One bookmark. It is the fastest way to see whether any of this is for you.</dd>
+      </div>
+      <div class="row">
+        <dt>Free, in a drawer</dt>
+        <dd>An <b>old tablet</b>, propped up or screwed to the wall. It displays an image; it does not need to be fast, and it does not need to be supported by anyone any more.</dd>
+      </div>
+      <div class="row">
+        <dt>Free, already on</dt>
+        <dd>A <b>browser tab on the box that is already running</b> &mdash; the same machine serving the board can show it.</dd>
+      </div>
+      <div class="row">
+        <dt>From about &euro;120</dt>
+        <dd>A <b>TRMNL device</b>, which you buy from TRMNL; no hardware has ever shipped from here and none ever will, so this is the only screen on the list you would ever pay for.</dd>
+      </div>
+      <div class="row">
+        <dt>Any bare panel</dt>
+        <dd>Any <b>E-Ink panel</b> that can fetch an image over HTTP, over the open <b>BYOS protocol</b>. No TRMNL account is required, and none is created.</dd>
+      </div>
+      <div class="row">
+        <dt>What is sent to it</dt>
+        <dd>One PNG, <b>4-bit greyscale</b>. The panel does nothing else &mdash; there is nothing to press on the wall.</dd>
+      </div>
+    </dl>
+
+    <p class="footnote">
+      <strong>E-Ink is the one this was built for</strong>, and the reason is not that the
+      others are compromises &mdash; the phone genuinely works, the drawer tablet genuinely
+      works. It is that a panel with no backlight is the only one on that list that can hang
+      in a hallway without being a lit rectangle in the evening, that puts no microphone in
+      the room, and that keeps showing the last board it drew after the power goes off. All
+      of which makes it the best surface for this rather than the requirement for it, and the
+      free ones at the top of the list are still where I would start.
+    </p>
+  </div>
+</section>
+
+<!-- ══ 6 · where it runs — three modes, two doors, one honest table ════════ -->
+<section class="sec g-field2 dither" id="running">
+  <div class="wrap">
+    <h2 class="h-sec">Where it runs</h2>
+    <p class="lede" style="margin-top:22px">
+      Three ways. What changes is who does the work, who is liable, and who notices when it
+      breaks.
+    </p>
+
+    <dl class="rows">
+      <div class="row">
+        <dt>All on your machine</dt>
+        <dd>One compose file brings up Postgres, Whisper, Ollama and the app. It wants a real box &mdash; a NUC, an old desktop, roughly <b>8 GB of RAM free</b>, because the embedding model alone is about <b>4.7 GB</b> on disk. <b>A Raspberry Pi will run the application, but not the transcription.</b></dd>
+      </div>
+      <div class="row">
+        <dt>Your machine, heavy parts on APIs you pick</dt>
+        <dd>The same install, except that transcription and the language model sit at a provider you chose, on your key and your bill. <b>Your contract, not mine</b> &mdash; which also means the box in your flat only has to render an image and talk to a bot, so this is the mode that fits on a Pi.</dd>
+      </div>
+      <div class="row">
+        <dt>My machine</dt>
+        <dd>Nothing to install, no server to keep alive, no updates to apply and no mail server to configure; you tap an invite link and start talking to it.</dd>
+      </div>
+    </dl>
+
+    <p class="footnote">
+      <strong>What you would be paying me for is not really &ldquo;hosting&rdquo;</strong>, which
+      is a word for renting a machine, and the machine is the cheap part of this.
+      I transcribe, I sort, and I notice when it breaks &mdash; those three, which happen to be
+      exactly the three things a small box sitting in a cupboard does badly or not at all.
+    </p>
+
+    <h3 class="h-sub subhead">What actually leaves your house</h3>
+    <p class="body">
+      &ldquo;Nothing leaves your house&rdquo; would be a lie in all three modes, so it is not
+      written anywhere on this page. Your voice message reaches Telegram&rsquo;s servers before
+      anything of yours touches it &mdash; that is how the bot gets the file at all. Here is the
+      rest of it, per mode.
+    </p>
+
+    <div class="table-scroll">
+      <table class="prose leaves">
+        <caption>What leaves the building, in each of the three modes.</caption>
+        <thead>
+          <tr>
+            <th scope="col"><span class="sr">What</span></th>
+            <th scope="col">All on your machine</th>
+            <th scope="col">Your machine + APIs</th>
+            <th scope="col" class="self">My machine</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">The audio you recorded</th>
+            <td data-col="All on your machine">Telegram, then your own box</td>
+            <td data-col="Your machine + APIs">Telegram, then your transcription provider</td>
+            <td class="self" data-col="My machine">Telegram, then me</td>
+          </tr>
+          <tr>
+            <th scope="row">The words you said</th>
+            <td data-col="All on your machine">Stays on your box</td>
+            <td data-col="Your machine + APIs">Your language-model provider, on your key</td>
+            <td class="self" data-col="My machine">Me &mdash; I run the model</td>
+          </tr>
+          <tr>
+            <th scope="row">The board image</th>
+            <td data-col="All on your machine">Your box &rarr; your screen</td>
+            <td data-col="Your machine + APIs">Your box &rarr; your screen</td>
+            <td class="self" data-col="My machine">My box &rarr; your screen</td>
+          </tr>
+          <tr>
+            <th scope="row">Your rough location, for the weather</th>
+            <td data-col="All on your machine"><b>open-meteo, on every render</b></td>
+            <td data-col="Your machine + APIs"><b>open-meteo, on every render</b></td>
+            <td class="self" data-col="My machine"><b>open-meteo, on every render</b></td>
+          </tr>
+          <tr>
+            <th scope="row">Your calendar, if you connect one</th>
+            <td data-col="All on your machine">Google</td>
+            <td data-col="Your machine + APIs">Google</td>
+            <td class="self" data-col="My machine">Google</td>
+          </tr>
+          <tr>
+            <th scope="row">The morning briefing</th>
+            <td data-col="All on your machine">Your mail server</td>
+            <td data-col="Your machine + APIs">Your mail server</td>
+            <td class="self" data-col="My machine">Mine</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="footnote">
+      Which leaves the question of what local transcription is actually worth, given that
+      Telegram has already had the file. It is worth this: <strong>the recording is not then
+      handed to a second company</strong>, and the words go only where you pointed them &mdash;
+      a considerably smaller claim than the one usually made on pages like this one, with the
+      advantage that it survives someone reading the source.
+    </p>
+
+    <h3 class="h-sub subhead">If I run it</h3>
+    <p class="body">
+      Encrypted in transit and encrypted on the disk. Your entries are never used to train
+      anything, and never sold or passed on. The audio recording is discarded once it has been
+      transcribed. Ask for your data and you get it; ask for it to be deleted and it is gone,
+      along with the account. The subprocessors are named rather than summarised: Telegram
+      carries the message, open-meteo answers the weather, Google if you connect a calendar,
+      Hetzner in Germany runs the machine, and a payment provider named in the terms takes the payment. Transcription and
+      sorting happen on that machine, which is the part you are paying for.
+    </p>
+
+    <h3 class="h-sub subhead">Two doors, for two different people</h3>
+    <p class="body">
+      There is one build. No gated feature, no licence check, no code path that behaves
+      differently depending on who is running it &mdash; the hosted backend is a URL in a config
+      field, and both doors lead into the same AGPL-3.0 repository. So which one you take comes
+      down to how you would rather spend your evenings, and not to which version of this you
+      were judged to deserve.
+    </p>
+
+    <div class="table-scroll">
+      <table class="prose doors">
+        <caption>The trade, both ways round. Neither column is the discount version of the other.</caption>
+        <thead>
+          <tr>
+            <th scope="col"><span class="sr">Trade</span></th>
+            <th scope="col">You do the work</th>
+            <th scope="col" class="self">I do the work</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">You get</th>
+            <td data-col="You do the work"><b>Nothing of yours reaches me at all.</b> Not the audio, not the words, not the board.</td>
+            <td class="self" data-col="I do the work"><b>It runs without you.</b> Nothing to update, nothing to restart, no mail server to configure.</td>
+          </tr>
+          <tr>
+            <th scope="row">You give</th>
+            <td data-col="You do the work">A box, electricity, and attention.</td>
+            <td class="self" data-col="I do the work">Money.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="footnote">
+      <strong>The strongest argument for the left column is a legal one rather than a
+      technical one.</strong> A single person running a box for their own household sits
+      inside the GDPR household exemption, Art. 2(2)(c), which means nobody here is anybody
+      else&rsquo;s data controller and no processing agreement has to exist. The parties in the
+      table above do not go away &mdash; Telegram still carries the file, open-meteo still gets
+      the coordinates &mdash; but I am not one of them, and there is nothing between you and
+      them that has to be trusted. I have nothing to sell that competes with that, which is
+      worth saying out loud on a page that is also trying to sell you something.
+    </p>
+
+    <p class="footnote">
+      <strong>The strongest argument for the right column is an argument against
+      myself.</strong> A self-hosted setup fails silently: the bot quietly stops answering,
+      the panel goes on showing Tuesday for three days, and nobody in the household notices,
+      because this is precisely the object that nobody ever opens. That is not a hypothetical
+      risk offered up for balance &mdash; it is the ordinary failure mode of every unattended
+      box in every flat, mine included, and the only thing that has ever fixed it is somebody
+      whose job it is to look.
+    </p>
+
+    <h3 class="h-sub subhead">If you run it yourself</h3>
+    <p class="body">
+      The objection is usually &ldquo;so now I need an API subscription too.&rdquo; You don&rsquo;t,
+      and if you choose one anyway the number is small enough to write out in full. A busy
+      household sends on the order of ten messages a day, so 200&ndash;300 a month. Sorting one
+      costs roughly 700 tokens in and 200 back. At small-model prices &mdash; about $0.10 per
+      million tokens in and $0.40 out &mdash; that is 140&ndash;210k tokens in and 40&ndash;60k
+      out, which comes to <b>€0.03 to €0.05 per household per month</b>. The workings are
+      written out so you can redo them against your own provider instead of taking the figure
+      from me. Run the model locally instead and it costs what your electricity costs, which
+      is the one number I cannot quote for you.
+    </p>
+  </div>
+</section>
+
+<!-- ══ 7 · honest status ══════════════════════════════════════════════════ -->
+<section class="sec g-ground" id="status">
+  <div class="wrap">
+    <h2 class="h-sec">Honest status</h2>
+    <p class="lede" style="margin-top:22px">
+      What it does, what it doesn&rsquo;t, and what nobody has measured. In that order, because
+      the third one is the one that matters.
+    </p>
+
+    <div class="status-grid">
+      <div class="status-col">
+        <h3 class="h-sub">What it does</h3>
+        <ul>
+          <li>Takes a text or voice message in Telegram.</li>
+          <li>Transcribes it, on your machine or on one you pointed it at.</li>
+          <li>Sorts it into dated entries and open loops.</li>
+          <li>Renders the board and pushes it over BYOS. It hangs on a fridge door in my kitchen; the wall scenes on this page are staged, and only the panel and the board in them are real.</li>
+          <li>Writes and sends the morning briefing.</li>
+        </ul>
+      </div>
+      <div class="status-col">
+        <h3 class="h-sub">What it doesn&rsquo;t</h3>
+        <ul>
+          <li>No hardware ships from here, ever. You bring the screen.</li>
+          <li>Nothing on the wall is interactive. The panel is a surface, not a control &mdash; every correction goes back through the chat.</li>
+          <li>The briefing is an e-mail, not a chat message. Self-hosted, that means a mail server you configure.</li>
+          <li>The weather is fetched from open-meteo on every render, in every mode. There is no fully offline board.</li>
+        </ul>
+      </div>
+      <div class="status-col">
+        <h3 class="h-sub">What is not measured</h3>
+        <ul>
+          <li>The accuracy of the sorting step. See below; this one is not a to-do.</li>
+          <li>Nothing here is benchmarked against the products in the table above.</li>
+          <li>Whether this is worth having to anyone but me. That is what the question at the top is for.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="unmeasured">
+      <p class="unmeasured-lead">Accuracy of the sorting step is structurally unmeasurable.</p>
+      <div class="body">
+        <p style="margin:0">
+          Not &ldquo;not measured yet&rdquo;. There is no ground truth for whether a sentence should have
+          become an appointment on Thursday or a loose reminder, because the only person who
+          knows is the one who said it, and their messages are the one corpus that cannot be
+          collected to find out. No benchmark exists, no labelled set exists, and building one
+          out of a household&rsquo;s own voice notes would defeat the thing that makes it worth
+          running at all.
+        </p>
+        <p style="margin:18px 0 0">
+          <strong>So there is no accuracy number anywhere on this page, and there will not be one
+          until that changes.</strong> Everything above describes what the system does, not how
+          well it does it.
+        </p>
+        <p style="margin:18px 0 0">
+          What happens when it gets one wrong is worth saying plainly, because it will.
+          A dentist appointment lands as a loose reminder instead of Thursday at half three, or
+          &ldquo;next Tuesday&rdquo; becomes this one. It is wrong on the wall, in front of the
+          household, until someone says so &mdash; and you say so the same way you said it the
+          first time, in one message. Nothing is lost and nothing has to be re-entered. But it
+          is a system that is occasionally confidently wrong in a place you will read it, and
+          that is the honest shape of the trade.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 8 · technical, at the bottom, for the people who check ═════════════ -->
+<section class="sec g-field dither" id="technical">
+  <div class="wrap">
+    <h2 class="h-sec">Technical</h2>
+    <p class="lede" style="margin-top:22px">Down here on purpose. Nothing above needed it.</p>
+
+    <dl class="rows spec">
+      <div class="row"><dt>Input</dt><dd>Telegram bot. Text or voice message; there is no app to install. The file is fetched from <code>api.telegram.org</code>, which is why Telegram sees the audio first in every mode.</dd></div>
+      <div class="row"><dt>Transcription</dt><dd>Whisper on your own machine, or an API endpoint you point it at.</dd></div>
+      <div class="row"><dt>Sorting</dt><dd>A language model, either local through Ollama or an API endpoint you point it at.</dd></div>
+      <div class="row"><dt>Search</dt><dd>Postgres with pgvector, embeddings from qwen3-embedding at 4096 dimensions. The model is about 4.7&nbsp;GB on disk, and it is the reason the local floor is ~8&nbsp;GB of RAM.</dd></div>
+      <div class="row"><dt>Render</dt><dd>Satori &rarr; resvg &rarr; PNG, re-encoded to 4-bit greyscale. Server-side; the panel is a dumb surface.</dd></div>
+      <div class="row"><dt>Delivery</dt><dd>Open BYOS protocol. No vendor account.</dd></div>
+      <div class="row"><dt>Weather</dt><dd>open-meteo, called on every render, in every mode. No key, no account, coordinates only.</dd></div>
+      <div class="row"><dt>Calendar</dt><dd>Optional Google Calendar connection. Nothing is called if you never connect one.</dd></div>
+      <div class="row"><dt>Second output</dt><dd>The morning briefing, generated and sent by SMTP e-mail. Self-hosted, you supply the mail server.</dd></div>
+      <div class="row"><dt>Hosted mode</dt><dd>One backend URL in the config. Same build, same repository, no licence check anywhere in it.</dd></div>
+      <div class="row"><dt>Also exposed</dt><dd>An MCP server over the same store, so other tools can read and write it. Not a headline feature; listed because you would find it anyway.</dd></div>
+      <div class="row"><dt>Home Assistant</dt><dd>An HA dashboard can embed the same PNG. That is a footnote, not the point of this.</dd></div>
+      <div class="row"><dt>Source</dt><dd><a class="lnk" href="https://github.com/moguls753/cortex" rel="noopener">github.com/moguls753/cortex</a> — still under the old name.</dd></div>
+      <div class="row"><dt>Licence</dt><dd>AGPL-3.0.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ══ 9 · buy ════════════════════════════════════════════════════════════ -->
+<section class="close sec" id="buy">
+  <img class="close-bg" src="../assets/scene-dark-1600.jpg" width="1600" height="900" loading="lazy" decoding="async" alt="">
+  <div class="close-grade" aria-hidden="true"></div>
+
+  <div class="wrap close-inner">
+    <h2 class="h-sec">Let me run it for you.</h2>
+    <p class="lede" style="margin-top:26px">
+      <strong style="color:var(--paper);font-weight:700">About &euro;7 a month, per household.</strong>
+      Monthly, cancel whenever you like.
+    </p>
+
+    <!--
+      IMPLEMENTER: point href at the checkout. The button is real; only the
+      endpoint is not wired in this build.
+    -->
+    <a class="btn btn-buy" href="#buy">Start &mdash; &euro;7 a month</a>
+
+    <div class="body" style="margin-top:36px">
+      <p style="margin:0">
+        Or take the other door: the software is
+        <a class="lnk" href="https://github.com/moguls753/cortex" rel="noopener">on GitHub under AGPL-3.0</a>,
+        it is the same build, and you can have it running on your own box tonight without
+        asking me. Nothing is gated and there is no licence check to fail.
+      </p>
+      <p style="margin:20px 0 0">
+        If you are doing neither today, the click that helps most is still the one up there.
+      </p>
+    </div>
+    <a class="back" href="#choice">
+      <svg class="ico" aria-hidden="true" style="transform:rotate(-45deg)"><use href="#m-arrow"/></svg>
+      Back to the question
+    </a>
+  </div>
+</section>
+
+<footer>
+  <div class="foot-inner">
+    <span>crtxboard</span>
+    <span>August 2026</span>
+    <a href="https://github.com/moguls753/cortex" rel="noopener">github.com/moguls753/cortex</a>
+    <span>AGPL-3.0</span>
+    <span>This page makes no third-party requests.</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* forced choice — reveal the acknowledgement, hand the value to analytics */
+  var ack = document.getElementById('choice-ack');
+  document.querySelectorAll('[data-choice]').forEach(function (input) {
+    input.addEventListener('change', function () {
+      if (!input.checked) return;
+      if (ack) ack.setAttribute('data-on', '');
+      /* IMPLEMENTER: replace with the chosen self-hosted analytics call, e.g.
+         plausible('rather', { props: { answer: input.value } }); */
+      if (window.__crtxboard_record) window.__crtxboard_record('rather', input.value);
+    });
+  });
+
+  /* free text — nothing is transmitted from this build.
+     IMPLEMENTER: delete this handler once action="/answers" exists. */
+  var form = document.getElementById('scenario');
+  var formAck = document.getElementById('form-ack');
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = form.querySelector('textarea');
+      if (!text || !text.value.trim()) { text.focus(); return; }
+      if (formAck) formAck.setAttribute('data-on', '');
+      var btn = form.querySelector('button');
+      if (btn) { btn.disabled = true; btn.textContent = 'Sent'; }
+      text.setAttribute('readonly', '');
+    });
+  }
+
+  /* the one authored moment: an E-Ink panel doing a full refresh, once,
+     when the briefing scrolls into view */
+  var plate = document.getElementById('digest');
+  var still = window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (plate && 'IntersectionObserver' in window && !still.matches) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        io.disconnect();
+        plate.classList.add('is-refreshing');
+        plate.addEventListener('animationend', function () {
+          plate.classList.remove('is-refreshing');
+        }, { once: true });
+      });
+    }, { threshold: 0.55 });
+    io.observe(plate);
+  }
+})();
+</script>
+</body>
+</html>
